@@ -1,0 +1,37 @@
+<!-- Мобильное (бургер) меню сайта (рендерится из данных админки: раздел «Меню сайта») -->
+<div class="bottom_links_wrapper row">
+	{% for item in menu %}
+	<div class="menu-item col-md-4 unvisible {% if item.children %}dropdown{% endif %}   ">
+		<div class="wrap">
+			<a class="{% if item.children %}dropdown-toggle{% endif %}" href="{{ item.url }}">
+				<div class="link-title color-theme-hover">{{ item.title }}</div>
+			</a>
+			{% if item.children %}
+			<span class="tail"></span>
+			<div class="burger-dropdown-menu">
+				<div class="menu-wrapper">
+					{% for child in item.children %}
+					<div class="{% if child.children %}dropdown-submenu{% endif %}   ">
+						<a href="{{ child.url }}" class="color-theme-hover" title="{{ child.title }}">
+							<span class="name option-font-bold">{{ child.title }}</span>
+						</a>
+						{% if child.children %}
+						<div class="burger-dropdown-menu toggle_menu">
+							{% for grand in child.children %}
+							<div class="menu-item   ">
+								<a href="{{ grand.url }}" title="{{ grand.title }}">
+									<span class="name color-theme-hover">{{ grand.title }}</span>
+								</a>
+							</div>
+							{% endfor %}
+						</div>
+						{% endif %}
+					</div>
+					{% endfor %}
+				</div>
+			</div>
+			{% endif %}
+		</div>
+	</div>
+	{% endfor %}
+</div>

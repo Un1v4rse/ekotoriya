@@ -1,0 +1,10 @@
+<!-- Иконки соцсетей (рендерится из данных админки: раздел «Соцсети») -->
+<!-- noindex -->
+<ul>
+	{% for s in socials %}
+	<li class="{{ s.name }}">
+		<a href="{{ s.url }}" target="_blank" rel="nofollow" title="{{ s.title }}">{{ s.title }}</a>
+	</li>
+	{% endfor %}
+</ul>
+<!-- /noindex -->

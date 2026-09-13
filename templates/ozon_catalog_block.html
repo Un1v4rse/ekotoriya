@@ -1,0 +1,47 @@
+<!-- Блок товаров Ozon -->
+{% if ozon_products %}
+<div class="wb-catalog-wrapper" style="padding: 2rem 0; background: #f9f9f9;">
+    <div class="maxwidth-theme">
+        <h2 class="wb-catalog-title" style="font-size: 1.6rem; margin-bottom: 1.5rem;">Товары на Ozon</h2>
+        {% if ozon_demo %}
+        <div class="wb-demo-note" style="background: #fffbe6; border: 1px solid #ffe58f; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem; color: #8c6a00;">
+            Демо-режим: для актуальных цен и фото введите Client-ID и Api-Key Ozon в админке.
+        </div>
+        {% endif %}
+        <div class="wb-products-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.5rem;">
+            {% for p in ozon_products %}
+            <a href="{{ p.url }}" target="_blank" class="wb-product-card" style="display: block; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; background: #fff; text-decoration: none; color: inherit; transition: box-shadow 0.2s;">
+                <div style="padding: 1rem; background: #f9f9f9;">
+                    <img src="/proxy/image?url={{ p.photo | urlencode }}" alt="{{ p.name }}" style="width: 100%; height: 220px; object-fit: contain; display: block;" {% if loop.index0 > 3 %}loading="lazy"{% endif %}>
+                </div>
+                <div style="padding: 1rem;">
+                    <div data-name="{{ p.name }}" style="font-weight: 600; font-size: 0.95rem; line-height: 1.35; min-height: 3.9em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;">{{ p.name }}</div>
+                    <div style="margin-top: 0.75rem; display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap;">
+                        {% if p.final_price < p.price %}
+                        <span style="text-decoration: line-through; color: #999; font-size: 0.9rem;">{{ p.price }} ₽</span>
+                        <span style="color: #c00; font-weight: 700; font-size: 1.15rem;">{{ p.final_price }} ₽</span>
+                        <span style="background: #c00; color: #fff; font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px;">−{{ ((p.price - p.final_price) / p.price * 100) | int }}%</span>
+                        {% else %}
+                        <span style="font-weight: 700; font-size: 1.15rem;">{{ p.price }} ₽</span>
+                        {% endif %}
+                    </div>
+                    {% if p.admin_discount_percent > 0 %}
+                    <div style="margin-top: 0.5rem; font-size: 0.8rem; color: #137333;">Доп. скидка {{ p.admin_discount_percent }}% уже применена</div>
+                    {% endif %}
+                    <div style="margin-top: 0.75rem; font-size: 0.85rem; color: #666;">Артикул: {{ p.id }}</div>
+                    <button type="button" class="wb-like-btn" data-id="{{ p.id }}" data-name="{{ p.name }}" style="margin-top: 0.75rem; width: 100%; background: #fff; color: #c00; border: 1px solid #c00; padding: 0.5rem; border-radius: 6px; cursor: pointer; font-weight: 600;">❤ В избранное</button>
+                    <button type="button" class="wb-buy-btn" data-id="{{ p.id }}" data-name="{{ p.name }}" data-price="{{ p.final_price }}" style="margin-top: 0.5rem; width: 100%; background: #b49d84; color: #fff; border: 0; padding: 0.6rem; border-radius: 6px; cursor: pointer; font-weight: 600;">Купить в 1 клик</button>
+                    <form class="wb-order-form" data-id="{{ p.id }}" style="display:none; margin-top: 0.75rem; padding: 0.75rem; background: #f9f9f9; border-radius: 6px;">
+                        <input type="text" name="name" placeholder="Ваше имя" required style="width:100%; margin-bottom:0.4rem; padding:0.4rem; border:1px solid #ddd; border-radius:4px;">
+                        <input type="tel" name="phone" placeholder="Телефон" required style="width:100%; margin-bottom:0.4rem; padding:0.4rem; border:1px solid #ddd; border-radius:4px;">
+                        <input type="email" name="email" placeholder="Email (необязательно)" style="width:100%; margin-bottom:0.4rem; padding:0.4rem; border:1px solid #ddd; border-radius:4px;">
+                        <button type="submit" style="width:100%; background:#137333; color:#fff; border:0; padding:0.5rem; border-radius:4px; cursor:pointer; font-weight:600;">Оформить заявку</button>
+                        <div class="wb-order-result" style="margin-top:0.4rem; font-size:0.8rem;"></div>
+                    </form>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}

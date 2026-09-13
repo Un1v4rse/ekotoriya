@@ -1,0 +1,41 @@
+<!-- Верхнее меню сайта (рендерится из данных админки: раздел «Меню сайта») -->
+<div class="table-menu">
+<table>
+<tr>
+{% for item in menu %}
+	<td class="menu-item unvisible {% if item.children %}dropdown{% endif %}   ">
+		<div class="wrap">
+			<a class="{% if item.children %}dropdown-toggle{% endif %}" href="{{ item.url }}">
+				<div>{{ item.title }}</div>
+			</a>
+			{% if item.children %}
+			<span class="tail"></span>
+			<div class="dropdown-menu">
+				<div class="customScrollbar scrollblock overscroll-behavior-contain scrollblock--thick">
+					<ul class="menu-wrapper menu-type-1">
+						{% for child in item.children %}
+						<li class="{% if child.children %}dropdown-submenu{% endif %}   parent-items">
+							<a href="{{ child.url }}" title="{{ child.title }}">
+								<span class="name option-font-bold">{{ child.title }}</span>
+							</a>
+							{% if child.children %}
+							<ul class="dropdown-menu toggle_menu">
+								{% for grand in child.children %}
+								<li class="menu-item   ">
+									<a href="{{ grand.url }}" title="{{ grand.title }}"><span class="name">{{ grand.title }}</span></a>
+								</li>
+								{% endfor %}
+							</ul>
+							{% endif %}
+						</li>
+						{% endfor %}
+					</ul>
+				</div>
+			</div>
+			{% endif %}
+		</div>
+	</td>
+{% endfor %}
+</tr>
+</table>
+</div>

@@ -1,0 +1,350 @@
+/*NOTE: This file is intended for programmers. Aspro technical support is not advised to work with him.*/
+
+/* Examples (uncomment to use):*/
+
+/* Expand site width */
+/* body .wrapper { max-width: 1400px !important;  } */
+
+/* Set site background image */
+/* body {  background: url(image_source) top no-repeat; }
+
+/* Hide compare button */
+/* a.compare_item { display: none !important;  }*/
+
+.sputnik-detail-prop-button.desable
+{
+    opacity: 0.5;
+    cursor: not-allowed !important;
+}
+.sputnik-detail-prop-button
+{
+    user-select: none !important;
+}
+.sputnik-item-section-name
+{
+
+}
+.sputnik-size-scroller-container
+{
+
+}
+.sputnik-list-values-wrapper
+{
+    margin: 0;
+}
+.brands img
+{
+	opacity: 1 !important;
+	filter: none !important;
+	-webkit-filter: none !important;
+}
+@media (min-width: 1200px)
+{
+	.main-slider .dark .banner_title a, .main-slider .dark .banner_title span
+	{
+		font-size: 48px !important;
+	}
+	.main-slider .banner_text
+	{
+		font-size: 1.5em !important;
+	}
+}
+@media (min-width: 1500px)
+{
+	.main-slider .dark .banner_title a, .main-slider .dark .banner_title span
+	{
+		font-size: 56px !important;
+	}
+	.main-slider .banner_text
+	{
+		font-size: 1.5em !important;
+	}
+}
+@media all and (max-width: 600px)
+{
+	.css-catalog-list-button-get-price
+	{
+		display: none !important;
+	}
+}
+
+@media (min-width: 992px) {
+	.long_banner header>.header-wrapper {
+		backdrop-filter: blur(5px);
+	}
+}
+
+/*-------------------------------------------------------*/
+body footer .footer_top {
+	padding-bottom: 30px;
+}
+
+.col.socl {
+	position: relative;
+	padding-left: 16px;
+	padding-right: 16px;
+	height: 35px;
+}
+
+.sc_block {
+	display: inline-flex;
+	height: 25px;
+	position: relative;
+	top: 7px;
+	margin: 0 0 0 4px;
+}
+/*.mobilemenu__footer .sc_block {
+	margin: 0 0 0 30px;
+}*/
+.sc_block .ph-head:first-child {
+	margin-right: 10px;
+}
+.sc_block .ph-head a img {
+	width: 35px;
+	height: 35px;
+	border-radius: 10px;
+}
+
+.line-soc {
+	height: 62px;
+	display: flex;
+	align-items: center;
+	margin-right: 10px;
+	/*display: none !important;*/
+}
+
+.line-soc .sc_block {
+	display: flex;
+	top: 0;
+}
+
+.line-soc .sc_block .ph-head a img {
+	width: 25px;
+	height: 25px;
+	border-radius: 50px;
+}
+
+.line2-soc {
+	display: flex;
+	align-items: center;
+	/*display: none !important;*/
+}
+
+.line2-soc .sc_block {
+	display: flex;
+	top: 0;
+}
+
+.line2-soc .sc_block .ph-head a img {
+	width: 25px;
+	height: 25px;
+	border-radius: 50px;
+}
+
+
+/*-------------------- Spec-block --------------------*/
+.cnt-block {
+	height: 260px;
+	margin: 30px 0 30px 0;
+	background: url("/static/bitrix/templates/aspro_max/images/cnt-bg.png") 0 0 no-repeat;
+}
+.cnt-block_txt {
+	width: 660px;
+	padding: 52px 0 0 44px;
+	color: #2E2E2E;
+	font-family: Montserrat;
+	font-size: 29.2px;
+	font-style: normal;
+	font-weight: 500;
+	line-height: normal;
+}
+.cnt-block_txt span {
+	font-weight: 700;
+}
+.cnt-block_btns {
+	margin: 30px 0 0 0;
+	display: flex;
+	gap: 20px;
+	height: 52px;
+}
+.cnt-block_btn {
+	margin-left: 44px;
+	text-decoration: none;
+	display: flex;
+	width: 255px;
+	height: 52px;
+	padding: 10.372px 25.929px 8px 25.929px;
+	justify-content: center;
+	align-items: center;
+	gap: 10.372px;
+	flex-shrink: 0;
+	border-radius: 51.858px;
+	background: #B19E86;
+	color: #FFF;
+	font-family: Montserrat;
+	font-size: 16px;
+	font-style: normal;
+	font-weight: 500;
+	line-height: 140%; /* 22.4px */
+	text-transform: uppercase;
+}
+.cnt-block_btn:hover {
+	color: #FFF;
+	text-decoration: none;
+}
+.cnt-block .sc_block {
+	height: 52px;
+	top: 0;
+	margin: 0 0 0 0;
+}
+.cnt-block .sc_block .ph-head a img {
+	width: 52px;
+	height: 52px;
+	border-radius: 50%;
+}
+
+.ozonWbDetailWrap {
+	display: grid;
+	grid-template-columns: repeat(2,1fr);
+}
+
+.wbDetailBtn {
+	height: 50px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(133, 18, 141, 1);
+	color: #fff;
+	text-align: center;
+	font-weight: 500;
+	font-size: 12px;
+	text-transform: uppercase;
+	border: none;
+	border-radius: 0;
+}
+
+.ozonDetailBtn {
+	height: 50px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(0, 93, 246, 1);
+	color: #fff;
+	text-align: center;
+	font-weight: 500;
+	font-size: 12px;
+	text-transform: uppercase;
+	border: none;
+	border-radius: 0;
+}
+
+.headerFlexWrap {
+	display: flex;
+	justify-content: space-between;
+	gap: 50px;
+	align-items: center;
+}
+
+.headerTitle {
+	flex: none;
+}
+
+.headerBannerBg {
+	background: url("/static/upload/medialibrary/5ef/quet4at1b83cxlll5655xyxluc8iqwy9.jpg") center;
+	background-size: cover;
+	padding: 40px 35px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 30px;
+	width: 100%;
+}
+
+.headerBannerText {
+	font-weight: 500;
+	font-size: 18px;
+	text-transform: uppercase;
+	color: #fff;
+}
+
+.headerBannerText span {
+	font-weight: 700;
+}
+
+.headerBannerBtn {
+	height: 50px;
+	border-radius: 61px;
+	width: 150px;
+	text-transform: uppercase;
+	color: #fff;
+	border: 2px solid #fff;
+	background: transparent;
+	font-weight: 700;
+	font-size: 16px;
+}
+
+.optPriceDetailBtn {
+	height: 50px;
+	border: 1px solid rgba(180, 157, 132, 1);
+	background: rgba(251, 245, 238, 1);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	color: rgba(177, 158, 134, 1);
+	text-transform: uppercase;
+	font-weight: 500;
+	font-size: 12px;
+	cursor: pointer;
+	transition: all .3s;
+	width: 100%;
+}
+
+.optPriceDetailBtn:hover {
+	background: #b49d84;
+	color: #fff;
+}
+
+@media (max-width: 900px) {
+	.headerFlexWrap {
+		flex-direction: column;
+		align-items: start;
+		gap: 15px;
+	}
+}
+
+@media (max-width: 720px) {
+	.cnt-block {
+		height: auto;
+		background-position: 75% 0;
+		background-size: cover;
+		padding-bottom: 30px;
+	}
+	.cnt-block_txt {
+		width: auto;
+		padding: 30px 20px 0 20px;
+		font-size: 20px;
+	}
+	.cnt-block_btn {
+		margin-left: 20px;
+	}
+	.cnt-block_btns {
+		margin: 20px 0 0 0;
+		display: flex;
+		gap: 20px;
+		height: auto;
+		flex-wrap: wrap;
+	}
+	.cnt-block .sc_block {
+		margin: 0 0 0 20px;
+	}
+}
+
+@media (max-width: 600px) {
+	.headerBannerBg {
+		padding: 20px;
+		flex-direction: column;
+		gap: 15px;
+		align-items: start;
+	}
+}

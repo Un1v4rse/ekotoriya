@@ -1,0 +1,239 @@
+/* Редактор страницы прямо на сайте (оверлей, подключается только в режиме /admin/page/<slug>) */
+
+#pe-topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100000;
+    background: #2b2620;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 1rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 0.88rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+#pe-topbar .pe-title { font-weight: 700; margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#pe-topbar button {
+    border: 0;
+    border-radius: 6px;
+    padding: 0.4rem 0.9rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-family: inherit;
+    background: #4a4238;
+    color: #fff;
+}
+#pe-topbar button:hover { background: #5d5447; }
+#pe-topbar button.pe-save { background: #b49d84; color: #fff; }
+#pe-topbar button.pe-save:hover { background: #9a8269; }
+#pe-topbar button.pe-exit { background: transparent; border: 1px solid #6a6154; }
+#pe-topbar .pe-status { color: #b8ad9d; font-size: 0.8rem; }
+body.pe-active { padding-top: 46px; }
+
+/* Подсветка блока под курсором / выбранного */
+.pe-highlight {
+    position: absolute;
+    z-index: 99990;
+    pointer-events: none;
+    outline: 2px solid rgba(180, 157, 132, 0.9);
+    outline-offset: -1px;
+    background: rgba(180, 157, 132, 0.07);
+    display: none;
+}
+.pe-highlight.pe-hover { outline-style: dashed; outline-width: 1px; background: rgba(180, 157, 132, 0.04); }
+.pe-highlight.pe-selected { outline-width: 2px; background: rgba(180, 157, 132, 0.1); }
+
+/* Панель инструментов блока */
+.pe-toolbar {
+    position: absolute;
+    top: -34px;
+    left: 0;
+    display: none;
+    align-items: center;
+    gap: 2px;
+    background: #2b2620;
+    border-radius: 7px 7px 0 0;
+    padding: 3px 6px;
+    pointer-events: auto;
+    white-space: nowrap;
+}
+.pe-toolbar .pe-tb-name { color: #cfc3b2; font-size: 0.72rem; font-weight: 700; margin-right: 4px; }
+.pe-toolbar button {
+    border: 0;
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.82rem;
+    width: 26px;
+    height: 26px;
+    border-radius: 5px;
+    line-height: 1;
+}
+.pe-toolbar button:hover { background: #b49d84; }
+.pe-toolbar button.pe-tb-del:hover { background: #c00; }
+
+/* Кнопка «+» между блоками */
+.pe-addbtn {
+    position: absolute;
+    z-index: 99991;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    background: #b49d84;
+    color: #fff;
+    font-size: 1.15rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+    transform: translate(-50%, 50%);
+}
+.pe-addbtn:hover { background: #9a8269; transform: translate(-50%, 50%) scale(1.1); }
+
+/* Линия вставки при перетаскивании */
+.pe-drop-line {
+    position: absolute;
+    z-index: 99995;
+    height: 3px;
+    background: #b49d84;
+    display: none;
+    pointer-events: none;
+    box-shadow: 0 0 6px rgba(180,157,132,0.8);
+}
+
+/* Индикатор inline-редактирования текста */
+.pe-editable-on { outline: 2px dashed #b49d84 !important; outline-offset: 2px; cursor: text !important; min-height: 1em; }
+
+/* Правая панель настроек блока */
+#pe-drawer {
+    position: fixed;
+    top: 46px;
+    right: 0;
+    bottom: 0;
+    width: 360px;
+    z-index: 99999;
+    background: #fff;
+    box-shadow: -4px 0 18px rgba(0,0,0,0.18);
+    transform: translateX(105%);
+    transition: transform 0.22s ease;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    color: #333;
+}
+#pe-drawer.open { transform: translateX(0); }
+#pe-drawer .pe-drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.7rem 1rem;
+    background: #f7f3ee;
+    border-bottom: 1px solid #e5ddd2;
+    font-weight: 700;
+    font-size: 0.92rem;
+}
+#pe-drawer .pe-drawer-head button {
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-size: 1rem;
+    color: #888;
+}
+#pe-drawer .pe-drawer-body { padding: 1rem; overflow-y: auto; flex: 1; font-size: 0.9rem; }
+#pe-drawer label { display: block; font-weight: 600; margin-bottom: 0.3rem; font-size: 0.83rem; }
+#pe-drawer .field { margin-bottom: 0.9rem; }
+#pe-drawer input[type="text"], #pe-drawer input[type="number"], #pe-drawer textarea, #pe-drawer select {
+    width: 100%;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid #ddd;
+    border-radius: 7px;
+    font-size: 0.9rem;
+    font-family: inherit;
+}
+#pe-drawer input[type="color"] { width: 56px; height: 36px; padding: 2px; border: 1px solid #ddd; border-radius: 7px; }
+#pe-drawer textarea { min-height: 90px; resize: vertical; }
+#pe-drawer .help { color: #888; font-size: 0.8rem; margin-top: 0.25rem; }
+#pe-drawer .preview-img img { max-width: 100%; border: 1px solid #ddd; border-radius: 6px; }
+
+/* Поповер параметров страницы */
+#pe-pageprops {
+    position: fixed;
+    top: 52px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 99999;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+    padding: 1rem;
+    width: 480px;
+    max-width: 92vw;
+    display: none;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    color: #333;
+    font-size: 0.9rem;
+}
+#pe-pageprops.open { display: block; }
+#pe-pageprops label { display: block; font-weight: 600; margin-bottom: 0.25rem; font-size: 0.8rem; }
+#pe-pageprops .field { margin-bottom: 0.7rem; }
+#pe-pageprops input, #pe-pageprops textarea {
+    width: 100%;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid #ddd;
+    border-radius: 7px;
+    font-size: 0.9rem;
+    font-family: inherit;
+}
+
+/* Галерея блоков (попап на странице) */
+#pe-gallery-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(30, 25, 20, 0.55);
+    z-index: 100001;
+    display: none;
+    overflow-y: auto;
+    padding: 3rem 1rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+}
+#pe-gallery-overlay.open { display: block; }
+#pe-gallery {
+    max-width: 880px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 14px;
+    padding: 1.3rem 1.5rem;
+    color: #333;
+}
+#pe-gallery .pe-gallery-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+#pe-gallery .pe-gallery-head h3 { margin: 0; }
+#pe-gallery .pe-gallery-close { border: 0; background: #f0f0f0; border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 1rem; }
+#pe-gallery .pe-gallery-close:hover { background: #c00; color: #fff; }
+#pe-gallery .pe-gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.9rem; }
+#pe-gallery .gcard { border: 2px solid #e2e2e2; border-radius: 10px; padding: 0.6rem; cursor: pointer; background: #fff; }
+#pe-gallery .gcard:hover { border-color: #b49d84; background: #fbf8f4; }
+#pe-gallery .gmock {
+    height: 84px; border-radius: 7px; background: #f4f4f8;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 5px; padding: 10px; overflow: hidden;
+}
+#pe-gallery .gname { font-weight: 700; font-size: 0.86rem; margin-top: 0.45rem; text-align: center; }
+#pe-gallery .gdesc { color: #999; font-size: 0.74rem; margin-top: 0.12rem; text-align: center; }
+#pe-gallery .gm-bar { background: #cfcfcf; border-radius: 3px; }
+#pe-gallery .gm-img { width: 100%; height: 100%; background: #e2e2e8; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 1.3rem; }
+#pe-gallery .gm-btn { background: #b49d84; color: #fff; border-radius: 20px; padding: 4px 18px; font-size: 0.7rem; font-weight: 700; }
+#pe-gallery .gm-video { width: 100%; height: 100%; background: #3a3a3a; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.25rem; }
+#pe-gallery .gm-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; width: 100%; }
+#pe-gallery .gm-card-mini { background: #fff; border: 1px solid #ddd; border-radius: 4px; height: 32px; padding: 3px; }
+#pe-gallery .gm-card-mini .im { background: #eee; height: 14px; border-radius: 2px; }
+#pe-gallery .gm-card-mini .tx { background: #ddd; height: 5px; border-radius: 2px; margin-top: 4px; }
+#pe-gallery .gm-line { width: 80%; height: 2px; background: #cfcfcf; }
+#pe-gallery .gm-code { color: #999; font-family: monospace; font-size: 1rem; }

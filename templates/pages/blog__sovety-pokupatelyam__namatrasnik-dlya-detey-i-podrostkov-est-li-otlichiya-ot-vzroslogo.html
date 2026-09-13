@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ru" lang="ru"  >
+<head>
+	<title>{{ page.title }}</title>
+	<meta name="viewport" content="initial-scale=1.0, width=device-width, maximum-scale=1" />
+	<meta name="HandheldFriendly" content="true" />
+	<meta name="yes" content="yes" />
+	<meta name="apple-mobile-web-app-status-bar-style" content="black" />
+	<meta name="SKYPE_TOOLBAR" content="SKYPE_TOOLBAR_PARSER_COMPATIBLE" />
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="description" content="{{ page.meta_description }}" />
+<link href="/static/bitrix/css/aspro.max/notice.min.css" rel="stylesheet"/>
+<link href="/static/bitrix/cache/css/s1/aspro_max/page_ac677a330733c397c0ed512372b32732/page_ac677a330733c397c0ed512372b32732_v1.css" rel="stylesheet"/>
+<link href="/static/bitrix/cache/css/s1/aspro_max/template_5deba6f38b83b78c13eff0a201204194/template_5deba6f38b83b78c13eff0a201204194_v1.css" rel="stylesheet" data-template-style="true"/>
+<script>if(!window.BX)window.BX={};if(!window.BX.message)window.BX.message=function(mess){if(typeof mess==='object'){for(let i in mess) {BX.message[i]=mess[i];} return true;{{ '}}' }};</script>
+<script>(window.BX||top.BX).message({"pull_server_enabled":"N","pull_config_timestamp":0,"shared_worker_allowed":"Y","pull_guest_mode":"N","pull_guest_user_id":0,"pull_worker_mtime":1753868445});(window.BX||top.BX).message({"PULL_OLD_REVISION":"Для продолжения корректной работы с сайтом необходимо перезагрузить страницу."});</script>
+<script>(window.BX||top.BX).message({"MAIN_BASELINE_BROWSER_OUTDATED":"Вы используете устаревшую версию браузера. Обновите его для безопасной и стабильной работы","MAIN_BASELINE_DETAILS":"Подробнее","MAIN_BASELINE_CLOSE":"Закрыть"});</script>
+<script type="extension/settings" data-extension="main.baseline">{"collectData":false,"helpUrl":"https:\/\/helpdesk.bitrix24.ru\/open\/code_27229654\/","helpCode":"redirect=detail\u0026code=27229654"}</script>
+<script src="/static/bitrix/js/main/baseline/dist/baseline.bundle.min.js"></script>
+<script>(window.BX||top.BX).message({"JS_CORE_LOADING":"Загрузка...","JS_CORE_NO_DATA":"- Нет данных -","JS_CORE_WINDOW_CLOSE":"Закрыть","JS_CORE_WINDOW_EXPAND":"Развернуть","JS_CORE_WINDOW_NARROW":"Свернуть в окно","JS_CORE_WINDOW_SAVE":"Сохранить","JS_CORE_WINDOW_CANCEL":"Отменить","JS_CORE_WINDOW_CONTINUE":"Продолжить","JS_CORE_H":"ч","JS_CORE_M":"м","JS_CORE_S":"с","JSADM_AI_HIDE_EXTRA":"Скрыть лишние","JSADM_AI_ALL_NOTIF":"Показать все","JSADM_AUTH_REQ":"Требуется авторизация!","JS_CORE_WINDOW_AUTH":"Войти","JS_CORE_IMAGE_FULL":"Полный размер"});</script>
+<script src="/static/bitrix/js/main/core/core.min.js"></script>
+<script>BX.Runtime.registerExtension({"name":"main.core","namespace":"BX","loaded":true});</script>
+<script>BX.setJSList(["\/bitrix\/js\/main\/core\/core_ajax.js","\/bitrix\/js\/main\/core\/core_promise.js","\/bitrix\/js\/main\/polyfill\/promise\/js\/promise.js","\/bitrix\/js\/main\/loadext\/loadext.js","\/bitrix\/js\/main\/loadext\/extension.js","\/bitrix\/js\/main\/polyfill\/promise\/js\/promise.js","\/bitrix\/js\/main\/polyfill\/find\/js\/find.js","\/bitrix\/js\/main\/polyfill\/includes\/js\/includes.js","\/bitrix\/js\/main\/polyfill\/matches\/js\/matches.js","\/bitrix\/js\/ui\/polyfill\/closest\/js\/closest.js","\/bitrix\/js\/main\/polyfill\/fill\/main.polyfill.fill.js","\/bitrix\/js\/main\/polyfill\/find\/js\/find.js","\/bitrix\/js\/main\/polyfill\/matches\/js\/matches.js","\/bitrix\/js\/main\/polyfill\/core\/dist\/polyfill.bundle.js","\/bitrix\/js\/main\/core\/core.js","\/bitrix\/js\/main\/polyfill\/intersectionobserver\/js\/intersectionobserver.js","\/bitrix\/js\/main\/lazyload\/dist\/lazyload.bundle.js","\/bitrix\/js\/main\/polyfill\/core\/dist\/polyfill.bundle.js","\/bitrix\/js\/main\/parambag\/dist\/parambag.bundle.js"]);
+</script>
+<script>BX.Runtime.registerExtension({"name":"aspro_logo","namespace":"window","loaded":true});</script>
+<script>(window.BX||top.BX).message({"NOTICE_ADDED2CART":"В корзине","NOTICE_CLOSE":"Закрыть","NOTICE_MORE":"и ещё #COUNT# #PRODUCTS#","NOTICE_PRODUCT0":"товаров","NOTICE_PRODUCT1":"товар","NOTICE_PRODUCT2":"товара","NOTICE_ADDED2DELAY":"В отложенных","NOTICE_ADDED2COMPARE":"В сравнении","NOTICE_ERROR":"Ошибка","NOTICE_REQUEST_ERROR":"Ошибка запроса","NOTICE_AUTHORIZED":"Вы успешно авторизовались","NOTICE_ADDED2FAVORITE":"В избранном","NOTICE_ADDED2SUBSCRIBE":"Вы подписались","NOTICE_REMOVED_FROM_COMPARE":"Удалено из сравнения","NOTICE_REMOVED_FROM_FAVORITE":"Удалено из избранного","NOTICE_REMOVED_FROM_SUBSCRIBE":"Удалено из подписки"});</script>
+<script>BX.Runtime.registerExtension({"name":"aspro_notice","namespace":"window","loaded":true});</script>
+<script>(window.BX||top.BX).message({"CT_BST_SEARCH_BUTTON2":"Найти","SEARCH_IN_SITE_FULL":"По всему сайту","SEARCH_IN_SITE":"Везде","SEARCH_IN_CATALOG_FULL":"По каталогу","SEARCH_IN_CATALOG":"Каталог"});</script>
+<script>BX.Runtime.registerExtension({"name":"aspro_searchtitle","namespace":"window","loaded":true});</script>
+<script>BX.Runtime.registerExtension({"name":"aspro_line_block","namespace":"window","loaded":true});</script>
+<script>BX.Runtime.registerExtension({"name":"aspro_mega_menu","namespace":"window","loaded":true});</script>
+<script>BX.Runtime.registerExtension({"name":"aspro_fancybox","namespace":"window","loaded":true});</script>
+<script>BX.Runtime.registerExtension({"name":"aspro_countdown","namespace":"window","loaded":true});</script>
+<script>BX.Runtime.registerExtension({"name":"aspro_animation_ext","namespace":"window","loaded":true});</script>
+<script type="extension/settings" data-extension="currency.currency-core">{"region":"ru"}</script>
+<script>BX.Runtime.registerExtension({"name":"currency.currency-core","namespace":"BX.Currency","loaded":true});</script>
+<script>BX.Runtime.registerExtension({"name":"currency","namespace":"window","loaded":true});</script>
+<script>(window.BX||top.BX).message({"LANGUAGE_ID":"ru","FORMAT_DATE":"DD.MM.YYYY","FORMAT_DATETIME":"DD.MM.YYYY HH:MI:SS","COOKIE_PREFIX":"BITRIX_SM","SERVER_TZ_OFFSET":"10800","UTF_MODE":"Y","SITE_ID":"s1","SITE_DIR":"\/","USER_ID":"","SERVER_TIME":1787602812,"USER_TZ_OFFSET":0,"USER_TZ_AUTO":"Y","bitrix_sessid":"cfd41296ff59cb5af280a399bfbadb88"});</script>
+
+<script src="/static/bitrix/js/pull/protobuf/protobuf.js"></script>
+<script src="/static/bitrix/js/pull/protobuf/model.min.js"></script>
+<script src="/static/bitrix/js/main/core/core_promise.js"></script>
+<script src="/static/bitrix/js/rest/client/rest.client.min.js"></script>
+<script src="/static/bitrix/js/pull/client/pull.client.min.js"></script>
+<script src="/static/bitrix/js/main/ajax.min.js"></script>
+<script src="/static/bitrix/js/aspro.max/notice.min.js"></script>
+<script src="/static/bitrix/js/currency/currency-core/dist/currency-core.bundle.min.js"></script>
+<script src="/static/bitrix/js/currency/core_currency.min.js"></script>
+<script>BX.setJSList(["\/bitrix\/templates\/aspro_max\/components\/bitrix\/news.detail\/news\/script.js","\/bitrix\/templates\/aspro_max\/js\/jquery.fancybox.min.js","\/bitrix\/templates\/aspro_max\/js\/countdown.js","\/bitrix\/templates\/aspro_max\/js\/lite.bootstrap.js","\/bitrix\/templates\/aspro_max\/js\/jquery.actual.min.js","\/bitrix\/templates\/aspro_max\/vendor\/js\/ripple.js","\/bitrix\/templates\/aspro_max\/js\/browser.js","\/bitrix\/templates\/aspro_max\/vendor\/js\/sticky-sidebar.js","\/bitrix\/templates\/aspro_max\/js\/jquery.alphanumeric.js","\/bitrix\/templates\/aspro_max\/js\/jquery.cookie.js","\/bitrix\/templates\/aspro_max\/js\/mobile.js","\/bitrix\/templates\/aspro_max\/js\/main.js","\/bitrix\/templates\/aspro_max\/js\/blocks\/blocks.js","\/bitrix\/templates\/aspro_max\/js\/logo.min.js","\/bitrix\/templates\/aspro_max\/js\/autoload\/dropdown-product.js","\/bitrix\/templates\/aspro_max\/js\/autoload\/item-action.js","\/bitrix\/templates\/aspro_max\/js\/autoload\/select_offer_load.js","\/bitrix\/templates\/aspro_max\/js\/jquery.validate.js","\/bitrix\/templates\/aspro_max\/js\/conditional\/validation.js","\/bitrix\/templates\/aspro_max\/js\/jquery.uniform.min.js","\/bitrix\/components\/bitrix\/search.title\/script.js","\/bitrix\/templates\/aspro_max\/components\/bitrix\/search.title\/mega_menu\/script.js","\/bitrix\/templates\/aspro_max\/js\/searchtitle.js","\/bitrix\/templates\/aspro_max\/components\/bitrix\/menu\/menu_in_burger\/script.js","\/bitrix\/templates\/aspro_max\/components\/bitrix\/menu\/top\/script.js","\/bitrix\/templates\/aspro_max\/js\/mega_menu.js","\/bitrix\/templates\/aspro_max\/components\/bitrix\/news.list\/banners\/script.js","\/bitrix\/templates\/aspro_max\/components\/bitrix\/menu\/bottom\/script.js","\/bitrix\/templates\/aspro_max\/components\/bitrix\/search.title\/fixed\/script.js","\/bitrix\/templates\/aspro_max\/js\/custom.js"]);</script>
+<script>BX.setCSSList(["\/bitrix\/templates\/aspro_max\/components\/bitrix\/news\/blog\/style.css","\/bitrix\/templates\/aspro_max\/css\/animation\/animate.min.css","\/bitrix\/templates\/aspro_max\/css\/animation\/animation_ext.css","\/bitrix\/templates\/aspro_max\/components\/bitrix\/news.detail\/news\/style.css","\/bitrix\/templates\/aspro_max\/css\/jquery.fancybox.min.css","\/bitrix\/templates\/aspro_max\/css\/fonts\/montserrat\/css\/montserrat.min.css","\/bitrix\/templates\/aspro_max\/css\/blocks\/dark-light-theme.css","\/bitrix\/templates\/aspro_max\/css\/colored.css","\/bitrix\/templates\/aspro_max\/css\/lite.bootstrap.css","\/bitrix\/templates\/aspro_max\/css\/styles.css","\/bitrix\/templates\/aspro_max\/css\/blocks\/blocks.css","\/bitrix\/templates\/aspro_max\/css\/blocks\/common.blocks\/counter-state\/counter-state.css","\/bitrix\/templates\/aspro_max\/css\/menu.css","\/bitrix\/templates\/aspro_max\/css\/catalog.css","\/bitrix\/templates\/aspro_max\/vendor\/css\/ripple.css","\/bitrix\/templates\/aspro_max\/css\/stores.css","\/bitrix\/templates\/aspro_max\/css\/yandex_map.css","\/bitrix\/templates\/aspro_max\/css\/header_fixed.css","\/bitrix\/templates\/aspro_max\/ajax\/ajax.css","\/bitrix\/templates\/aspro_max\/css\/searchtitle.css","\/bitrix\/templates\/aspro_max\/css\/blocks\/line-block.min.css","\/bitrix\/templates\/aspro_max\/components\/bitrix\/menu\/top\/style.css","\/bitrix\/templates\/aspro_max\/css\/mega_menu.css","\/bitrix\/templates\/aspro_max\/components\/bitrix\/breadcrumb\/main\/style.css","\/bitrix\/templates\/aspro_max\/css\/left_block_main_page.css","\/bitrix\/templates\/aspro_max\/components\/bitrix\/menu\/left_menu\/style.css","\/bitrix\/templates\/aspro_max\/css\/footer.css","\/bitrix\/components\/aspro\/marketing.popup\/templates\/max\/style.css","\/bitrix\/templates\/aspro_max\/styles.css","\/bitrix\/templates\/aspro_max\/template_styles.css","\/bitrix\/templates\/aspro_max\/css\/header.css","\/bitrix\/templates\/aspro_max\/css\/media.css","\/bitrix\/templates\/aspro_max\/css\/h1-normal.css","\/bitrix\/templates\/aspro_max\/css\/round-elements.css","\/bitrix\/templates\/aspro_max\/themes\/custom_s1\/theme.css","\/bitrix\/templates\/aspro_max\/css\/widths\/width-3.css","\/bitrix\/templates\/aspro_max\/css\/fonts\/font-10.css","\/bitrix\/templates\/aspro_max\/css\/custom.css"]);</script>
+<script>
+					(function () {
+						"use strict";
+						var counter = function ()
+						{
+							var cookie = (function (name) {
+								var parts = ("; " + document.cookie).split("; " + name + "=");
+								if (parts.length == 2) {
+									try {return JSON.parse(decodeURIComponent(parts.pop().split(";").shift()));}
+									catch (e) {}
+								}
+							})("BITRIX_CONVERSION_CONTEXT_s1");
+							if (cookie && cookie.EXPIRE >= BX.message("SERVER_TIME"))
+								return;
+							var request = new XMLHttpRequest();
+							request.open("POST", "/static/bitrix/tools/conversion/ajax_counter.php", true);
+							request.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+							request.send(
+								"SITE_ID="+encodeURIComponent("s1")+
+								"&sessid="+encodeURIComponent(BX.bitrix_sessid())+
+								"&HTTP_REFERER="+encodeURIComponent(document.referrer)
+							);
+						};
+						if (window.frameRequestStart === true)
+							BX.addCustomEvent("onFrameDataReceived", counter);
+						else
+							BX.ready(counter);
+					})();
+				</script>
+<link href="/static/bitrix/templates/aspro_max/css/critical.min.css" data-skip-moving="true" rel="stylesheet">
+<meta name="theme-color" content="#b49d84">
+<style>:root{--theme-base-color: #b49d84;--theme-base-opacity-color: #b49d841a;--theme-base-color-hue:31;--theme-base-color-saturation:24%;--theme-base-color-lightness:61%;}</style>
+<style>html {--theme-page-width: 1348px;--theme-page-width-padding: 30px}</style>
+<script src="/static/bitrix/templates/aspro_max/js/observer.js" async defer></script>
+<script data-skip-moving="true">window.lazySizesConfig = window.lazySizesConfig || {};lazySizesConfig.loadMode = 1;lazySizesConfig.expand = 200;lazySizesConfig.expFactor = 1;lazySizesConfig.hFac = 0.1;window.lazySizesConfig.loadHidden = false;window.lazySizesConfig.lazyClass = "lazy";</script>
+<script src="/static/bitrix/templates/aspro_max/js/ls.unveilhooks.min.js" data-skip-moving="true" defer></script>
+<script src="/static/bitrix/templates/aspro_max/js/lazysizes.min.js" data-skip-moving="true" defer></script>
+<link href="/static/bitrix/templates/aspro_max/css/print.css" data-template-style="true" rel="stylesheet" media="print">
+                    <script src="/static/bitrix/templates/aspro_max/js/app.min.js"></script>
+                    <script data-skip-moving="true" src="/static/bitrix/js/main/jquery/jquery-3.6.0.min.js"></script>
+                    <script data-skip-moving="true" src="/static/bitrix/templates/aspro_max/js/speed.min.js"></script>
+<link rel="shortcut icon" href="/static/favicon.ico" type="image/x-icon" />
+<link rel="apple-touch-icon" sizes="180x180" href="/static/include/apple-touch-icon.png" />
+<link rel="alternate" type="application/rss+xml" title="rss" href="/blog/rss/" />
+<meta property="og:description" content="Наматрасник для детей и подростков: есть ли отличия от взрослого? Эксперты Экотории дают советы покупателям по выбору приобретению наматрасников и постельного белья. Наш блог" />
+<meta property="og:image" content="https://ekotoriya.ru/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg" />
+<link rel="image_src" href="https://ekotoriya.ru/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg"  />
+<meta property="og:title" content="{{ page.title }}" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="{{ page.url }}" />
+<script src="/static/bitrix/templates/aspro_max/js/fetch/bottom_panel.min.js" defer=""></script>
+
+<script  src="/static/bitrix/cache/js/s1/aspro_max/template_b41abf003a79e436047973b43698bbc7/template_b41abf003a79e436047973b43698bbc7_v1.js"></script>
+<script  src="/static/bitrix/cache/js/s1/aspro_max/page_eba788aaab0f9745ba6799f554db6589/page_eba788aaab0f9745ba6799f554db6589_v1.js"></script>
+		<style>html {--theme-items-gap:32px;--fixed-header:80px;}</style>	<meta name="yandex-verification" content="3ef17494decf3606" />
+<meta name="google-site-verification" content="QhJ5jeqsNXkjp_vsexRNAwDhwtkfUxcGVVKkwHN87a8" />
+<link rel="stylesheet" href="/theme.css?v={{ site.theme.version | default(1) }}">
+</head>
+<body class=" site_s1  fill_bg_n catalog-delayed-btn-Y theme-light" id="main" data-site="/">
+		
+	<div id="panel"></div>
+	
+		        <!--'start_frame_cache_basketitems-component-block'-->                            
+                	<div id="ajax_basket"></div>
+                    <!--'end_frame_cache_basketitems-component-block'-->                <div class="cd-modal-bg"></div>
+        <script data-skip-moving="true">var solutionName = 'arMaxOptions';</script>
+        <script src="/static/bitrix/templates/aspro_max/js/setTheme.php" data-skip-moving="true"></script>
+        <script>window.onload=function(){window.basketJSParams = window.basketJSParams || [];}
+        BX.message({'MIN_ORDER_PRICE_TEXT':'<b>Минимальная сумма заказа #PRICE#<\/b><br/>Пожалуйста, добавьте еще товаров в корзину','LICENSES_TEXT':'Я даю согласие ИП Сипягина А.А. на обработку моих персональных данных, указанных в форме, для обработки моего обращения, обратной связи и внесения данных в CRM.<br>\nЯ ознакомлен(а) с <a href=\"/policy/\">Политикой обработки персональных данных<\/a> и условиями <a href=\"/consent/\">Согласия на обработку персональных данных<\/a>, включая цели, сроки и порядок отзыва согласия.'});
+        arAsproOptions.PAGES.FRONT_PAGE = window[solutionName].PAGES.FRONT_PAGE = "";arAsproOptions.PAGES.BASKET_PAGE = window[solutionName].PAGES.BASKET_PAGE = "";arAsproOptions.PAGES.ORDER_PAGE = window[solutionName].PAGES.ORDER_PAGE = "";arAsproOptions.PAGES.PERSONAL_PAGE = window[solutionName].PAGES.PERSONAL_PAGE = "";arAsproOptions.PAGES.CATALOG_PAGE = window[solutionName].PAGES.CATALOG_PAGE = "";</script>
+		<div class="wrapper1  header_bglight long_header3 with_left_block  basket_normal basket_fill_WHITE side_LEFT catalog_icons_N banner_auto  mheader-v1 header-v11 header-font-lower_N regions_N title_position_LEFT footer-v1 front-vindex1 mfixed_Y mfixed_view_scroll_top title-v3 lazy_Y with_phones compact-catalog normal-catalog-img landing-normal big-banners-mobile-normal bottom-icons-panel-N compact-breadcrumbs-N catalog-delayed-btn-Y  ">
+
+<div class="mega_fixed_menu scrollblock">
+	<div class="maxwidth-theme">
+		<svg class="svg svg-close" width="14" height="14" viewBox="0 0 14 14">
+		  <path data-name="Rounded Rectangle 568 copy 16" d="M1009.4,953l5.32,5.315a0.987,0.987,0,0,1,0,1.4,1,1,0,0,1-1.41,0L1008,954.4l-5.32,5.315a0.991,0.991,0,0,1-1.4-1.4L1006.6,953l-5.32-5.315a0.991,0.991,0,0,1,1.4-1.4l5.32,5.315,5.31-5.315a1,1,0,0,1,1.41,0,0.987,0.987,0,0,1,0,1.4Z" transform="translate(-1001 -946)"></path>
+		</svg>
+		<i class="svg svg-close mask arrow"></i>
+		<div class="row">
+			<div class="col-md-9">
+				<div class="left_menu_block">
+					<div class="logo_block flexbox flexbox--row align-items-normal">
+						<div class="logo">
+							<a href="/"><img data-lazyload class="lazy " src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-src="/static/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg" alt="Наматрасники любых размеров | Интернет-магазин Экотория" title="Наматрасники любых размеров | Интернет-магазин Экотория" /></a>						</div>
+						<div class="top-description addr">
+							<!--Готовый интернет-магазин 
+товаров для дома-->						</div>
+					</div>
+					<div class="search_block">
+						<div class="search_wrap">
+							<div class="search-block">
+									<div class="search-wrapper">
+		<div id="title-search_mega_menu">
+			<form action="/catalog/" class="search search--hastype">
+				<div class="search-input-div">
+					<input class="search-input" id="title-search-input_mega_menu" type="text" name="q" value="" placeholder="Поиск" size="20" maxlength="50" autocomplete="off" />
+				</div>
+				<div class="search-button-div">
+					<button class="btn btn-search" type="submit" name="s" value="Найти"><i class="svg search2  inline " aria-hidden="true"><svg width="17" height="17" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#search"></use></svg></i></button>
+											<div class="dropdown-select searchtype">
+							<input type="hidden" name="type" value="catalog" />
+							<div class="dropdown-select__title darken font_xs">
+								<span>Каталог</span>
+								<i class="svg  svg-inline-search-down" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="5" height="3" viewBox="0 0 5 3"><path class="cls-1" d="M250,80h5l-2.5,3Z" transform="translate(-250 -80)"/></svg></i>							</div>
+							<div class="dropdown-select__list dropdown-menu-wrapper" role="menu">
+								<!--noindex-->
+								<div class="dropdown-menu-inner rounded3">
+									<div class="dropdown-select__list-item font_xs">
+										<span class="dropdown-select__list-link darken" data-type="all">
+											<span>По всему сайту</span>
+										</span>
+									</div>
+									<div class="dropdown-select__list-item font_xs">
+										<span class="dropdown-select__list-link dropdown-select__list-link--current" data-type="catalog">
+											<span>По каталогу</span>
+										</span>
+									</div>
+								</div>
+								<!--/noindex-->
+							</div>
+						</div>
+					<span class="close-block inline-search-hide"><span class="svg svg-close close-icons"></span></span>
+				</div>
+			</form>
+		</div>
+	</div>
+<script>
+	var jsControl = new JCTitleSearch3({
+		//'WAIT_IMAGE': '/static/bitrix/themes/.default/images/wait.gif',
+		'AJAX_PAGE' : '/blog/sovety-pokupatelyam/namatrasnik-dlya-detey-i-podrostkov-est-li-otlichiya-ot-vzroslogo/',
+		'CONTAINER_ID': 'title-search_mega_menu',
+		'INPUT_ID': 'title-search-input_mega_menu',
+		'INPUT_ID_TMP': 'title-search-input_mega_menu',
+		'MIN_QUERY_LEN': 2
+	});
+</script>							</div>
+						</div>
+					</div>
+										<!-- noindex -->
+
+	<div class="burger_menu_wrapper">
+{% include 'site_burger_menu.html' %}
+</div>
+					<!-- /noindex -->
+														</div>
+			</div>
+			<div class="col-md-3">
+				<div class="right_menu_block">
+					<div class="contact_wrap">
+						<div class="info">
+							<div class="phone blocks">
+								<div class="">
+									                                <!-- noindex -->
+            <div class="phone with_dropdown white sm">
+                                    <div class="wrap">
+                        <div>
+                                    <i class="svg svg-inline-phone  inline " aria-hidden="true"><svg width="5" height="13" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#phone_footer"></use></svg></i><a rel="nofollow" href="tel:88002010824">8 800 201 08 24</a>
+                                        </div>
+                    </div>
+                                            </div>
+            <!-- /noindex -->
+                								</div>
+                                							</div>
+							<div class="question_button_wrapper">
+								<span class="btn btn-lg btn-transparent-border-color btn-wide animate-load colored_theme_hover_bg-el" data-event="jqm" data-param-form_id="ASK" data-name="ask">
+									Задать вопрос								</span>
+							</div>
+							<div class="person_wrap">
+        <!--'start_frame_cache_header-auth-block1'-->            <!-- noindex --><div class="auth_wr_inner "><a rel="nofollow" title="Мой кабинет" class="personal-link dark-color animate-load" data-event="jqm" data-param-backurl="%2Fblog%2Fsovety-pokupatelyam%2Fnamatrasnik-dlya-detey-i-podrostkov-est-li-otlichiya-ot-vzroslogo%2F" data-param-type="auth" data-name="auth" href="/personal/"><i class="svg svg-inline-cabinet big inline " aria-hidden="true"><svg width="18" height="18" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#user"></use></svg></i><span class="wrap"><span class="name">Войти</span></span></a></div><!-- /noindex -->        <!--'end_frame_cache_header-auth-block1'-->
+            <!--'start_frame_cache_mobile-basket-with-compare-block1'-->        <!-- noindex -->
+                    <div class="menu middle">
+                <ul>
+                                            <li class="counters">
+                            <a rel="nofollow" class="dark-color basket-link basket ready " href="/basket/">
+                                <i class="svg  svg-inline-basket" aria-hidden="true" ><svg class="" width="19" height="16" viewBox="0 0 19 16"><path data-name="Ellipse 2 copy 9" class="cls-1" d="M956.047,952.005l-0.939,1.009-11.394-.008-0.952-1-0.953-6h-2.857a0.862,0.862,0,0,1-.952-1,1.025,1.025,0,0,1,1.164-1h2.327c0.3,0,.6.006,0.6,0.006a1.208,1.208,0,0,1,1.336.918L943.817,947h12.23L957,948v1Zm-11.916-3,0.349,2h10.007l0.593-2Zm1.863,5a3,3,0,1,1-3,3A3,3,0,0,1,945.994,954.005ZM946,958a1,1,0,1,0-1-1A1,1,0,0,0,946,958Zm7.011-4a3,3,0,1,1-3,3A3,3,0,0,1,953.011,954.005ZM953,958a1,1,0,1,0-1-1A1,1,0,0,0,953,958Z" transform="translate(-938 -944)"></path></svg></i>                                <span>Корзина<span class="count js-count empted">0</span></span>
+                            </a>
+                        </li>
+                                                                <li class="counters">
+                            <a rel="nofollow"
+                                class="dark-color basket-link delay ready "
+                                href="/personal/favorite/"
+                            >
+                                <i class="svg  svg-inline-basket" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="16" height="13" viewBox="0 0 16 13"><defs><style>.clsw-1{fill:#fff;fill-rule:evenodd;}</style></defs><path class="clsw-1" d="M506.755,141.6l0,0.019s-4.185,3.734-5.556,4.973a0.376,0.376,0,0,1-.076.056,1.838,1.838,0,0,1-1.126.357,1.794,1.794,0,0,1-1.166-.4,0.473,0.473,0,0,1-.1-0.076c-1.427-1.287-5.459-4.878-5.459-4.878l0-.019A4.494,4.494,0,1,1,500,135.7,4.492,4.492,0,1,1,506.755,141.6Zm-3.251-5.61A2.565,2.565,0,0,0,501,138h0a1,1,0,1,1-2,0h0a2.565,2.565,0,0,0-2.506-2,2.5,2.5,0,0,0-1.777,4.264l-0.013.019L500,145.1l5.179-4.749c0.042-.039.086-0.075,0.126-0.117l0.052-.047-0.006-.008A2.494,2.494,0,0,0,503.5,135.993Z" transform="translate(-492 -134)"/></svg></i>                                <span>Избранные товары<span class="count js-count empted">0</span></span>
+                            </a>
+                        </li>
+                                    </ul>
+            </div>
+                        <!-- /noindex -->
+        <!--'end_frame_cache_mobile-basket-with-compare-block1'-->    							</div>
+						</div>
+					</div>
+					<div class="footer_wrap">
+						
+        
+                            <div class="email blocks color-theme-hover">
+                    <i class="svg inline  svg-inline-email" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="11" height="9" viewBox="0 0 11 9"><path  data-name="Rectangle 583 copy 16" class="cls-1" d="M367,142h-7a2,2,0,0,1-2-2v-5a2,2,0,0,1,2-2h7a2,2,0,0,1,2,2v5A2,2,0,0,1,367,142Zm0-2v-3.039L364,139h-1l-3-2.036V140h7Zm-6.634-5,3.145,2.079L366.634,135h-6.268Z" transform="translate(-358 -133)"/></svg></i>                    <a href="mailto:HelloEkotoriya@yandex.ru">helloekotoriya@yandex.ru</a>                </div>
+        
+    						                    <div class="address blocks">
+                <i class="svg inline  svg-inline-addr" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="9" height="12" viewBox="0 0 9 12"><path class="cls-1" d="M959.135,82.315l0.015,0.028L955.5,87l-3.679-4.717,0.008-.013a4.658,4.658,0,0,1-.83-2.655,4.5,4.5,0,1,1,9,0A4.658,4.658,0,0,1,959.135,82.315ZM955.5,77a2.5,2.5,0,0,0-2.5,2.5,2.467,2.467,0,0,0,.326,1.212l-0.014.022,2.181,3.336,2.034-3.117c0.033-.046.063-0.094,0.093-0.142l0.066-.1-0.007-.009a2.468,2.468,0,0,0,.32-1.2A2.5,2.5,0,0,0,955.5,77Z" transform="translate(-951 -75)"/></svg></i>                <div class="title font_upper muted">Адрес производства</div>
+г. Череповец, ул. Гоголя 56            </div>
+                        						<div class="social-block">
+							<div class="social-icons">
+		{% include 'site_socials.html' %}
+</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="header_wrap visible-lg visible-md title-v3 ">
+	<header id="header">
+		<div class="header-wrapper header-v11 centered">
+	<div class="logo_and_menu-row header__top-part">
+		<div class="maxwidth-theme logo-row">
+			<div class="header__top-inner">
+				<div class="header__top-item flex1">
+					<div class="line-block line-block--2">
+												<div class="line-block__item ">
+							<div class="wrap_icon inner-table-block">
+								<div class="phone-block block2 fontUp">
+																			                                <!-- noindex -->
+            <div class="phone with_dropdown no-icons">
+                                    <i class="svg svg-inline-phone  inline " aria-hidden="true"><svg width="5" height="13" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#phone_black"></use></svg></i><a rel="nofollow" href="tel:88002010824">8 800 201 08 24</a>
+                                            </div>
+            <!-- /noindex -->
+                																										</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div class="logo-block  text-center nopadding header__top-item">
+					<div class="line-block line-block--16">
+						<div class="logo  line-block__item no-shrinked">
+							<a href="/"><img data-lazyload class="lazy " src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-src="/static/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg" alt="Наматрасники любых размеров | Интернет-магазин Экотория" title="Наматрасники любых размеров | Интернет-магазин Экотория" /></a>						</div>
+					</div>
+				</div>
+				<div class="right-icons header__top-item flex1">
+					<div class="line-block line-block--40 line-block--40-1200 flexbox--justify-end  ">
+																		                        						<div class="line-block__item">
+							<div class="wrap_icon">
+								<button class="top-btn inline-search-show">
+									<i class="svg svg-inline-search inline " aria-hidden="true"><svg width="17" height="17" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#search"></use></svg></i>									<span class="title">Поиск</span>
+								</button>
+							</div>
+						</div>
+						<div class="line-block__item">
+							<div class="wrap_icon inner-table-block person">
+        <!--'start_frame_cache_header-auth-block2'-->            <!-- noindex --><div class="auth_wr_inner "><a rel="nofollow" title="Мой кабинет" class="personal-link dark-color animate-load" data-event="jqm" data-param-backurl="%2Fblog%2Fsovety-pokupatelyam%2Fnamatrasnik-dlya-detey-i-podrostkov-est-li-otlichiya-ot-vzroslogo%2F" data-param-type="auth" data-name="auth" href="/personal/"><i class="svg svg-inline-cabinet big inline " aria-hidden="true"><svg width="18" height="18" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#user"></use></svg></i><span class="wrap"><span class="name">Войти</span></span></a></div><!-- /noindex -->        <!--'end_frame_cache_header-auth-block2'-->
+    							</div>
+						</div>
+														                                        <!--'start_frame_cache_header-basket-with-compare-block1'-->                
+                <!-- noindex -->
+                                                            <div class="wrap_icon wrap_basket baskets line-block__item ">
+                                            <a
+                            rel="nofollow"
+                            class="basket-link delay  big basket-count"
+                            href="/personal/favorite/"
+                            title="Избранные товары"
+                        >
+                            <span class="js-basket-block">
+                                <i class="svg wish big inline " aria-hidden="true"><svg width="20" height="16" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#chosen"></use></svg></i>                                <span class="title dark_link">Избранные товары</span>
+                                <span class="count js-count">0</span>
+                            </span>
+                        </a>
+                                            </div>
+                                                                                                <div class="wrap_icon wrap_basket baskets line-block__item  top_basket">
+                                            <a rel="nofollow" class="basket-link basket   big " href="/basket/" title="Корзина пуста">
+                            <span class="js-basket-block">
+                                <i class="svg basket big inline " aria-hidden="true"><svg width="19" height="16" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#basket"></use></svg></i>                                                                <span class="title dark_link">Корзина</span>
+                                <span class="count js-count">0</span>
+                                                            </span>
+                        </a>
+                        <span class="basket_hover_block loading_block loading_block_content"></span>
+                                            </div>
+                                                    <!-- /noindex -->
+            <!--'end_frame_cache_header-basket-with-compare-block1'-->                        											</div>
+				</div>
+		</div>
+	</div>
+</div>
+	<div class="menu-row middle-block bglight">
+		<hr class="left_border">
+		<div class="maxwidth-theme">
+			<div class="row">
+				<div class="col-md-12">
+					<div class="menu-only">
+						<nav class="mega-menu sliced">
+{% include 'site_menu.html' %}
+</nav>
+					</div>
+				</div>
+			</div>
+		</div>
+		<hr class="right_border">
+	</div>
+	<div class="line-row visible-xs"></div>
+</div>
+	</header>
+</div>
+	<div id="headerfixed">
+		<div class="maxwidth-theme">
+	<div class="logo-row v1 row margin0 menu-row ">
+		<div class="header__top-inner">
+			<div class="left_wrap header__top-item  flex1">
+				<div class="line-block line-block--8">
+											<div class="line-block__item">
+							<div class="burger inner-table-block"><i class="svg inline  svg-inline-burger dark" aria-hidden="true" ><svg width="16" height="12" viewBox="0 0 16 12"><path data-name="Rounded Rectangle 81 copy 4" class="cls-1" d="M872,958h-8a1,1,0,0,1-1-1h0a1,1,0,0,1,1-1h8a1,1,0,0,1,1,1h0A1,1,0,0,1,872,958Zm6-5H864a1,1,0,0,1,0-2h14A1,1,0,0,1,878,953Zm0-5H864a1,1,0,0,1,0-2h14A1,1,0,0,1,878,948Z" transform="translate(-863 -946)"></path></svg></i></div>
+						</div>
+					
+					<div class="line-block__item">
+						<div class="wrap_icon inner-table-block phones_block ">
+							<div class="phone-block">
+																	                                <!-- noindex -->
+            <div class="phone with_dropdown no-icons">
+                                    <i class="svg svg-inline-phone  inline " aria-hidden="true"><svg width="5" height="13" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#phone_black"></use></svg></i><a rel="nofollow" href="tel:88002010824">8 800 201 08 24</a>
+                                            </div>
+            <!-- /noindex -->
+                																							</div>
+						</div>
+					</div>
+                    <div class="line-block__item">
+                        <div class="address blocks">
+                            г. Череповец, ул. Гоголя 56                        </div>
+                    </div>
+				</div>	
+			</div>
+							<div class="header__top-item no-shrinked">
+					<div class="logo-block text-center nopadding">
+						<div class="inner-table-block">
+							<div class="logo">
+								<a href="/"><img src="/static/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg" alt="Наматрасники любых размеров | Интернет-магазин Экотория" title="Наматрасники любых размеров | Интернет-магазин Экотория" data-src="" /></a>							</div>
+						</div>
+					</div>
+				</div>
+			<div class="right_wrap header__top-item wb  flex1">
+				<div class="line-block line-block--40 line-block--40-1200 flex1 flexbox--justify-end">
+					<div class="line-block__item  no-shrinked">
+						<div class=" inner-table-block">
+							<div class="wrap_icon">
+								<button class="top-btn inline-search-show dark-color">
+									<i class="svg svg-inline-search inline " aria-hidden="true"><svg width="17" height="17" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#search"></use></svg></i>									<span class="title">Поиск</span>
+								</button>
+							</div>
+						</div>
+					</div>
+					<div class="line-block__item  no-shrinked">
+						<div class=" inner-table-block nopadding small-block">
+							<div class="wrap_icon wrap_cabinet">
+        <!--'start_frame_cache_header-auth-block3'-->            <!-- noindex --><div class="auth_wr_inner "><a rel="nofollow" title="Мой кабинет" class="personal-link dark-color animate-load" data-event="jqm" data-param-backurl="%2Fblog%2Fsovety-pokupatelyam%2Fnamatrasnik-dlya-detey-i-podrostkov-est-li-otlichiya-ot-vzroslogo%2F" data-param-type="auth" data-name="auth" href="/personal/"><i class="svg svg-inline-cabinet big inline " aria-hidden="true"><svg width="18" height="18" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#user"></use></svg></i><span class="wrap"><span class="name">Войти</span></span></a></div><!-- /noindex -->        <!--'end_frame_cache_header-auth-block3'-->
+    							</div>
+						</div>
+					</div>
+												<div class="line-block__item line-block line-block--40 line-block--40-1200">
+							                                        <!--'start_frame_cache_header-basket-with-compare-block2'-->                
+                <!-- noindex -->
+                                                            <a
+                            rel="nofollow"
+                            class="basket-link delay inner-table-block big basket-count"
+                            href="/personal/favorite/"
+                            title="Избранные товары"
+                        >
+                            <span class="js-basket-block">
+                                <i class="svg wish big inline " aria-hidden="true"><svg width="20" height="16" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#chosen"></use></svg></i>                                <span class="title dark_link">Избранные товары</span>
+                                <span class="count js-count">0</span>
+                            </span>
+                        </a>
+                                                                                                <a rel="nofollow" class="basket-link basket  inner-table-block big " href="/basket/" title="Корзина пуста">
+                            <span class="js-basket-block">
+                                <i class="svg basket big inline " aria-hidden="true"><svg width="19" height="16" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#basket"></use></svg></i>                                                                <span class="title dark_link">Корзина</span>
+                                <span class="count js-count">0</span>
+                                                            </span>
+                        </a>
+                        <span class="basket_hover_block loading_block loading_block_content"></span>
+                                                    <!-- /noindex -->
+            <!--'end_frame_cache_header-basket-with-compare-block2'-->                        						</div>
+									</div>	
+			</div>
+		</div>	
+	</div>
+</div>
+	</div>
+<div id="mobileheader" class="visible-xs visible-sm">
+	<div class="mobileheader-v1">
+	<div class="burger pull-left">
+		<i class="svg inline  svg-inline-burger dark" aria-hidden="true" ><svg width="16" height="12" viewBox="0 0 16 12"><path data-name="Rounded Rectangle 81 copy 4" class="cls-1" d="M872,958h-8a1,1,0,0,1-1-1h0a1,1,0,0,1,1-1h8a1,1,0,0,1,1,1h0A1,1,0,0,1,872,958Zm6-5H864a1,1,0,0,1,0-2h14A1,1,0,0,1,878,953Zm0-5H864a1,1,0,0,1,0-2h14A1,1,0,0,1,878,948Z" transform="translate(-863 -946)"></path></svg></i>		<i class="svg inline  svg-inline-close dark" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path data-name="Rounded Rectangle 114 copy 3" class="cccls-1" d="M334.411,138l6.3,6.3a1,1,0,0,1,0,1.414,0.992,0.992,0,0,1-1.408,0l-6.3-6.306-6.3,6.306a1,1,0,0,1-1.409-1.414l6.3-6.3-6.293-6.3a1,1,0,0,1,1.409-1.414l6.3,6.3,6.3-6.3A1,1,0,0,1,340.7,131.7Z" transform="translate(-325 -130)"/></svg></i>	</div>
+	<div class="logo-block pull-left">
+		<div class="logo">
+			<a href="/"><img data-lazyload class="lazy " src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-src="/static/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg" alt="Наматрасники любых размеров | Интернет-магазин Экотория" title="Наматрасники любых размеров | Интернет-магазин Экотория" /></a>		</div>
+	</div>
+	<div class="right-icons pull-right">
+		<div class="pull-right">
+			<div class="wrap_icon wrap_basket">
+				                                        <!--'start_frame_cache_header-basket-with-compare-block3'-->                
+                <!-- noindex -->
+                                                            <a
+                            rel="nofollow"
+                            class="basket-link delay  big basket-count"
+                            href="/personal/favorite/"
+                            title="Избранные товары"
+                        >
+                            <span class="js-basket-block">
+                                <i class="svg wish big inline " aria-hidden="true"><svg width="20" height="16" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#chosen"></use></svg></i>                                <span class="title dark_link">Избранные товары</span>
+                                <span class="count js-count">0</span>
+                            </span>
+                        </a>
+                                                                                                <a rel="nofollow" class="basket-link basket   big " href="/basket/" title="Корзина пуста">
+                            <span class="js-basket-block">
+                                <i class="svg basket big inline " aria-hidden="true"><svg width="19" height="16" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#basket"></use></svg></i>                                                                <span class="title dark_link">Корзина</span>
+                                <span class="count js-count">0</span>
+                                                            </span>
+                        </a>
+                        <span class="basket_hover_block loading_block loading_block_content"></span>
+                                                    <!-- /noindex -->
+            <!--'end_frame_cache_header-basket-with-compare-block3'-->                        			</div>
+		</div>
+		<div class="pull-right">
+			<div class="wrap_icon wrap_cabinet">
+        <!--'start_frame_cache_header-auth-block4'-->            <!-- noindex --><div class="auth_wr_inner "><a rel="nofollow" title="Мой кабинет" class="personal-link dark-color animate-load" data-event="jqm" data-param-backurl="%2Fblog%2Fsovety-pokupatelyam%2Fnamatrasnik-dlya-detey-i-podrostkov-est-li-otlichiya-ot-vzroslogo%2F" data-param-type="auth" data-name="auth" href="/personal/"><i class="svg svg-inline-cabinet big inline " aria-hidden="true"><svg width="18" height="18" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#user"></use></svg></i></a></div><!-- /noindex -->        <!--'end_frame_cache_header-auth-block4'-->
+    			</div>
+		</div>
+		<div class="pull-right">
+			<div class="wrap_icon">
+				<button class="top-btn inline-search-show twosmallfont">
+					<i class="svg inline  svg-inline-search" aria-hidden="true" ><svg class="" width="17" height="17" viewBox="0 0 17 17" aria-hidden="true"><path class="cls-1" d="M16.709,16.719a1,1,0,0,1-1.412,0l-3.256-3.287A7.475,7.475,0,1,1,15,7.5a7.433,7.433,0,0,1-1.549,4.518l3.258,3.289A1,1,0,0,1,16.709,16.719ZM7.5,2A5.5,5.5,0,1,0,13,7.5,5.5,5.5,0,0,0,7.5,2Z"></path></svg></i>				</button>
+			</div>
+		</div>
+		<div class="pull-right">
+			<div class="wrap_icon wrap_phones">
+				                                <!-- noindex -->
+            <button class="top-btn inline-phone-show">
+                <i class="svg inline  svg-inline-phone" aria-hidden="true" ><svg class="" width="18.031" height="17.969" viewBox="0 0 18.031 17.969"><path class="cls-1" d="M673.56,155.153c-4.179-4.179-6.507-7.88-2.45-12.3l0,0a3,3,0,0,1,4.242,0l1.87,2.55a3.423,3.423,0,0,1,.258,3.821l-0.006-.007c-0.744.7-.722,0.693,0.044,1.459l0.777,0.873c0.744,0.788.759,0.788,1.458,0.044l-0.009-.01a3.153,3.153,0,0,1,3.777.264l2.619,1.889a3,3,0,0,1,0,4.243C681.722,162.038,677.739,159.331,673.56,155.153Zm11.17,1.414a1,1,0,0,0,0-1.414l-2.618-1.89a1.4,1.4,0,0,0-.926-0.241l0.009,0.009c-1.791,1.835-2.453,1.746-4.375-.132l-1.05-1.194c-1.835-1.878-1.518-2.087.272-3.922l0,0a1.342,1.342,0,0,0-.227-0.962l-1.87-2.549a1,1,0,0,0-1.414,0l-0.008-.009c-2.7,3.017-.924,6.1,2.453,9.477s6.748,5.54,9.765,2.837Z" transform="translate(-669 -142)"/></svg>
+</i>            </button>
+            <div id="mobilePhone" class="dropdown-mobile-phone ">
+                <div class="phone wrap">
+                    <div class="more_phone title"><span class="no-decript dark-color ">Телефоны <i class="svg inline  svg-inline-close dark dark-i" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path data-name="Rounded Rectangle 114 copy 3" class="cccls-1" d="M334.411,138l6.3,6.3a1,1,0,0,1,0,1.414,0.992,0.992,0,0,1-1.408,0l-6.3-6.306-6.3,6.306a1,1,0,0,1-1.409-1.414l6.3-6.3-6.293-6.3a1,1,0,0,1,1.409-1.414l6.3,6.3,6.3-6.3A1,1,0,0,1,340.7,131.7Z" transform="translate(-325 -130)"/></svg></i></span></div>
+                        <div class="more_phone flexbox flexbox--row flexbox--gap flexbox--gap-16">
+                            <a class="more_phone_a dark-color no-decript flexbox flexbox--row flexbox--gap flexbox--gap-8" rel="nofollow" href="tel:88002010824">
+                                <span class="phones__phone-icon no-icon">
+                                                                    </span>
+                                <span class="phones__phone-link-text flexbox dropdown--top-reverse flexbox--gap flexbox--gap-8">
+                                    <span class="phones__phone-title">8 800 201 08 24</span>
+                                                                    </span>
+                            </a>
+                                                    </div>
+                                                        </div>
+            </div>
+            <!-- /noindex -->
+                			</div>
+		</div>
+	</div>
+	</div>	<div id="mobilemenu" class="leftside">
+		<div class="mobilemenu-v1 scroller">
+	<div class="wrap">
+				<!-- noindex -->
+				<div class="menu top top-mobile-menu">
+		<ul class="top">
+															<li>
+					<a class="dark-color parent" href="/catalog/" title="Каталог">
+						<span>Каталог</span>
+													<span class="arrow">
+								<i class="svg triangle inline " aria-hidden="true"><svg width="3" height="5" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/trianglearrow_sprite.svg#trianglearrow_right"></use></svg></i>							</span>
+											</a>
+											<ul class="dropdown">
+							<li class="menu_back"><a href="" class="dark-color" rel="nofollow"><i class="svg inline  svg-inline-back_arrow" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="15.969" height="12" viewBox="0 0 15.969 12"><defs><style>.cls-1{fill:#999;fill-rule:evenodd;}</style></defs><path  data-name="Rounded Rectangle 982 copy" class="cls-1" d="M34,32H22.414l3.3,3.3A1,1,0,1,1,24.3,36.713l-4.978-4.978c-0.01-.01-0.024-0.012-0.034-0.022s-0.015-.041-0.03-0.058a0.974,0.974,0,0,1-.213-0.407,0.909,0.909,0,0,1-.024-0.123,0.982,0.982,0,0,1,.267-0.838c0.011-.011.025-0.014,0.036-0.024L24.3,25.287A1,1,0,0,1,25.713,26.7l-3.3,3.3H34A1,1,0,0,1,34,32Z" transform="translate(-19.031 -25)"/></svg>
+</i>Назад</a></li>
+							<li class="menu_title"><a href="/catalog/">Каталог</a></li>
+																															<li>
+									<a class="dark-color parent top-mobile-menu__link" href="/catalog/namatrasniki/" title="Наматрасники">
+																				<span class="top-mobile-menu__title">Наматрасники</span>
+																					<span class="arrow"><i class="svg triangle inline " aria-hidden="true"><svg width="3" height="5" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/trianglearrow_sprite.svg#trianglearrow_right"></use></svg></i></span>
+																			</a>
+																			<ul class="dropdown">
+											<li class="menu_back"><a href="" class="dark-color" rel="nofollow"><i class="svg inline  svg-inline-back_arrow" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="15.969" height="12" viewBox="0 0 15.969 12"><defs><style>.cls-1{fill:#999;fill-rule:evenodd;}</style></defs><path  data-name="Rounded Rectangle 982 copy" class="cls-1" d="M34,32H22.414l3.3,3.3A1,1,0,1,1,24.3,36.713l-4.978-4.978c-0.01-.01-0.024-0.012-0.034-0.022s-0.015-.041-0.03-0.058a0.974,0.974,0,0,1-.213-0.407,0.909,0.909,0,0,1-.024-0.123,0.982,0.982,0,0,1,.267-0.838c0.011-.011.025-0.014,0.036-0.024L24.3,25.287A1,1,0,0,1,25.713,26.7l-3.3,3.3H34A1,1,0,0,1,34,32Z" transform="translate(-19.031 -25)"/></svg>
+</i>Назад</a></li>
+											<li class="menu_title"><a href="/catalog/namatrasniki/">Наматрасники</a></li>
+																																															<li>
+													<a class="dark-color top-mobile-menu__link" href="/catalog/namatrasniki/namatrasniki-na-rezinke/" title="Наматрасники на резинке">
+																												<span class="top-mobile-menu__title">Наматрасники на резинке</span>
+																											</a>
+																									</li>
+																																															<li>
+													<a class="dark-color top-mobile-menu__link" href="/catalog/namatrasniki/namatrasniki-na-molnii/" title="Наматрасники на молнии">
+																												<span class="top-mobile-menu__title">Наматрасники на молнии</span>
+																											</a>
+																									</li>
+																																															<li>
+													<a class="dark-color top-mobile-menu__link" href="/catalog/namatrasniki/nepromokaemye-namatrasniki/" title="Непромокаемые наматрасники">
+																												<span class="top-mobile-menu__title">Непромокаемые наматрасники</span>
+																											</a>
+																									</li>
+																					</ul>
+																	</li>
+																															<li>
+									<a class="dark-color parent top-mobile-menu__link" href="/catalog/odeyala/" title="Одеяла">
+																				<span class="top-mobile-menu__title">Одеяла</span>
+																					<span class="arrow"><i class="svg triangle inline " aria-hidden="true"><svg width="3" height="5" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/trianglearrow_sprite.svg#trianglearrow_right"></use></svg></i></span>
+																			</a>
+																			<ul class="dropdown">
+											<li class="menu_back"><a href="" class="dark-color" rel="nofollow"><i class="svg inline  svg-inline-back_arrow" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="15.969" height="12" viewBox="0 0 15.969 12"><defs><style>.cls-1{fill:#999;fill-rule:evenodd;}</style></defs><path  data-name="Rounded Rectangle 982 copy" class="cls-1" d="M34,32H22.414l3.3,3.3A1,1,0,1,1,24.3,36.713l-4.978-4.978c-0.01-.01-0.024-0.012-0.034-0.022s-0.015-.041-0.03-0.058a0.974,0.974,0,0,1-.213-0.407,0.909,0.909,0,0,1-.024-0.123,0.982,0.982,0,0,1,.267-0.838c0.011-.011.025-0.014,0.036-0.024L24.3,25.287A1,1,0,0,1,25.713,26.7l-3.3,3.3H34A1,1,0,0,1,34,32Z" transform="translate(-19.031 -25)"/></svg>
+</i>Назад</a></li>
+											<li class="menu_title"><a href="/catalog/odeyala/">Одеяла</a></li>
+																																															<li>
+													<a class="dark-color top-mobile-menu__link" href="/catalog/odeyala/zimnie/" title="Зимние">
+																												<span class="top-mobile-menu__title">Зимние</span>
+																											</a>
+																									</li>
+																																															<li>
+													<a class="dark-color top-mobile-menu__link" href="/catalog/odeyala/vsesezonnye/" title="Всесезонные">
+																												<span class="top-mobile-menu__title">Всесезонные</span>
+																											</a>
+																									</li>
+																																															<li>
+													<a class="dark-color top-mobile-menu__link" href="/catalog/odeyala/letnie/" title="Летние">
+																												<span class="top-mobile-menu__title">Летние</span>
+																											</a>
+																									</li>
+																					</ul>
+																	</li>
+																															<li>
+									<a class="dark-color top-mobile-menu__link" href="/catalog/naperniki/" title="Наперники">
+																				<span class="top-mobile-menu__title">Наперники</span>
+																			</a>
+																	</li>
+													</ul>
+									</li>
+															<li>
+					<a class="dark-color" href="/help/opt/" title="Оптовым покупателям">
+						<span>Оптовым покупателям</span>
+											</a>
+									</li>
+															<li>
+					<a class="dark-color parent" href="/company/" title="Компания">
+						<span>Компания</span>
+													<span class="arrow">
+								<i class="svg triangle inline " aria-hidden="true"><svg width="3" height="5" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/trianglearrow_sprite.svg#trianglearrow_right"></use></svg></i>							</span>
+											</a>
+											<ul class="dropdown">
+							<li class="menu_back"><a href="" class="dark-color" rel="nofollow"><i class="svg inline  svg-inline-back_arrow" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="15.969" height="12" viewBox="0 0 15.969 12"><defs><style>.cls-1{fill:#999;fill-rule:evenodd;}</style></defs><path  data-name="Rounded Rectangle 982 copy" class="cls-1" d="M34,32H22.414l3.3,3.3A1,1,0,1,1,24.3,36.713l-4.978-4.978c-0.01-.01-0.024-0.012-0.034-0.022s-0.015-.041-0.03-0.058a0.974,0.974,0,0,1-.213-0.407,0.909,0.909,0,0,1-.024-0.123,0.982,0.982,0,0,1,.267-0.838c0.011-.011.025-0.014,0.036-0.024L24.3,25.287A1,1,0,0,1,25.713,26.7l-3.3,3.3H34A1,1,0,0,1,34,32Z" transform="translate(-19.031 -25)"/></svg>
+</i>Назад</a></li>
+							<li class="menu_title"><a href="/company/">Компания</a></li>
+																															<li>
+									<a class="dark-color top-mobile-menu__link" href="/company/" title="О компании">
+																				<span class="top-mobile-menu__title">О компании</span>
+																			</a>
+																	</li>
+																															<li>
+									<a class="dark-color top-mobile-menu__link" href="/company/reviews/" title="Отзывы">
+																				<span class="top-mobile-menu__title">Отзывы</span>
+																			</a>
+																	</li>
+																															<li>
+									<a class="dark-color top-mobile-menu__link" href="/company/docs/" title="Документы">
+																				<span class="top-mobile-menu__title">Документы</span>
+																			</a>
+																	</li>
+													</ul>
+									</li>
+															<li>
+					<a class="dark-color" href="/proizvodstvo/" title="Наше производство">
+						<span>Наше производство</span>
+											</a>
+									</li>
+															<li class="selected">
+					<a class="dark-color" href="/blog/" title="Советы покупателям">
+						<span>Советы покупателям</span>
+											</a>
+									</li>
+															<li>
+					<a class="dark-color" href="/contacts/" title="Контакты">
+						<span>Контакты</span>
+											</a>
+									</li>
+					</ul>
+	</div>
+		<!-- /noindex -->
+		        <!--'start_frame_cache_mobile-auth-block1'-->        <!-- noindex -->
+<div class="menu middle">
+	<ul>
+		<li  >
+						<a rel="nofollow" class="dark-color" href="/personal/">
+				<i class="svg inline  svg-inline-cabinet" aria-hidden="true" ><svg class="" width="18" height="18" viewBox="0 0 18 18"><path data-name="Ellipse 206 copy 4" class="cls-1" d="M909,961a9,9,0,1,1,9-9A9,9,0,0,1,909,961Zm2.571-2.5a6.825,6.825,0,0,0-5.126,0A6.825,6.825,0,0,0,911.571,958.5ZM909,945a6.973,6.973,0,0,0-4.556,12.275,8.787,8.787,0,0,1,9.114,0A6.973,6.973,0,0,0,909,945Zm0,10a4,4,0,1,1,4-4A4,4,0,0,1,909,955Zm0-6a2,2,0,1,0,2,2A2,2,0,0,0,909,949Z" transform="translate(-900 -943)"></path></svg></i>				<span>Личный кабинет</span>
+							</a>
+					</li>
+	</ul>
+</div>
+<!-- /noindex -->        <!--'end_frame_cache_mobile-auth-block1'-->            <!--'start_frame_cache_mobile-basket-with-compare-block2'-->        <!-- noindex -->
+                    <div class="menu middle">
+                <ul>
+                                            <li class="counters">
+                            <a rel="nofollow" class="dark-color basket-link basket ready " href="/basket/">
+                                <i class="svg  svg-inline-basket" aria-hidden="true" ><svg class="" width="19" height="16" viewBox="0 0 19 16"><path data-name="Ellipse 2 copy 9" class="cls-1" d="M956.047,952.005l-0.939,1.009-11.394-.008-0.952-1-0.953-6h-2.857a0.862,0.862,0,0,1-.952-1,1.025,1.025,0,0,1,1.164-1h2.327c0.3,0,.6.006,0.6,0.006a1.208,1.208,0,0,1,1.336.918L943.817,947h12.23L957,948v1Zm-11.916-3,0.349,2h10.007l0.593-2Zm1.863,5a3,3,0,1,1-3,3A3,3,0,0,1,945.994,954.005ZM946,958a1,1,0,1,0-1-1A1,1,0,0,0,946,958Zm7.011-4a3,3,0,1,1-3,3A3,3,0,0,1,953.011,954.005ZM953,958a1,1,0,1,0-1-1A1,1,0,0,0,953,958Z" transform="translate(-938 -944)"></path></svg></i>                                <span>Корзина<span class="count js-count empted">0</span></span>
+                            </a>
+                        </li>
+                                                                <li class="counters">
+                            <a rel="nofollow"
+                                class="dark-color basket-link delay ready "
+                                href="/personal/favorite/"
+                            >
+                                <i class="svg  svg-inline-basket" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="16" height="13" viewBox="0 0 16 13"><defs><style>.clsw-1{fill:#fff;fill-rule:evenodd;}</style></defs><path class="clsw-1" d="M506.755,141.6l0,0.019s-4.185,3.734-5.556,4.973a0.376,0.376,0,0,1-.076.056,1.838,1.838,0,0,1-1.126.357,1.794,1.794,0,0,1-1.166-.4,0.473,0.473,0,0,1-.1-0.076c-1.427-1.287-5.459-4.878-5.459-4.878l0-.019A4.494,4.494,0,1,1,500,135.7,4.492,4.492,0,1,1,506.755,141.6Zm-3.251-5.61A2.565,2.565,0,0,0,501,138h0a1,1,0,1,1-2,0h0a2.565,2.565,0,0,0-2.506-2,2.5,2.5,0,0,0-1.777,4.264l-0.013.019L500,145.1l5.179-4.749c0.042-.039.086-0.075,0.126-0.117l0.052-.047-0.006-.008A2.494,2.494,0,0,0,503.5,135.993Z" transform="translate(-492 -134)"/></svg></i>                                <span>Избранные товары<span class="count js-count empted">0</span></span>
+                            </a>
+                        </li>
+                                    </ul>
+            </div>
+                        <!-- /noindex -->
+        <!--'end_frame_cache_mobile-basket-with-compare-block2'-->                                    <!-- noindex -->
+            <div class="menu middle mobile-menu-contacts">
+                <ul>
+                    <li>
+                        <a rel="nofollow" href="tel:88002010824" class="dark-color no-decript">
+                            <i class="svg svg-phone"></i>
+                            <i class="svg svg-inline-phone  inline " aria-hidden="true"><svg width="5" height="13" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#phone_black"></use></svg></i>                            <span>8 800 201 08 24</span>
+                                                    </a>
+                                            </li>
+                </ul>
+            </div>
+            <!-- /noindex -->
+                            <div class="contacts">
+            <div class="title">Контактная информация</div>
+                                        <div class="address">
+                    <i class="svg inline  svg-inline-address" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="9" height="12" viewBox="0 0 9 12"><path class="cls-1" d="M959.135,82.315l0.015,0.028L955.5,87l-3.679-4.717,0.008-.013a4.658,4.658,0,0,1-.83-2.655,4.5,4.5,0,1,1,9,0A4.658,4.658,0,0,1,959.135,82.315ZM955.5,77a2.5,2.5,0,0,0-2.5,2.5,2.467,2.467,0,0,0,.326,1.212l-0.014.022,2.181,3.336,2.034-3.117c0.033-.046.063-0.094,0.093-0.142l0.066-.1-0.007-.009a2.468,2.468,0,0,0,.32-1.2A2.5,2.5,0,0,0,955.5,77Z" transform="translate(-951 -75)"/></svg></i>                    <div class="title font_upper muted">Адрес производства</div>
+г. Череповец, ул. Гоголя 56                </div>
+                                        <div class="email">
+                    <i class="svg inline  svg-inline-email" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="11" height="9" viewBox="0 0 11 9"><path  data-name="Rectangle 583 copy 16" class="cls-1" d="M367,142h-7a2,2,0,0,1-2-2v-5a2,2,0,0,1,2-2h7a2,2,0,0,1,2,2v5A2,2,0,0,1,367,142Zm0-2v-3.039L364,139h-1l-3-2.036V140h7Zm-6.634-5,3.145,2.079L366.634,135h-6.268Z" transform="translate(-358 -133)"/></svg></i>                    <a href="mailto:HelloEkotoriya@yandex.ru">helloekotoriya@yandex.ru</a>                </div>
+                                </div>
+        		<div class="social-icons">
+		{% include 'site_socials.html' %}
+</div>
+        	</div>
+</div>
+	</div>
+</div>
+<div id="mobilefilter" class="scrollbar-filter"></div>
+
+		<div class="wraps hover_shine" id="content">
+{{ page.content_html | safe }}
+</div> 					</div>
+		<footer id="footer">
+			
+<div class="footer-v1">
+    <div class="footer-inner">
+        <div class="footer_top">
+            <div class="maxwidth-theme">
+                <div class="row">
+                    <div class="col-md-2 col-sm-3">
+                        <div class="fourth_bottom_menu">
+                            		<div class="bottom-menu second">
+		<div class="items">
+														<div class="item">
+					<div class="title">
+													<a href="/catalog/">Каталог</a>
+											</div>
+				</div>
+														<div class="item">
+						<div class="title">
+															<a href="/catalog/namatrasniki/">Наматрасники</a>
+													</div>
+					</div>
+																								<div class="item">
+						<div class="title">
+															<a href="/catalog/odeyala/"> Одеяла</a>
+													</div>
+					</div>
+											</div>
+	</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-sm-3">
+                        <div class="first_bottom_menu">
+                            		<div class="bottom-menu">
+		<div class="items">
+																													 				<div class="item 0 childs   accordion-close " data-parent="#bottom_company" data-target="#bottom_company" >
+					<div class="title">
+													<a href="/company/">Компания</a>
+											</div>
+											<div class="compact_arrow">
+	                    	<i class="svg  svg-inline-down colored_theme_hover_bg-el" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5"><path  data-name="Rounded Rectangle 890 copy 2" class="cls-1" d="M517.778,610.8a0.721,0.721,0,0,1-1.016,0L514,607.769l-2.79,3.028a0.715,0.715,0,1,1-1.01-1.011l3.273-3.552c0.009-.009.012-0.021,0.021-0.03a0.723,0.723,0,0,1,1.017,0,0.022,0.022,0,0,1,0,0l3.265,3.577A0.712,0.712,0,0,1,517.778,610.8Z" transform="translate(-510 -606)"/></svg></i>						</div>
+									</div>
+									<div id="bottom_company" class="wrap panel-collapse wrap_compact_mobile">
+																											<div class="item">
+								<div class="title">
+																			<a href="/company/">О компании</a>
+																	</div>
+							</div>
+																											<div class="item">
+								<div class="title">
+																			<a href="/company/reviews/">Отзывы</a>
+																	</div>
+							</div>
+																											<div class="item">
+								<div class="title">
+																			<a href="/company/docs/">Документы</a>
+																	</div>
+							</div>
+											</div>
+													</div>
+	</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-3">
+                        <div class="second_bottom_menu">
+                            		<div class="bottom-menu">
+		<div class="items">
+																													 				<div class="item 0 childs   accordion-close " data-parent="#bottom_info" data-target="#bottom_info" >
+					<div class="title">
+													<a href="/info/">Информация</a>
+											</div>
+											<div class="compact_arrow">
+	                    	<i class="svg  svg-inline-down colored_theme_hover_bg-el" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5"><path  data-name="Rounded Rectangle 890 copy 2" class="cls-1" d="M517.778,610.8a0.721,0.721,0,0,1-1.016,0L514,607.769l-2.79,3.028a0.715,0.715,0,1,1-1.01-1.011l3.273-3.552c0.009-.009.012-0.021,0.021-0.03a0.723,0.723,0,0,1,1.017,0,0.022,0.022,0,0,1,0,0l3.265,3.577A0.712,0.712,0,0,1,517.778,610.8Z" transform="translate(-510 -606)"/></svg></i>						</div>
+									</div>
+									<div id="bottom_info" class="wrap panel-collapse wrap_compact_mobile">
+																											<div class="item">
+								<div class="title">
+																			<a href="/help/payment/">Условия оплаты</a>
+																	</div>
+							</div>
+																											<div class="item">
+								<div class="title">
+																			<a href="/help/delivery/">Условия доставки</a>
+																	</div>
+							</div>
+																											<div class="item">
+								<div class="title">
+																			<a href="/help/warranty/">Гарантия на товар</a>
+																	</div>
+							</div>
+																											<div class="item">
+								<div class="title">
+																			<a href="/policy/">Политика конфиденциальности</a>
+																	</div>
+							</div>
+																											<div class="item">
+								<div class="title">
+																			<a href="/help/faq/">Часто-задаваемые вопросы</a>
+																	</div>
+							</div>
+																											<div class="item">
+								<div class="title">
+																			<a href="/help/opt/">Оптовым покупателям</a>
+																	</div>
+							</div>
+											</div>
+													</div>
+	</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 col-sm-3">
+                        <div class="third_bottom_menu">
+                                                    </div>
+                    </div>
+                    <div class="col-md-3 col-sm-12 contact-block">
+                        <div class="info">
+                            <div class="row">
+                                                                    <div class="col-md-12 col-sm-12">
+                                        <div class="subscribe_button">
+                                            <span class="btn" data-event="jqm" data-param-id="subscribe" data-param-type="subscribe" data-name="subscribe">Подписаться на рассылку<i class="svg inline  svg-inline-subscribe" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="21" height="16" viewBox="0 0 21 16"><path  data-name="Rounded Rectangle 873 copy 3" class="cls-1" d="M286,133.856a0.949,0.949,0,0,1,0,.226c0,0.006,0,.013,0,0.02a0.955,0.955,0,0,1-.112.357l-4.958,10.883a0.927,0.927,0,0,1-.046.153,0.974,0.974,0,0,1-.179.214h0a0.974,0.974,0,0,1-.28.2c-0.017.008-.032,0.019-0.05,0.026a0.972,0.972,0,0,1-.267.063,1.07,1.07,0,0,1-.127.012,0.989,0.989,0,0,1-.213-0.036,1.01,1.01,0,0,1-.132-0.022c-0.021-.009-0.035-0.027-0.056-0.036s-0.036-.007-0.052-0.016l-3.133-1.8-3.523,4.4a22.232,22.232,0,0,1-.2.229,0.96,0.96,0,0,1-.218.147,1.048,1.048,0,0,1-.1.047,0.975,0.975,0,0,1-.3.06c-0.019,0-.035.011-0.054,0.011s-0.017,0-.026,0a0.968,0.968,0,0,1-.293-0.06,0.821,0.821,0,0,1-.1-0.033,0.792,0.792,0,0,1-.082-0.028,0.906,0.906,0,0,1-.131-0.116,0.73,0.73,0,0,1-.233-0.284,0.887,0.887,0,0,1-.069-0.142,1.032,1.032,0,0,1-.043-0.213A0.964,0.964,0,0,1,271,148v-6.986l-5.32-3.05a0.979,0.979,0,0,1-.618-0.621,1.19,1.19,0,0,1-.044-0.118c0-.014-0.012-0.024-0.014-0.039a0.749,0.749,0,0,1,0-.082,0.966,0.966,0,0,1,1.118-1.112L284.851,133c0.027,0,.052.005,0.078,0s0.047,0,.071,0a0.98,0.98,0,0,1,.307.037,0.906,0.906,0,0,1,.089.042,0.96,0.96,0,0,1,.233.128,1.008,1.008,0,0,1,.122.13,0.957,0.957,0,0,1,.119.15c0.011,0.018.029,0.029,0.039,0.048a1,1,0,0,1,.059.212,0.661,0.661,0,0,1,.028.074A0.226,0.226,0,0,1,286,133.856Zm-6.453,9.739,3.332-7.314-8.3,4.467ZM273,145.17l1.651-2.064L273,142.16v3.01Zm-0.462-5.59,6.83-3.676-10.359,1.653Z" transform="translate(-265 -133)"/></svg></i></span>
+                                        </div>
+                                    </div>
+                                <div class="col-md-12 col-sm-12">
+                                    <div class="phone blocks">
+                                        <div class="inline-block">
+                                                                            <!-- noindex -->
+            <div class="phone with_dropdown white sm">
+                                    <div class="wrap">
+                        <div>
+                                    <i class="svg svg-inline-phone  inline " aria-hidden="true"><svg width="5" height="13" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#phone_footer"></use></svg></i><a rel="nofollow" href="tel:88002010824">8 800 201 08 24</a>
+                                        </div>
+                    </div>
+                                            </div>
+            <!-- /noindex -->
+                                                        </div>
+                                                                                                                    </div>
+                                </div>
+                                <div class="col-md-12 col-sm-12">
+        
+                            <div class="email blocks">
+                    <i class="svg inline  svg-inline-email" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="11" height="9" viewBox="0 0 11 9"><path  data-name="Rectangle 583 copy 16" class="cls-1" d="M367,142h-7a2,2,0,0,1-2-2v-5a2,2,0,0,1,2-2h7a2,2,0,0,1,2,2v5A2,2,0,0,1,367,142Zm0-2v-3.039L364,139h-1l-3-2.036V140h7Zm-6.634-5,3.145,2.079L366.634,135h-6.268Z" transform="translate(-358 -133)"/></svg></i>                    <a href="mailto:HelloEkotoriya@yandex.ru">helloekotoriya@yandex.ru</a>                </div>
+        
+                                    </div>
+                                <div class="col-md-12 col-sm-12">
+                                                        <div class="address blocks">
+                <i class="svg inline  svg-inline-addr" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="9" height="12" viewBox="0 0 9 12"><path class="cls-1" d="M959.135,82.315l0.015,0.028L955.5,87l-3.679-4.717,0.008-.013a4.658,4.658,0,0,1-.83-2.655,4.5,4.5,0,1,1,9,0A4.658,4.658,0,0,1,959.135,82.315ZM955.5,77a2.5,2.5,0,0,0-2.5,2.5,2.467,2.467,0,0,0,.326,1.212l-0.014.022,2.181,3.336,2.034-3.117c0.033-.046.063-0.094,0.093-0.142l0.066-.1-0.007-.009a2.468,2.468,0,0,0,.32-1.2A2.5,2.5,0,0,0,955.5,77Z" transform="translate(-951 -75)"/></svg></i>                <div class="title font_upper muted">Адрес производства</div>
+г. Череповец, ул. Гоголя 56            </div>
+                                                        </div>
+                            </div>
+                        </div>
+                                            </div>
+                </div>
+            </div>
+        </div>
+        <div class="footer_middle">
+            <div class="maxwidth-theme">
+                <div class="row">
+                    <div class="col-md-12 col-sm-12">
+                        <div class="social-block">
+                            <div class="social-icons">
+		{% include 'site_socials.html' %}
+</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="footer_bottom">
+            <div class="maxwidth-theme">
+                <div class="footer-bottom__items-wrapper">
+                    <div class="footer-bottom__item copy font_xs">
+                        Экотория - производитель качественных наматрасников и постельного белья. Интернет-магазин.  &copy; 2026                    </div>
+                    <div id="bx-composite-banner"></div>
+                    <div class="footer-bottom__item pays">
+                        <!--<i title="Cash" class="cacsh"></i>
+<i title="MasterCard" class="mastercard"></i>
+<i title="Visa" class="visa"></i>
+<i title="WebMoney" class="webmoney"></i>
+<i title="Qiwi" class="qiwi"></i>
+<i title="Sberbank" class="sbrf"></i>
+<i title="Alfa" class="alfa"></i>
+<i title="Mir" class="mir"></i>
+<i title="Jcb" class="jcb"></i>
+<i title="PayPal" class="paypal"></i>
+<i title="Maestro" class="maestro"></i>
+<i title="Yoomoney" class="yoomoney"></i>
+<i title="Yookassa" class="yookassa"></i>
+<i title="Belkart" class="belkart"></i>
+<i title="Halva" class="halva"></i>
+<i title="Tinkoff" class="tinkoff"></i>-->
+                    </div>
+                                    </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- marketnig popups -->
+<!--'start_frame_cache_cdmcEY'-->	<!--'end_frame_cache_cdmcEY'--><!-- /marketnig popups -->		</footer>
+		<div class="bx_areas">
+	<!-- Yandex.Metrika counter -->
+<script >
+   (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+   m[i].l=1*new Date();
+   for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; {{ '}}' }}
+   k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+   (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+   ym(96433627, "init", {
+        clickmap:true,
+        trackLinks:true,
+        accurateTrackBounce:true,
+        webvisor:true
+   });
+</script></div>
+	<div class="inline-search-block fixed with-close big">
+		<div class="search-wrapper search-maxwidth-wrapper">
+			<div id="title-search">
+				<form action="/catalog/" class="search search--hastype">
+					<div class="search-input-div">
+						<input class="search-input" id="title-search-input" type="text" name="q" value="" placeholder="Поиск" size="20" maxlength="50" autocomplete="off" />
+					</div>
+					<div class="search-button-div">
+						<button class="btn btn-search btn-default btn-lg " type="submit" name="s" value="Найти">Найти</button>
+													<div class="dropdown-select searchtype searchtype--drop2left">
+								<input type="hidden" name="type" value="catalog" />
+								<div class="dropdown-select__title darken">
+									<span>Каталог</span>
+									<i class="svg  svg-inline-search-down" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="5" height="3" viewBox="0 0 5 3"><path class="cls-1" d="M250,80h5l-2.5,3Z" transform="translate(-250 -80)"/></svg></i>								</div>
+								<div class="dropdown-select__list dropdown-menu-wrapper" role="menu">
+									<!--noindex-->
+									<div class="dropdown-menu-inner rounded3">
+										<div class="dropdown-select__list-item font_xs">
+											<span class="dropdown-select__list-link darken" data-type="all">
+												<span>По всему сайту</span>
+											</span>
+										</div>
+										<div class="dropdown-select__list-item font_xs">
+											<span class="dropdown-select__list-link dropdown-select__list-link--current" data-type="catalog">
+												<span>По каталогу</span>
+											</span>
+										</div>
+									</div>
+									<!--/noindex-->
+								</div>
+							</div>
+						<span class="close-block inline-search-hide"><i class="svg inline  svg-inline-search svg-close close-icons colored_theme_hover" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path data-name="Rounded Rectangle 114 copy 3" class="cccls-1" d="M334.411,138l6.3,6.3a1,1,0,0,1,0,1.414,0.992,0.992,0,0,1-1.408,0l-6.3-6.306-6.3,6.306a1,1,0,0,1-1.409-1.414l6.3-6.3-6.293-6.3a1,1,0,0,1,1.409-1.414l6.3,6.3,6.3-6.3A1,1,0,0,1,340.7,131.7Z" transform="translate(-325 -130)"></path></svg></i></span>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+<script>
+	var jsControl = new JCTitleSearch2({
+		//'WAIT_IMAGE': '/static/bitrix/themes/.default/images/wait.gif',
+		'AJAX_PAGE' : '/blog/sovety-pokupatelyam/namatrasnik-dlya-detey-i-podrostkov-est-li-otlichiya-ot-vzroslogo/',
+		'CONTAINER_ID': 'title-search',
+		'INPUT_ID': 'title-search-input',
+		'INPUT_ID_TMP': 'title-search-input',
+		'MIN_QUERY_LEN': 2
+	});
+</script><!--'start_frame_cache_basketitems-block'-->
+                                <script>
+                                    function jsPriceFormat(_number){
+                        BX.Currency.setCurrencyFormat('RUB', {'CURRENCY':'RUB','LID':'ru','FORMAT_STRING':'# &#8381;','FULL_NAME':'Российский рубль','DEC_POINT':'.','THOUSANDS_SEP':'&nbsp;','DECIMALS':'2','THOUSANDS_VARIANT':'B','HIDE_ZERO':'Y','CREATED_BY':'','DATE_CREATE':'2024-01-12 22:03:38','MODIFIED_BY':'1','TIMESTAMP_X':'2024-01-18 18:11:29','TEMPLATE':{'SINGLE':'# &#8381;','PARTS':['#',' &#8381;'],'VALUE_INDEX':'0'{{ '}}' }});
+                        return BX.Currency.currencyFormat(_number, 'RUB', true);
+                    }
+                            </script>
+                <script>
+            var arAsproCounters = arBasketAspro = {'BASKET':[],'SUBSCRIBE':[],'NOT_AVAILABLE':[],'SERVICES':[],'COMPARE':{'ITEMS':[],'COUNT':'0'},'FAVORITE':{'ITEMS':[],'COUNT':'0'{{ '}}' }};
+            $(document).ready(function(){
+                setBasketStatusBtn();
+            });
+        </script>
+        <!--'end_frame_cache_basketitems-block'-->                                                                                                <div class="basket_fly_forms basket_fill_WHITE">
+                        <div class="wrap_cont">
+                            <div class="opener">
+                                            </div>
+                        </div>
+                    </div>
+                
+                    <div id="body_iframe_wrapper"></div>
+<div id="popup_iframe_wrapper"></div>
+	</body>
+</html>

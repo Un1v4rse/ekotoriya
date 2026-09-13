@@ -1,0 +1,10 @@
+
+; /* Start:"a:4:{s:4:"full";s:94:"/bitrix/templates/aspro_max/components/bitrix/news.list/front_news/script.min.js?1705594194523";s:6:"source";s:76:"/bitrix/templates/aspro_max/components/bitrix/news.list/front_news/script.js";s:3:"min";s:0:"";s:3:"map";s:0:"";}"*/
+$(document).ready((function(){var containerEl=document.querySelector(".mixitup-container");if(containerEl){var config,mixer=mixitup(containerEl,{selectors:{target:'[data-ref="mixitup-target"]'},animation:{effects:"fade scale stagger(50ms)"},load:{filter:"none"},animation:{duration:350},controls:{scope:"local"},callbacks:{onMixStart:function(state){},onMixEnd:function(){InitLazyLoad()}}});containerEl.classList.add("mixitup-ready"),mixer.show().then((function(){mixer.configure({animation:{effects:"fade scale"}})}))}}));
+/* End */
+;
+; /* Start:"a:4:{s:4:"full";s:66:"/bitrix/templates/aspro_max/js/section_filter.min.js?1768243611879";s:6:"source";s:48:"/bitrix/templates/aspro_max/js/section_filter.js";s:3:"min";s:0:"";s:3:"map";s:0:"";}"*/
+$(document).ready((function(){InitScrollBar(),$(".select_head_wrap .menu_item_selected span").text($(".select_head_wrap .head-block .item-link.active").text()),$(".select_head_wrap .menu_item_selected").on("click",(function(){window.matchMedia("(max-width: 767px)").matches&&($(this).toggleClass("opened"),$(this).closest(".select_head_wrap").find(".head-block").slideToggle(200))})),$(".select_head_wrap .btn-inline").on("click",(function(){var text=$(this).text(),head_wrap=$(this).closest(".select_head_wrap");head_wrap.find(".menu_item_selected span").text(text),head_wrap.find(".menu_item_selected").removeClass("opened"),window.matchMedia("(max-width: 767px)").matches&&head_wrap.find(".head-block").slideUp(200)})),$("html, body").on("mousedown",(function(e){$(e.target).closest(".select_head_wrap").length||$(".select_head_wrap .menu_item_selected.opened").click()}))}));
+/* End */
+;; /* /bitrix/templates/aspro_max/components/bitrix/news.list/front_news/script.min.js?1705594194523*/
+; /* /bitrix/templates/aspro_max/js/section_filter.min.js?1768243611879*/

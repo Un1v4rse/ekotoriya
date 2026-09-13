@@ -1,0 +1,1580 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление сайтом — Экотория</title>
+    <style>
+        :root {
+            --bg: #f4f4f8;
+            --card: #fff;
+            --accent: #b49d84;
+            --accent-dark: #9a8269;
+            --text: #333;
+            --border: #ddd;
+            --danger: #c00;
+            --ok: #137333;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+        }
+        header {
+            background: var(--accent);
+            color: #fff;
+            padding: 0.9rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        header h1 { margin: 0; font-size: 1.2rem; font-weight: 600; }
+        header a { color: #fff; text-decoration: none; font-weight: 500; margin-left: 1rem; }
+        .wrap { max-width: 1600px; margin: 0 auto; padding: 1.25rem; }
+        .grid { display: grid; grid-template-columns: 260px 1fr; gap: 1.25rem; align-items: start; }
+        nav {
+            background: var(--card);
+            border-radius: 10px;
+            padding: 0.9rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 76px;
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+        nav h3 { margin: 0.6rem 0 0.4rem; font-size: 0.75rem; color: #999; text-transform: uppercase; letter-spacing: 0.04em; }
+        nav h3:first-child { margin-top: 0; }
+        nav button {
+            width: 100%;
+            text-align: left;
+            padding: 0.55rem 0.8rem;
+            border: 0;
+            background: transparent;
+            border-radius: 7px;
+            cursor: pointer;
+            color: var(--text);
+            font-size: 0.9rem;
+            margin-bottom: 0.15rem;
+        }
+        nav button:hover, nav button.active { background: var(--bg); color: var(--accent-dark); font-weight: 600; }
+        nav button small { display: block; color: #aaa; font-weight: normal; font-size: 0.72rem; }
+        main { min-width: 0; }
+        section { display: none; background: var(--card); border-radius: 10px; padding: 1.4rem 1.6rem; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        section.active { display: block; }
+        h2 { margin-top: 0; font-size: 1.25rem; }
+        h3 { font-size: 1rem; }
+        .field { margin-bottom: 0.9rem; }
+        label { display: block; font-weight: 600; margin-bottom: 0.3rem; font-size: 0.88rem; }
+        input[type="text"], input[type="email"], input[type="tel"], input[type="url"], input[type="number"], textarea, select {
+            width: 100%;
+            padding: 0.55rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            font-size: 0.93rem;
+            font-family: inherit;
+            background: #fff;
+        }
+        input[type="color"] { width: 60px; height: 38px; padding: 2px; border: 1px solid var(--border); border-radius: 7px; background: #fff; cursor: pointer; }
+        textarea { min-height: 70px; resize: vertical; }
+        textarea.code { min-height: 260px; font-family: Consolas, Monaco, monospace; font-size: 0.82rem; }
+        .help { color: #888; font-size: 0.83rem; margin-top: 0.25rem; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+        .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.9rem; }
+        .actions {
+            position: sticky;
+            bottom: 0;
+            background: var(--card);
+            border-top: 1px solid var(--border);
+            padding: 0.9rem 0 0;
+            margin-top: 1.2rem;
+            display: flex;
+            gap: 0.8rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        button.primary {
+            background: var(--accent);
+            color: #fff;
+            border: 0;
+            padding: 0.65rem 1.4rem;
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 0.97rem;
+            font-weight: 600;
+        }
+        button.primary:hover { background: var(--accent-dark); }
+        button.primary:disabled { opacity: 0.6; cursor: default; }
+        button.secondary {
+            background: #fff;
+            border: 1px solid var(--accent);
+            color: var(--accent-dark);
+            padding: 0.6rem 1.1rem;
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        button.secondary:hover { background: #faf6f1; }
+        button.danger {
+            background: #fff;
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            padding: 0.45rem 0.9rem;
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .msg { padding: 0.6rem 1rem; border-radius: 7px; display: none; font-size: 0.9rem; }
+        .msg.success { background: #e6f4ea; color: var(--ok); border: 1px solid #b7e1c4; }
+        .msg.error { background: #fce8e8; color: #a50e0e; border: 1px solid #f5c6c6; }
+        .page-meta { color: #999; font-size: 0.83rem; }
+        .preview-img { margin-top: 0.4rem; max-width: 180px; }
+        .preview-img img { max-width: 100%; height: auto; border: 1px solid var(--border); border-radius: 6px; }
+
+        /* ================= Редактор страницы (как в Tilda) ================= */
+        .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.8rem; }
+        .page-head h2 { margin: 0 0 0.2rem; border-bottom: 2px solid var(--accent); padding-bottom: 0.4rem; }
+        details.page-params { border: 1px solid var(--border); border-radius: 8px; padding: 0.55rem 0.9rem; margin-bottom: 1rem; background: #fbfbfb; }
+        details.page-params summary { cursor: pointer; font-weight: 600; font-size: 0.88rem; color: #666; }
+        details.page-params .inner { padding-top: 0.8rem; }
+        details.dev { margin-top: 1rem; border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.9rem; }
+        details.dev summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; color: #777; }
+
+        .editor-split { display: grid; grid-template-columns: 430px minmax(0, 1fr); gap: 1.1rem; align-items: start; }
+        .editor-left { min-width: 0; }
+        .editor-right { position: sticky; top: 76px; }
+        .add-block-btn {
+            width: 100%;
+            padding: 0.85rem;
+            border: 2px dashed var(--accent);
+            background: #fbf8f4;
+            color: var(--accent-dark);
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            margin-bottom: 0.8rem;
+            font-family: inherit;
+        }
+        .add-block-btn:hover { background: var(--accent); color: #fff; border-style: solid; }
+        .preview-bar { display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: #999; padding: 0 0.2rem 0.4rem; }
+        #preview-iframe { width: 100%; height: calc(100vh - 250px); min-height: 500px; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+
+        .blk-item { border: 1px solid var(--border); border-radius: 9px; margin-bottom: 0.5rem; background: #fff; }
+        .blk-item.dragging { opacity: 0.35; }
+        .blk-item.drop-before { box-shadow: 0 -3px 0 0 var(--accent); }
+        .blk-item.drop-after { box-shadow: 0 3px 0 0 var(--accent); }
+        .blk-row { display: flex; align-items: center; gap: 0.45rem; padding: 0.5rem 0.6rem; cursor: pointer; user-select: none; }
+        .blk-row:hover { background: #fafafa; }
+        .blk-item.open .blk-row { background: #f7f3ee; }
+        .blk-drag { cursor: grab; color: #c0c0c0; font-size: 0.75rem; letter-spacing: -2px; }
+        .blk-num { color: #bbb; font-size: 0.72rem; width: 1.6em; font-weight: 700; }
+        .blk-badge { font-weight: 600; font-size: 0.85rem; white-space: nowrap; }
+        .blk-snippet { flex: 1; color: #a0a0a0; font-size: 0.76rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; min-width: 0; }
+        .blk-actions { display: flex; gap: 0.2rem; flex: none; }
+        .blk-actions button {
+            border: 1px solid var(--border);
+            background: #fff;
+            border-radius: 6px;
+            width: 26px;
+            height: 26px;
+            cursor: pointer;
+            font-size: 0.72rem;
+            color: #555;
+            line-height: 1;
+        }
+        .blk-actions button:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .blk-actions button.a-del:hover { background: var(--danger); border-color: var(--danger); }
+        .blk-settings { padding: 0.8rem 0.9rem; border-top: 1px solid var(--border); display: none; }
+        .blk-item.open .blk-settings { display: block; }
+        .blk-item.legacy .blk-row { background: #fff8e6; }
+        .blk-empty { border: 2px dashed var(--border); border-radius: 10px; text-align: center; color: #999; padding: 1.6rem 1rem; font-size: 0.9rem; }
+
+        /* Галерея блоков (модальное окно) */
+        .gallery-overlay { position: fixed; inset: 0; background: rgba(30, 25, 20, 0.5); display: none; z-index: 100; overflow-y: auto; padding: 2.5rem 1rem; }
+        .gallery-overlay.open { display: block; }
+        .gallery { max-width: 880px; margin: 0 auto; background: #fff; border-radius: 14px; padding: 1.4rem 1.5rem; }
+        .gallery-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .gallery-head h3 { margin: 0; font-size: 1.1rem; }
+        .gallery-close { border: 0; background: #f0f0f0; border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 1rem; }
+        .gallery-close:hover { background: var(--danger); color: #fff; }
+        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.9rem; }
+        .gcard { border: 2px solid var(--border); border-radius: 10px; padding: 0.6rem; cursor: pointer; background: #fff; }
+        .gcard:hover { border-color: var(--accent); background: #fbf8f4; }
+        .gmock {
+            height: 88px;
+            border-radius: 7px;
+            background: #f4f4f8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 10px;
+            overflow: hidden;
+        }
+        .gname { font-weight: 700; font-size: 0.88rem; margin-top: 0.5rem; text-align: center; }
+        .gdesc { color: #999; font-size: 0.75rem; margin-top: 0.15rem; text-align: center; }
+        .gm-bar { background: #cfcfcf; border-radius: 3px; }
+        .gm-img { width: 100%; height: 100%; background: #e2e2e8; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 1.4rem; }
+        .gm-btn { background: var(--accent); color: #fff; border-radius: 20px; padding: 4px 18px; font-size: 0.7rem; font-weight: 700; }
+        .gm-video { width: 100%; height: 100%; background: #3a3a3a; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.3rem; }
+        .gm-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; width: 100%; }
+        .gm-card-mini { background: #fff; border: 1px solid #ddd; border-radius: 4px; height: 34px; padding: 3px; }
+        .gm-card-mini .im { background: #eee; height: 16px; border-radius: 2px; }
+        .gm-card-mini .tx { background: #ddd; height: 5px; border-radius: 2px; margin-top: 4px; }
+        .gm-line { width: 80%; height: 2px; background: #cfcfcf; }
+        .gm-code { color: #999; font-family: monospace; font-size: 1rem; }
+
+        /* Меню-редактор */
+        .mnode { border-left: 2px solid var(--border); margin-left: 0.4rem; padding-left: 0.7rem; }
+        .mrow { display: flex; gap: 0.45rem; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; }
+        .mrow input[type="text"] { flex: 2; min-width: 130px; }
+        .mrow input.url { flex: 2; min-width: 130px; }
+        .mrow button {
+            border: 1px solid var(--border);
+            background: #fff;
+            border-radius: 6px;
+            width: 30px;
+            height: 32px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: #555;
+            flex: none;
+        }
+        .mrow button:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .mrow button.del:hover { background: var(--danger); border-color: var(--danger); }
+        .mrow button.addchild { width: auto; padding: 0 0.6rem; font-size: 0.78rem; }
+
+        /* Товары WB/Ozon */
+        .prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 1rem; margin-top: 1rem; }
+        .prod-card { border: 1px solid var(--border); border-radius: 9px; padding: 0.9rem; background: #fff; }
+        .prod-card img { width: 100%; height: 150px; object-fit: contain; background: #f8f8f8; border-radius: 6px; margin-bottom: 0.5rem; }
+        .prod-card .pname { font-weight: 600; font-size: 0.88rem; min-height: 2.6em; overflow: hidden; margin-bottom: 0.4rem; }
+        .prod-card .old { text-decoration: line-through; color: #999; font-size: 0.83rem; }
+        .prod-card .new { font-weight: 700; color: var(--danger); margin-left: 0.4rem; }
+        .prod-card .disc-row { display: flex; gap: 0.4rem; margin-top: 0.4rem; }
+        .prod-card .disc-row input { flex: 1; padding: 0.35rem 0.5rem; }
+
+        table.adm { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+        table.adm th { background: #f4f4f8; padding: 0.45rem 0.6rem; border: 1px solid var(--border); text-align: left; }
+        table.adm td { padding: 0.45rem 0.6rem; border: 1px solid var(--border); }
+        .table-wrap { overflow-x: auto; }
+
+        @media (max-width: 1100px) {
+            .grid { grid-template-columns: 1fr; }
+            nav { position: static; max-height: none; }
+            .editor-split { grid-template-columns: 1fr; }
+            .editor-right { position: static; }
+            #preview-iframe { height: 480px; }
+        }
+        @media (max-width: 700px) {
+            .row, .row3 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🛠 Управление сайтом «Экотория»</h1>
+        <div><a href="/" target="_blank">Открыть сайт ↗</a></div>
+    </header>
+    <div class="wrap">
+        <div class="grid">
+            <nav>
+                <h3>Страницы сайта</h3>
+                <div id="pages-list"></div>
+                <div style="margin-top:0.5rem;display:flex;gap:0.4rem;flex-wrap:wrap;">
+                    <button type="button" class="secondary" onclick="showAddPage()" style="font-size:0.82rem;padding:0.35rem 0.6rem;">+ Новая страница</button>
+                    <button type="button" class="danger" onclick="deleteCurrentPage()" style="font-size:0.82rem;">Удалить</button>
+                </div>
+                <div id="add-page-form" style="display:none;margin-top:0.7rem;padding:0.7rem;border:1px solid var(--border);border-radius:8px;background:#f9f9f9;">
+                    <div class="field">
+                        <label>Адрес (латиницей, без пробелов)</label>
+                        <input type="text" id="new-page-slug" placeholder="akcii">
+                        <div class="help">Страница будет доступна по адресу /akcii/</div>
+                    </div>
+                    <div class="field">
+                        <label>Название страницы</label>
+                        <input type="text" id="new-page-title" placeholder="Акции">
+                    </div>
+                    <div style="display:flex;gap:0.5rem;">
+                        <button type="button" class="primary" onclick="addPage()" style="font-size:0.85rem;padding:0.4rem 0.9rem;">Создать</button>
+                        <button type="button" class="secondary" onclick="hideAddPage()" style="font-size:0.85rem;padding:0.4rem 0.9rem;">Отмена</button>
+                    </div>
+                    <div id="add-page-result" class="help" style="margin-top:0.4rem;"></div>
+                </div>
+                <hr style="border:0;border-top:1px solid var(--border);margin:0.9rem 0;">
+                <button data-tab="site">🏠 Настройки сайта</button>
+                <button data-tab="theme">🎨 Дизайн: цвета и шрифты</button>
+                <button data-tab="menu">☰ Меню сайта</button>
+                <button data-tab="socials">👍 Соцсети</button>
+                <button data-tab="wildberries">🛍 Wildberries</button>
+                <button data-tab="ozon">🛍 Ozon</button>
+                <button data-tab="customers">👥 Клиенты и заявки</button>
+                <button data-tab="seo">📈 Продвижение (SEO)</button>
+                <button data-tab="backup">💾 Резервная копия</button>
+            </nav>
+            <main>
+                <section id="tab-page" class="active">
+                    <div class="page-head">
+                        <div>
+                            <h2>Редактор страницы</h2>
+                            <div class="page-meta" id="page-meta"></div>
+                        </div>
+                        <a href="#" id="page-open-link" target="_blank" class="secondary" style="text-decoration:none;display:inline-block;">Открыть на сайте ↗</a>
+                        <a href="#" id="page-edit-link" target="_blank" class="secondary" style="text-decoration:none;display:inline-block;background:var(--accent);color:#fff;border-color:var(--accent);">✏ Редактировать на странице</a>
+                    </div>
+
+                    <details class="page-params">
+                        <summary>Параметры страницы: название вкладки, заголовок, описание для поисковиков</summary>
+                        <div class="inner">
+                            <div class="row">
+                                <div class="field">
+                                    <label>Название вкладки браузера (title)</label>
+                                    <input type="text" id="page-title" data-page-path="title">
+                                </div>
+                                <div class="field">
+                                    <label>Заголовок страницы (H1)</label>
+                                    <input type="text" id="page-h1" data-page-path="h1">
+                                </div>
+                            </div>
+                            <div class="field" style="margin-bottom:0;">
+                                <label>Описание для поисковиков (meta description)</label>
+                                <textarea id="page-meta-description" data-page-path="meta_description" rows="2"></textarea>
+                            </div>
+                        </div>
+                    </details>
+
+                    <div class="editor-split">
+                        <div class="editor-left">
+                            <button type="button" class="add-block-btn" onclick="openGallery()">+ Добавить блок</button>
+                            <div id="blocks-list"><p class="help">Загрузка…</p></div>
+                        </div>
+                        <div class="editor-right">
+                            <div class="preview-bar">
+                                <span>Предпросмотр — страница выглядит так для посетителей</span>
+                                <span id="preview-status"></span>
+                            </div>
+                            <iframe id="preview-iframe" title="Предпросмотр страницы"></iframe>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-site">
+                    <h2>Настройки сайта</h2>
+                    <div class="row">
+                        <div class="field">
+                            <label for="site-title">Название сайта</label>
+                            <input type="text" id="site-title" data-path="site.title">
+                        </div>
+                        <div class="field">
+                            <label for="site-phone">Телефон</label>
+                            <input type="tel" id="site-phone" data-path="site.phone">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="field">
+                            <label for="site-email">Email</label>
+                            <input type="email" id="site-email" data-path="site.email">
+                        </div>
+                        <div class="field">
+                            <label for="site-address">Адрес</label>
+                            <input type="text" id="site-address" data-path="site.address">
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>Логотип</label>
+                        <input type="file" id="logo-file" accept="image/*">
+                        <button type="button" class="secondary" style="margin-top:0.4rem;" onclick="uploadLogo()">Загрузить логотип</button>
+                        <div id="logo-upload-result" class="help"></div>
+                        <div class="preview-img"><img id="logo-preview" src="" alt="logo"></div>
+                    </div>
+                </section>
+
+                <section id="tab-theme">
+                    <h2>Дизайн: цвета и шрифты</h2>
+                    <div class="help" style="margin-bottom:1rem;">Изменения применяются ко всему сайту сразу после сохранения.</div>
+                    <div class="row3">
+                        <div class="field">
+                            <label for="theme-primary">Основной цвет</label>
+                            <input type="color" id="theme-primary" data-path="site.theme.primary_color">
+                        </div>
+                        <div class="field">
+                            <label for="theme-secondary">Тёмный оттенок</label>
+                            <input type="color" id="theme-secondary" data-path="site.theme.secondary_color">
+                        </div>
+                        <div class="field">
+                            <label for="theme-accent">Акцентный цвет</label>
+                            <input type="color" id="theme-accent" data-path="site.theme.accent_color">
+                        </div>
+                    </div>
+                    <div class="row3">
+                        <div class="field">
+                            <label for="theme-text">Цвет текста</label>
+                            <input type="color" id="theme-text" data-path="site.theme.text_color">
+                        </div>
+                        <div class="field">
+                            <label for="theme-bg">Цвет фона</label>
+                            <input type="color" id="theme-bg" data-path="site.theme.bg_color">
+                        </div>
+                        <div class="field"></div>
+                    </div>
+                    <div class="row">
+                        <div class="field">
+                            <label for="theme-font-family">Шрифт сайта</label>
+                            <select id="theme-font-family" data-path="site.theme.font_family"></select>
+                        </div>
+                        <div class="field">
+                            <label for="theme-font-size">Размер текста</label>
+                            <select id="theme-font-size" data-path="site.theme.font_size">
+                                <option value="14px">Мелкий (14px)</option>
+                                <option value="15px">Небольшой (15px)</option>
+                                <option value="16px">Обычный (16px)</option>
+                                <option value="17px">Крупный (17px)</option>
+                                <option value="18px">Очень крупный (18px)</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-menu">
+                    <h2>Меню сайта</h2>
+                    <div class="help" style="margin-bottom:1rem;">Это меню показывается в шапке сайта (компьютер и телефон). «Подпункты» — выпадающий список при наведении.</div>
+                    <div id="menu-editor"></div>
+                    <button type="button" class="secondary" onclick="menuAddRoot()">+ Добавить пункт меню</button>
+                </section>
+
+                <section id="tab-socials">
+                    <h2>Социальные сети</h2>
+                    <div class="help" style="margin-bottom:1rem;">Иконки соцсетей в подвале и шапке сайта.</div>
+                    <div id="socials-editor"></div>
+                    <button type="button" class="secondary" onclick="socialAdd()">+ Добавить соцсеть</button>
+                </section>
+
+                <section id="tab-wildberries">
+                    <h2>Wildberries — товары и скидки</h2>
+                    <div class="field">
+                        <label for="wb-token">API-токен WB (категория «Контент» или «Цены и скидки»)</label>
+                        <input type="text" id="wb-token" data-path="site.wb_api_token" placeholder="Оставьте пустым — будет демо-каталог">
+                        <div class="help">Товары загружаются официальным API продавца WB (api-seller.wildberries.ru): карточки и фото — через «Контент», цены и скидки — через «Цены и скидки». Токен создаётся в кабинете WB: Настройки → Доступ к API. <a href="https://dev.wildberries.ru" target="_blank">Документация WB API ↗</a></div>
+                    </div>
+                    <div class="field">
+                        <button type="button" class="secondary" onclick="wbSync()">🔄 Загрузить / обновить товары с WB</button>
+                        <span id="wb-sync-result" class="help" style="display:inline;margin-left:0.5rem;"></span>
+                    </div>
+                    <div id="wb-products"></div>
+                </section>
+
+                <section id="tab-ozon">
+                    <h2>Ozon — товары и скидки</h2>
+                    <div class="row">
+                        <div class="field">
+                            <label for="ozon-client-id">Ozon Client-ID</label>
+                            <input type="text" id="ozon-client-id" data-path="site.ozon_client_id" placeholder="Демо-режим">
+                        </div>
+                        <div class="field">
+                            <label for="ozon-api-key">Ozon Api-Key</label>
+                            <input type="text" id="ozon-api-key" data-path="site.ozon_api_key" placeholder="Демо-режим">
+                        </div>
+                    </div>
+                    <div class="help">Без ключей работает демо-режим. <a href="https://seller.ozon.ru/app/settings#api-keys" target="_blank">Где взять ключи</a></div>
+                    <div class="field" style="margin-top:0.8rem;">
+                        <button type="button" class="secondary" onclick="ozonSync()">🔄 Загрузить / обновить товары с Ozon</button>
+                        <span id="ozon-sync-result" class="help" style="display:inline;margin-left:0.5rem;"></span>
+                    </div>
+                    <div id="ozon-products"></div>
+                </section>
+
+                <section id="tab-customers">
+                    <h2>Клиенты и заявки</h2>
+                    <div class="field">
+                        <button type="button" class="secondary" onclick="loadCustomers()">🔄 Обновить список</button>
+                    </div>
+                    <h3>Заявки на покупку</h3>
+                    <div id="orders-list" class="table-wrap">
+                        <p class="help">Нажмите «Обновить список», чтобы загрузить заявки.</p>
+                    </div>
+                    <h3 style="margin-top:1.4rem;">База клиентов</h3>
+                    <div id="customers-list" class="table-wrap"></div>
+                </section>
+
+                <section id="tab-seo">
+                    <h2>Продвижение (SEO)</h2>
+                    <div class="row">
+                        <div class="field">
+                            <label for="seo-yandex">Яндекс.Метрика (номер счётчика)</label>
+                            <input type="text" id="seo-yandex" data-path="site.seo.yandex_metrika_id" placeholder="96433627">
+                        </div>
+                        <div class="field">
+                            <label for="seo-ga">Google Analytics (ID)</label>
+                            <input type="text" id="seo-ga" data-path="site.seo.google_analytics_id" placeholder="G-XXXXXXXXXX">
+                        </div>
+                    </div>
+                    <div class="help">Счётчики подключаются к каждой странице автоматически. Заодно для поисковиков работают <a href="/robots.txt" target="_blank">robots.txt ↗</a> и <a href="/sitemap.xml" target="_blank">sitemap.xml ↗</a> (обновляются сами).</div>
+                    <details class="dev">
+                        <summary>Дополнительно (для специалистов)</summary>
+                        <div class="field" style="margin-top:0.8rem;">
+                            <label for="seo-robots">robots.txt</label>
+                            <textarea id="seo-robots" data-path="site.seo.robots_txt" rows="5"></textarea>
+                        </div>
+                        <div class="field">
+                            <label for="seo-extra">Код в &lt;head&gt; каждой страницы</label>
+                            <textarea id="seo-extra" data-path="site.seo.extra_head" rows="4"></textarea>
+                            <div class="help">Верификация поисковиков, пиксели рекламы и т.п.</div>
+                        </div>
+                    </details>
+                </section>
+
+                <section id="tab-backup">
+                    <h2>Резервная копия</h2>
+                    <div class="field">
+                        <button type="button" class="secondary" onclick="downloadBackup()">⬇ Скачать резервную копию сайта (JSON)</button>
+                        <div class="help">Сохраните файл — в нём весь контент, настройки, меню и страницы.</div>
+                    </div>
+                    <div class="field">
+                        <button type="button" class="secondary" onclick="rebuild()">♻ Пересобрать шаблоны сайта</button>
+                        <div id="rebuild-result" class="help">Пригодится, если что-то в дизайне «поехало». Данные из конструктора и настройки сохранятся.</div>
+                    </div>
+                    <details class="dev">
+                        <summary>JSON данных (для разработчиков)</summary>
+                        <div class="field" style="margin-top:0.8rem;">
+                            <textarea class="code" id="raw-json" readonly></textarea>
+                        </div>
+                    </details>
+                </section>
+
+                <div class="actions">
+                    <button class="primary" onclick="save()">💾 Сохранить всё</button>
+                    <button class="secondary" onclick="location.reload()">Сбросить изменения</button>
+                    <span class="msg" id="msg"></span>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Галерея блоков (как в Tilda) -->
+    <div class="gallery-overlay" id="gallery-overlay">
+        <div class="gallery">
+            <div class="gallery-head">
+                <h3>Добавить блок</h3>
+                <button type="button" class="gallery-close" onclick="closeGallery()" title="Закрыть">✕</button>
+            </div>
+            <div class="gallery-grid" id="gallery-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        let data = {{ content | tojson | safe }};
+        let currentPageIndex = 0;
+        const pageHtmlCache = {};   // slug -> исходный content_html (для блока «дизайн исходной страницы»)
+        let openIndexes = new Set();
+        let dragIndex = null;
+        let previewTimer = null;
+        let previewSeq = 0;
+
+        const BLOCK_TYPES = {
+            heading: {
+                icon: '𝐇', label: 'Заголовок',
+                desc: 'Крупный заголовок раздела',
+                mock: '<div class="gm-bar" style="width:70%;height:10px;background:#9a8269;"></div>',
+                make: () => ({type: 'heading', level: 'h2', text: 'Новый заголовок'}),
+            },
+            text: {
+                icon: '📝', label: 'Текст',
+                desc: 'Абзацы текста. Пустая строка — новый абзац',
+                mock: '<div class="gm-bar" style="width:95%;height:6px;"></div><div class="gm-bar" style="width:90%;height:6px;"></div><div class="gm-bar" style="width:60%;height:6px;"></div>',
+                make: () => ({type: 'text', text: 'Новый текст. Напишите здесь о вашем товаре, услуге или акции. Пустая строка между предложениями создаст новый абзац.'}),
+            },
+            image: {
+                icon: '🖼', label: 'Картинка',
+                desc: 'Фото: загрузка с компьютера или по ссылке',
+                mock: '<div class="gm-img">🖼</div>',
+                make: () => ({type: 'image', src: '', alt: '', caption: ''}),
+            },
+            button: {
+                icon: '🔘', label: 'Кнопка',
+                desc: 'Кнопка с ссылкой: «Купить», «Позвонить»…',
+                mock: '<div class="gm-btn">КНОПКА</div>',
+                make: () => ({type: 'button', text: 'Подробнее', url: '/', color: '#b49d84', align: 'center'}),
+            },
+            video: {
+                icon: '🎬', label: 'Видео',
+                desc: 'Вставьте ссылку на YouTube или Vimeo',
+                mock: '<div class="gm-video">▶</div>',
+                make: () => ({type: 'video', url: ''}),
+            },
+            products: {
+                icon: '🛒', label: 'Товары',
+                desc: 'Карточки WB/Ozon с ценами и кнопкой «Купить»',
+                mock: '<div class="gm-grid"><div class="gm-card-mini"><div class="im"></div><div class="tx"></div></div><div class="gm-card-mini"><div class="im"></div><div class="tx"></div></div><div class="gm-card-mini"><div class="im"></div><div class="tx"></div></div><div class="gm-card-mini"><div class="im"></div><div class="tx"></div></div></div>',
+                make: () => ({type: 'products', source: 'all', limit: 8, title: 'Товары'}),
+            },
+            divider: {
+                icon: '—', label: 'Разделитель',
+                desc: 'Горизонтальная линия между блоками',
+                mock: '<div class="gm-line"></div>',
+                make: () => ({type: 'divider'}),
+            },
+            html: {
+                icon: '⚙', label: 'HTML',
+                desc: 'Свой код (только для специалистов)',
+                mock: '<div class="gm-code">&lt;/&gt;</div>',
+                make: () => ({type: 'html', html: ''}),
+            },
+        };
+
+        const FONTS = [
+            ['-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', 'Стандартный (современный)'],
+            ["'Montserrat', sans-serif", 'Montserrat (как на оригинальном сайте)'],
+            ["Arial, Helvetica, sans-serif", 'Arial'],
+            ["Verdana, Geneva, sans-serif", 'Verdana'],
+            ["Georgia, 'Times New Roman', serif", 'Georgia'],
+            ["'Times New Roman', Times, serif", 'Times New Roman'],
+            ["'Courier New', Courier, monospace", 'Моноширинный'],
+        ];
+
+        function $(id) { return document.getElementById(id); }
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text == null ? '' : String(text);
+            return div.innerHTML;
+        }
+        function setDeep(obj, path, value) {
+            const keys = path.split('.');
+            for (let i = 0; i < keys.length - 1; i++) {
+                if (obj[keys[i]] === undefined) obj[keys[i]] = {};
+                obj = obj[keys[i]];
+            }
+            obj[keys[keys.length - 1]] = value;
+        }
+        function getDeep(obj, path) {
+            return path.split('.').reduce((o, k) => (o == null ? '' : o[k]), obj);
+        }
+        function formatDate(iso) {
+            return iso ? new Date(iso).toLocaleString('ru-RU') : '';
+        }
+
+        /* ================= Список страниц ================= */
+        function renderPagesList() {
+            const container = $('pages-list');
+            container.innerHTML = '';
+            data.pages.forEach((p, i) => {
+                const btn = document.createElement('button');
+                btn.className = i === currentPageIndex ? 'active' : '';
+                btn.innerHTML = `<span>${escapeHtml(p.h1 || p.title)}</span><small>${p.url}</small>`;
+                btn.addEventListener('click', () => selectPage(i));
+                const edit = document.createElement('span');
+                edit.textContent = '✎';
+                edit.title = 'Редактировать прямо на странице';
+                edit.style.cssText = 'float:right;color:#b49d84;font-weight:700;cursor:pointer;margin-left:0.3rem;';
+                edit.addEventListener('click', e => {
+                    e.stopPropagation();
+                    window.open(`${location.origin}/admin/page/${p.slug}`, '_blank');
+                });
+                btn.appendChild(edit);
+                container.appendChild(btn);
+            });
+        }
+
+        function currentPage() { return data.pages[currentPageIndex]; }
+
+        async function selectPage(index) {
+            currentPageIndex = index;
+            openIndexes = new Set();
+            renderPagesList();
+            document.querySelectorAll('nav button[data-tab]').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('main section').forEach(s => s.classList.remove('active'));
+            $('tab-page').classList.add('active');
+            const page = currentPage();
+            $('page-open-link').href = page.url;
+            $('page-edit-link').href = `/admin/page/${page.slug}`;
+            bindPageFields();
+            await ensureBlocksLoaded();
+            renderBlocks();
+            schedulePreview();
+        }
+
+        function bindPageFields() {
+            const page = currentPage();
+            $('page-meta').textContent = `Адрес страницы: ${page.url}`;
+            document.querySelectorAll('[data-page-path]').forEach(el => {
+                el.value = page[el.dataset.pagePath] || '';
+                el.oninput = () => { page[el.dataset.pagePath] = el.value; schedulePreview(); };
+            });
+        }
+
+        /* ================= Живой предпросмотр (WYSIWYG) ================= */
+        function schedulePreview() {
+            clearTimeout(previewTimer);
+            previewTimer = setTimeout(updatePreview, 700);
+        }
+
+        async function updatePreview() {
+            const page = currentPage();
+            if (!page || !Array.isArray(page.blocks)) return;
+            const seq = ++previewSeq;
+            $('preview-status').textContent = 'обновление…';
+            try {
+                const resp = await fetch(location.origin + '/admin/api/preview', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        slug: page.slug,
+                        page: {
+                            title: page.title,
+                            h1: page.h1,
+                            meta_description: page.meta_description,
+                            url: page.url,
+                        },
+                        blocks: page.blocks,
+                    }),
+                });
+                const result = await resp.json();
+                if (seq !== previewSeq) return;
+                if (result.success) {
+                    $('preview-iframe').srcdoc = result.html;
+                    $('preview-status').textContent = 'обновлено ' + new Date().toLocaleTimeString('ru-RU');
+                } else {
+                    $('preview-status').textContent = 'ошибка: ' + (result.error || '');
+                }
+            } catch (e) {
+                if (seq === previewSeq) $('preview-status').textContent = 'ошибка сети';
+            }
+        }
+
+        /* ================= Конструктор блоков ================= */
+        async function ensureBlocksLoaded() {
+            const page = currentPage();
+            if (Array.isArray(page.blocks)) return;
+            // Страница перенесена с оригинального сайта — показываем её как один
+            // особый блок; исходный HTML подгружаем, чтобы не потерять его при сохранении.
+            let html = pageHtmlCache[page.slug];
+            if (html === undefined) {
+                try {
+                    const resp = await fetch(`${location.origin}/admin/api/page-html?slug=${encodeURIComponent(page.slug)}`);
+                    const result = await resp.json();
+                    html = result.success ? result.content_html : '';
+                } catch (e) { html = ''; }
+                pageHtmlCache[page.slug] = html;
+            }
+            page.blocks = [{type: 'html', legacy: true, html}];
+        }
+
+        function blockSnippet(b) {
+            if (b.legacy) return 'дизайн, перенесённый с оригинального сайта';
+            switch (b.type) {
+                case 'heading': return b.text || '';
+                case 'text': return (b.text || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+                case 'image': return (b.src || '').split('/').pop() || b.alt || 'картинка';
+                case 'button': return `${b.text || 'Кнопка'} → ${b.url || ''}`;
+                case 'video': return b.url || 'ссылка на видео';
+                case 'products': {
+                    const src = {all: 'WB + Ozon', wb: 'Wildberries', ozon: 'Ozon'}[b.source || 'all'];
+                    return `${src}, ${b.limit || 8} карточек${b.title ? ' · ' + b.title : ''}`;
+                }
+                case 'divider': return 'линия-разделитель';
+                case 'html': return 'произвольный HTML';
+                default: return '';
+            }
+        }
+
+        function renderBlocks() {
+            const page = currentPage();
+            const container = $('blocks-list');
+            container.innerHTML = '';
+            if (!page.blocks.length) {
+                const empty = document.createElement('div');
+                empty.className = 'blk-empty';
+                empty.textContent = 'Страница пустая. Нажмите «+ Добавить блок» и выберите первый блок.';
+                container.appendChild(empty);
+                return;
+            }
+            page.blocks.forEach((block, i) => {
+                container.appendChild(renderBlockItem(block, i));
+            });
+        }
+
+        function renderBlockItem(block, i) {
+            const type = block.legacy ? 'html' : (block.type || 'text');
+            const cfg = BLOCK_TYPES[type] || BLOCK_TYPES.text;
+            const item = document.createElement('div');
+            item.className = 'blk-item' + (block.legacy ? ' legacy' : '') + (openIndexes.has(i) ? ' open' : '');
+            item.dataset.i = i;
+            item.draggable = true;
+
+            const row = document.createElement('div');
+            row.className = 'blk-row';
+            row.innerHTML =
+                `<span class="blk-drag" title="Перетащите, чтобы изменить порядок">⋮⋮</span>` +
+                `<span class="blk-num">${String(i + 1).padStart(2, '0')}</span>` +
+                `<span class="blk-badge">${cfg.icon} ${block.legacy ? 'Дизайн страницы' : cfg.label}</span>` +
+                `<span class="blk-snippet">${escapeHtml(blockSnippet(block))}</span>`;
+
+            const actions = document.createElement('span');
+            actions.className = 'blk-actions';
+            const mkAct = (txt, title, cls, fn) => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = txt;
+                b.title = title;
+                if (cls) b.className = cls;
+                b.addEventListener('click', e => { e.stopPropagation(); fn(); });
+                actions.appendChild(b);
+            };
+            mkAct('⚙', 'Настройки блока', '', () => {
+                openIndexes.has(i) ? openIndexes.delete(i) : openIndexes.add(i);
+                item.classList.toggle('open');
+            });
+            if (!block.legacy) {
+                mkAct('⧉', 'Дублировать блок', '', () => duplicateBlock(i));
+            }
+            mkAct('✕', 'Удалить блок', 'a-del', () => deleteBlock(i));
+            row.appendChild(actions);
+            row.addEventListener('click', () => {
+                openIndexes.has(i) ? openIndexes.delete(i) : openIndexes.add(i);
+                item.classList.toggle('open');
+            });
+
+            // Drag & drop (как в Tilda)
+            item.addEventListener('dragstart', e => {
+                dragIndex = i;
+                item.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                try { e.dataTransfer.setData('text/plain', String(i)); } catch (err) {}
+            });
+            item.addEventListener('dragend', () => {
+                dragIndex = null;
+                item.classList.remove('dragging');
+                document.querySelectorAll('.blk-item').forEach(el => el.classList.remove('drop-before', 'drop-after'));
+            });
+            item.addEventListener('dragover', e => {
+                if (dragIndex === null || dragIndex === i) return;
+                e.preventDefault();
+                const rect = item.getBoundingClientRect();
+                const before = (e.clientY - rect.top) < rect.height / 2;
+                item.classList.toggle('drop-before', before);
+                item.classList.toggle('drop-after', !before);
+            });
+            item.addEventListener('dragleave', () => {
+                item.classList.remove('drop-before', 'drop-after');
+            });
+            item.addEventListener('drop', e => {
+                if (dragIndex === null || dragIndex === i) return;
+                e.preventDefault();
+                const rect = item.getBoundingClientRect();
+                const before = (e.clientY - rect.top) < rect.height / 2;
+                moveBlockTo(dragIndex, i, before);
+            });
+
+            item.appendChild(row);
+
+            const settings = document.createElement('div');
+            settings.className = 'blk-settings';
+            renderBlockSettings(block, i, settings);
+            item.appendChild(settings);
+            return item;
+        }
+
+        function moveBlockTo(from, targetIndex, insertBefore) {
+            const blocks = currentPage().blocks;
+            if (from === targetIndex) return;
+            const [moved] = blocks.splice(from, 1);
+            let pos;
+            if (from < targetIndex) {
+                pos = insertBefore ? targetIndex - 1 : targetIndex;
+            } else {
+                pos = insertBefore ? targetIndex : targetIndex + 1;
+            }
+            blocks.splice(pos, 0, moved);
+            openIndexes = new Set();
+            renderBlocks();
+            schedulePreview();
+        }
+
+        function duplicateBlock(i) {
+            const blocks = currentPage().blocks;
+            const copy = JSON.parse(JSON.stringify(blocks[i]));
+            delete copy.legacy;
+            blocks.splice(i + 1, 0, copy);
+            openIndexes = new Set([i + 1]);
+            renderBlocks();
+            schedulePreview();
+        }
+
+        function deleteBlock(i) {
+            const blocks = currentPage().blocks;
+            const b = blocks[i];
+            if (b.legacy) {
+                if (!confirm('Это дизайн, перенесённый с оригинального сайта. Удалить его и собрать страницу заново из блоков?')) return;
+            } else if (!confirm(`Удалить блок «${BLOCK_TYPES[b.type].label}»?`)) {
+                return;
+            }
+            blocks.splice(i, 1);
+            openIndexes = new Set();
+            renderBlocks();
+            schedulePreview();
+        }
+
+        /* ---------- Галерея блоков ---------- */
+        function openGallery() {
+            const grid = $('gallery-grid');
+            grid.innerHTML = '';
+            Object.entries(BLOCK_TYPES).forEach(([type, cfg]) => {
+                const card = document.createElement('div');
+                card.className = 'gcard';
+                card.innerHTML =
+                    `<div class="gmock">${cfg.mock}</div>` +
+                    `<div class="gname">${cfg.icon} ${cfg.label}</div>` +
+                    `<div class="gdesc">${cfg.desc}</div>`;
+                card.addEventListener('click', () => { closeGallery(); addBlock(type); });
+                grid.appendChild(card);
+            });
+            $('gallery-overlay').classList.add('open');
+        }
+        function closeGallery() { $('gallery-overlay').classList.remove('open'); }
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeGallery(); });
+
+        function addBlock(type) {
+            const page = currentPage();
+            page.blocks.push(BLOCK_TYPES[type].make());
+            openIndexes = new Set([page.blocks.length - 1]);
+            renderBlocks();
+            schedulePreview();
+            const items = $('blocks-list').querySelectorAll('.blk-item');
+            const last = items[items.length - 1];
+            if (last) last.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+        }
+
+        /* ---------- Поля настроек блока ---------- */
+        function field(labelText, inputEl) {
+            const f = document.createElement('div');
+            f.className = 'field';
+            const l = document.createElement('label');
+            l.textContent = labelText;
+            f.appendChild(l);
+            f.appendChild(inputEl);
+            return f;
+        }
+        function helpEl(text) {
+            const d = document.createElement('div');
+            d.className = 'help';
+            d.textContent = text;
+            return d;
+        }
+        function textInput(value, onchange, placeholder) {
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.value = value || '';
+            if (placeholder) inp.placeholder = placeholder;
+            inp.addEventListener('input', () => onchange(inp.value));
+            return inp;
+        }
+        function textareaInput(value, onchange, rows) {
+            const t = document.createElement('textarea');
+            t.rows = rows || 4;
+            t.value = value || '';
+            t.addEventListener('input', () => onchange(t.value));
+            return t;
+        }
+        function selectInput(options, value, onchange) {
+            const s = document.createElement('select');
+            options.forEach(([val, label]) => {
+                const o = document.createElement('option');
+                o.value = val;
+                o.textContent = label;
+                s.appendChild(o);
+            });
+            s.value = value;
+            s.addEventListener('change', () => onchange(s.value));
+            return s;
+        }
+
+        function renderBlockSettings(block, i, container) {
+            const set = (k, v) => {
+                block[k] = v;
+                const sn = document.querySelector(`.blk-item[data-i="${i}"] .blk-snippet`);
+                if (sn) sn.textContent = blockSnippet(block);
+                schedulePreview();
+            };
+            const type = block.legacy ? 'html' : (block.type || 'text');
+
+            if (type === 'heading') {
+                container.appendChild(field('Текст заголовка', textInput(block.text, v => set('text', v))));
+                container.appendChild(field('Размер', selectInput([
+                    ['h1', 'Самый крупный (H1)'],
+                    ['h2', 'Крупный (H2)'],
+                    ['h3', 'Средний (H3)'],
+                ], block.level || 'h2', v => set('level', v))));
+            } else if (type === 'text') {
+                container.appendChild(field('Текст', textareaInput(block.text, v => set('text', v), 7)));
+                container.appendChild(helpEl('Пустая строка между текстом — новый абзац.'));
+            } else if (type === 'image') {
+                const file = document.createElement('input');
+                file.type = 'file';
+                file.accept = 'image/*';
+                const status = document.createElement('div');
+                status.className = 'help';
+                file.addEventListener('change', async () => {
+                    if (!file.files.length) return;
+                    status.textContent = 'Загрузка…';
+                    const fd = new FormData();
+                    fd.append('file', file.files[0]);
+                    try {
+                        const resp = await fetch(`${location.origin}/admin/api/upload`, {method: 'POST', body: fd});
+                        const result = await resp.json();
+                        if (result.success) {
+                            set('src', result.url);
+                            status.textContent = 'Загружено: ' + result.url;
+                            const img = container.querySelector('.preview-img img');
+                            if (img) { img.src = result.url; img.style.display = ''; }
+                        } else {
+                            status.textContent = 'Ошибка: ' + (result.error || '');
+                        }
+                    } catch (e) { status.textContent = 'Ошибка сети: ' + e.message; }
+                });
+                container.appendChild(field('Загрузить с компьютера', file));
+                container.appendChild(status);
+                container.appendChild(field('…или ссылка на картинку', textInput(block.src, v => {
+                    set('src', v);
+                    const img = container.querySelector('.preview-img img');
+                    if (img) { img.src = v; img.style.display = v ? '' : 'none'; }
+                }, 'https://…')));
+                const pv = document.createElement('div');
+                pv.className = 'preview-img';
+                const img = document.createElement('img');
+                img.src = block.src || '';
+                img.style.display = block.src ? '' : 'none';
+                pv.appendChild(img);
+                container.appendChild(pv);
+                container.appendChild(field('Подпись для поисковиков (alt)', textInput(block.alt, v => set('alt', v))));
+                container.appendChild(field('Подпись под картинкой', textInput(block.caption, v => set('caption', v))));
+            } else if (type === 'button') {
+                container.appendChild(field('Текст на кнопке', textInput(block.text, v => set('text', v))));
+                container.appendChild(field('Куда ведёт (адрес страницы)', textInput(block.url, v => set('url', v), '/catalog/')));
+                const colorRow = document.createElement('div');
+                colorRow.className = 'row';
+                const color = document.createElement('input');
+                color.type = 'color';
+                color.value = block.color || '#b49d84';
+                color.addEventListener('input', () => set('color', color.value));
+                colorRow.appendChild(field('Цвет кнопки', color));
+                colorRow.appendChild(field('Положение', selectInput([
+                    ['left', 'Слева'], ['center', 'По центру'], ['right', 'Справа'],
+                ], block.align || 'center', v => set('align', v))));
+                container.appendChild(colorRow);
+            } else if (type === 'video') {
+                container.appendChild(field('Ссылка на видео YouTube или Vimeo', textInput(block.url, v => set('url', v), 'https://youtube.com/watch?v=…')));
+                container.appendChild(helpEl('Достаточно обычной ссылки из адресной строки браузера.'));
+            } else if (type === 'products') {
+                container.appendChild(field('Заголовок над товарами (можно пусто)', textInput(block.title, v => set('title', v), 'Наши товары')));
+                const row = document.createElement('div');
+                row.className = 'row';
+                row.appendChild(field('Откуда товары', selectInput([
+                    ['all', 'Все (WB + Ozon)'],
+                    ['wb', 'Только Wildberries'],
+                    ['ozon', 'Только Ozon'],
+                ], block.source || 'all', v => set('source', v))));
+                const limit = document.createElement('input');
+                limit.type = 'number';
+                limit.min = 1;
+                limit.max = 48;
+                limit.value = block.limit || 8;
+                limit.addEventListener('input', () => set('limit', parseInt(limit.value || 8, 10)));
+                row.appendChild(field('Сколько карточек показать', limit));
+                container.appendChild(row);
+                container.appendChild(helpEl('Карточки сами подгрузятся с актуальными ценами и скидками из админки, с кнопками «Купить» и «В избранное».'));
+            } else if (type === 'divider') {
+                container.appendChild(helpEl('Горизонтальная линия-разделитель. Настроек нет.'));
+            } else if (type === 'html') {
+                if (block.legacy) {
+                    container.appendChild(helpEl('Это содержимое перенесённой страницы. Добавьте свои блоки выше или ниже — или удалите этот блок и соберите страницу заново.'));
+                }
+                container.appendChild(field('HTML-код', textareaInput(block.html, v => set('html', v), 14)));
+            }
+        }
+
+        /* ================= Настройки сайта ================= */
+        function bindSiteFields() {
+            document.querySelectorAll('[data-path]').forEach(el => {
+                const val = getDeep(data, el.dataset.path);
+                if (el.id === 'theme-font-family') {
+                    el.innerHTML = '';
+                    let current = val || FONTS[0][0];
+                    if (!FONTS.some(([v]) => v === current)) FONTS.unshift([current, current]);
+                    FONTS.forEach(([v, label]) => {
+                        const o = document.createElement('option');
+                        o.value = v;
+                        o.textContent = label;
+                        el.appendChild(o);
+                    });
+                    el.value = current;
+                } else {
+                    el.value = val || '';
+                }
+                el.addEventListener('input', () => {
+                    setDeep(data, el.dataset.path, el.value);
+                    if (el.id === 'site-logo') $('logo-preview').src = el.value;
+                });
+            });
+            $('logo-preview').src = getDeep(data, 'site.logo') || '';
+        }
+
+        async function uploadLogo() {
+            const input = $('logo-file');
+            if (!input.files.length) { $('logo-upload-result').textContent = 'Сначала выберите файл'; return; }
+            const fd = new FormData();
+            fd.append('file', input.files[0]);
+            $('logo-upload-result').textContent = 'Загрузка…';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/upload`, {method: 'POST', body: fd});
+                const result = await resp.json();
+                if (result.success) {
+                    setDeep(data, 'site.logo', result.url);
+                    $('logo-preview').src = result.url;
+                    $('logo-upload-result').textContent = 'Логотип загружен. Нажмите «Сохранить всё».';
+                } else {
+                    $('logo-upload-result').textContent = 'Ошибка: ' + (result.error || '');
+                }
+            } catch (e) {
+                $('logo-upload-result').textContent = 'Ошибка сети: ' + e.message;
+            }
+        }
+
+        /* ================= Визуальный редактор меню ================= */
+        function renderMenuEditor() {
+            const container = $('menu-editor');
+            container.innerHTML = '';
+            data.menu.forEach((item, i) => {
+                container.appendChild(menuNodeEl(item, i, data.menu, 1));
+            });
+        }
+
+        function menuNodeEl(item, index, siblings, depth) {
+            const wrap = document.createElement('div');
+            const row = document.createElement('div');
+            row.className = 'mrow';
+            const title = textInput(item.title, v => { item.title = v; });
+            const url = textInput(item.url, v => { item.url = v; });
+            url.className = 'url';
+            url.placeholder = '/catalog/';
+            row.appendChild(title);
+            row.appendChild(url);
+
+            const mkBtn = (txt, titleTxt, fn, del, cls) => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = txt;
+                b.title = titleTxt;
+                if (del) b.classList.add('del');
+                if (cls) b.classList.add(cls);
+                b.addEventListener('click', fn);
+                row.appendChild(b);
+                return b;
+            };
+            mkBtn('↑', 'Выше', () => {
+                if (index > 0) { [siblings[index - 1], siblings[index]] = [siblings[index], siblings[index - 1]]; renderMenuEditor(); }
+            });
+            mkBtn('↓', 'Ниже', () => {
+                if (index < siblings.length - 1) { [siblings[index + 1], siblings[index]] = [siblings[index], siblings[index + 1]]; renderMenuEditor(); }
+            });
+            if (depth < 3) {
+                const add = mkBtn('+ подпункт', 'Добавить подпункт', () => {
+                    item.children = item.children || [];
+                    item.children.push({title: 'Новый подпункт', url: '/'});
+                    renderMenuEditor();
+                });
+                add.classList.add('addchild');
+            }
+            mkBtn('✕', 'Удалить пункт', () => {
+                if (confirm(`Удалить пункт «${item.title}»${item.children ? ' со всеми подпунктами' : ''}?`)) {
+                    siblings.splice(index, 1);
+                    renderMenuEditor();
+                }
+            }, true);
+            wrap.appendChild(row);
+
+            if (item.children && item.children.length) {
+                const kids = document.createElement('div');
+                kids.className = 'mnode';
+                item.children.forEach((child, ci) => {
+                    kids.appendChild(menuNodeEl(child, ci, item.children, depth + 1));
+                });
+                wrap.appendChild(kids);
+            }
+            return wrap;
+        }
+
+        function menuAddRoot() {
+            data.menu.push({title: 'Новый раздел', url: '/'});
+            renderMenuEditor();
+        }
+
+        /* ================= Визуальный редактор соцсетей ================= */
+        const SOCIAL_PRESETS = [
+            ['vk', 'ВКонтакте'], ['telegram', 'Telegram'], ['whatsapp', 'WhatsApp'],
+            ['instagram', 'Instagram'], ['facebook', 'Facebook'], ['youtube', 'YouTube'], ['ok', 'Одноклассники'],
+        ];
+        function renderSocialsEditor() {
+            const container = $('socials-editor');
+            container.innerHTML = '';
+            data.socials.forEach((s, i) => {
+                const row = document.createElement('div');
+                row.className = 'mrow';
+                const nameSel = document.createElement('select');
+                nameSel.style.flex = '1';
+                let current = s.name || 'vk';
+                if (!SOCIAL_PRESETS.some(([v]) => v === current)) {
+                    const o = document.createElement('option');
+                    o.value = current;
+                    o.textContent = current;
+                    nameSel.appendChild(o);
+                }
+                SOCIAL_PRESETS.forEach(([v, label]) => {
+                    const o = document.createElement('option');
+                    o.value = v;
+                    o.textContent = label;
+                    nameSel.appendChild(o);
+                });
+                nameSel.value = current;
+                nameSel.addEventListener('change', () => { s.name = nameSel.value; });
+                row.appendChild(nameSel);
+
+                const url = textInput(s.url, v => { s.url = v; });
+                url.className = 'url';
+                url.placeholder = 'https://…';
+                row.appendChild(url);
+
+                const mkBtn = (txt, titleTxt, fn, del) => {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.textContent = txt;
+                    b.title = titleTxt;
+                    if (del) b.classList.add('del');
+                    b.addEventListener('click', fn);
+                    row.appendChild(b);
+                };
+                mkBtn('↑', 'Выше', () => {
+                    if (i > 0) { [data.socials[i - 1], data.socials[i]] = [data.socials[i], data.socials[i - 1]]; renderSocialsEditor(); }
+                });
+                mkBtn('↓', 'Ниже', () => {
+                    if (i < data.socials.length - 1) { [data.socials[i + 1], data.socials[i]] = [data.socials[i], data.socials[i + 1]]; renderSocialsEditor(); }
+                });
+                mkBtn('✕', 'Удалить', () => { data.socials.splice(i, 1); renderSocialsEditor(); }, true);
+                container.appendChild(row);
+            });
+        }
+        function socialAdd() {
+            data.socials.push({name: 'vk', title: 'ВКонтакте', url: 'https://'});
+            renderSocialsEditor();
+        }
+
+        /* ================= Сохранение ================= */
+        async function save(silent) {
+            const btn = document.querySelector('.actions .primary');
+            const orig = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Сохранение…';
+            // Сбрасываем кеш CSS темы, чтобы цвета/шрифты применились у всех сразу
+            try {
+                const v = parseInt(getDeep(data, 'site.theme.version') || 1, 10);
+                setDeep(data, 'site.theme.version', v + 1);
+            } catch (e) {}
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/save`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                const result = await resp.json();
+                if (!silent) showMsg(result.success ? '✅ Сохранено' : 'Ошибка: ' + (result.error || ''), result.success);
+                btn.disabled = false;
+                btn.textContent = orig;
+                return result.success;
+            } catch (e) {
+                if (!silent) showMsg('Ошибка сети: ' + e.message, false);
+                btn.disabled = false;
+                btn.textContent = orig;
+                return false;
+            }
+        }
+
+        function showMsg(text, success) {
+            const el = $('msg');
+            el.textContent = text;
+            el.className = 'msg ' + (success ? 'success' : 'error');
+            el.style.display = 'inline-block';
+            setTimeout(() => { el.style.display = 'none'; }, 4000);
+        }
+
+        /* ================= Страницы: создание/удаление ================= */
+        function showAddPage() { $('add-page-form').style.display = 'block'; }
+        function hideAddPage() { $('add-page-form').style.display = 'none'; }
+
+        function slugify(s) {
+            const map = {'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'h','ц':'c','ч':'ch','ш':'sh','щ':'sch','ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya'};
+            return s.toLowerCase().split('').map(ch => map[ch] !== undefined ? map[ch] : (/[a-z0-9]/.test(ch) ? ch : '-')).join('').replace(/-+/g, '-').replace(/^-|-$/g, '');
+        }
+
+        async function addPage() {
+            const resultEl = $('add-page-result');
+            resultEl.textContent = '';
+            let slug = slugify($('new-page-slug').value.trim());
+            const title = $('new-page-title').value.trim() || slug;
+            if (!slug) { resultEl.textContent = 'Укажите адрес страницы (латиницей)'; return; }
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/add-page`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({slug, url: '/' + slug + '/', title})
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    data.pages.push(result.page);
+                    renderPagesList();
+                    selectPage(data.pages.length - 1);
+                    hideAddPage();
+                    showMsg('Страница создана — соберите её из блоков и нажмите «Сохранить всё»', true);
+                    $('new-page-slug').value = '';
+                    $('new-page-title').value = '';
+                } else {
+                    resultEl.textContent = 'Ошибка: ' + (result.error || '');
+                }
+            } catch (e) {
+                resultEl.textContent = 'Ошибка сети: ' + e.message;
+            }
+        }
+
+        async function deleteCurrentPage() {
+            const page = currentPage();
+            if (!page) return;
+            if (!confirm(`Удалить страницу «${page.h1 || page.title}» (${page.url})?`)) return;
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/delete-page`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({slug: page.slug})
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    data.pages.splice(currentPageIndex, 1);
+                    currentPageIndex = Math.max(0, currentPageIndex - 1);
+                    renderPagesList();
+                    selectPage(currentPageIndex);
+                    showMsg('Страница удалена', true);
+                } else {
+                    showMsg('Ошибка: ' + (result.error || ''), false);
+                }
+            } catch (e) {
+                showMsg('Ошибка сети: ' + e.message, false);
+            }
+        }
+
+        async function rebuild() {
+            $('rebuild-result').textContent = 'Пересборка…';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/rebuild`, {method: 'POST'});
+                const result = await resp.json();
+                $('rebuild-result').textContent = result.success
+                    ? 'Готово. Обновите страницу админки (F5).'
+                    : 'Ошибка: ' + (result.error || '');
+            } catch (e) {
+                $('rebuild-result').textContent = 'Ошибка: ' + e.message;
+            }
+        }
+
+        async function downloadBackup() {
+            showMsg('Формирую копию…', true);
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/full-content`);
+                const full = await resp.json();
+                const blob = new Blob([JSON.stringify(full, null, 2)], {type: 'application/json'});
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'ekotoriya-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+                a.click();
+                URL.revokeObjectURL(a.href);
+                showMsg('Копия скачана', true);
+            } catch (e) {
+                showMsg('Ошибка: ' + e.message, false);
+            }
+        }
+
+        /* ================= WB / Ozon ================= */
+        async function wbSync() {
+            $('wb-sync-result').textContent = 'Синхронизация…';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/wb-sync`, {method: 'POST'});
+                const result = await resp.json();
+                $('wb-sync-result').textContent = result.success
+                    ? `Загружено ${result.count} товаров${result.demo ? ' (демо-режим)' : ' через WB API'}`
+                    : 'Ошибка: ' + (result.error || '');
+                if (result.success) loadWbProducts();
+            } catch (e) { $('wb-sync-result').textContent = 'Ошибка: ' + e.message; }
+        }
+
+        function productCard(p, market, setDiscount) {
+            const card = document.createElement('div');
+            card.className = 'prod-card';
+            card.innerHTML = `
+                <img src="${p.photo}" alt="" loading="lazy">
+                <div class="pname">${escapeHtml(p.name)}</div>
+                <div><span class="old">${p.price} ₽</span><span class="new">${p.final_price} ₽</span></div>
+                <div class="help">Скидка ${market}: ${p[market === 'WB' ? 'wb_discount_percent' : 'ozon_discount_percent']}%</div>
+                <div class="disc-row">
+                    <input type="number" min="0" max="99" value="${p.admin_discount_percent || 0}" class="disc-input" title="Доп. скидка, %">
+                    <button type="button" class="secondary" style="padding:0.3rem 0.7rem;font-size:0.82rem;">OK</button>
+                </div>`;
+            card.querySelector('button').addEventListener('click', () => {
+                setDiscount(p.id, parseInt(card.querySelector('.disc-input').value || 0, 10));
+            });
+            return card;
+        }
+
+        async function loadWbProducts() {
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/wb-products`);
+                const result = await resp.json();
+                if (!result.success) return;
+                const container = $('wb-products');
+                container.innerHTML = result.demo
+                    ? '<p class="help">Демо-режим: для реальных товаров вашего магазина введите API-токен выше и нажмите «Загрузить / обновить товары с WB».</p>'
+                    : '<p class="help">Товары загружены через официальный WB API.</p>';
+                const grid = document.createElement('div');
+                grid.className = 'prod-grid';
+                result.products.forEach(p => grid.appendChild(productCard(p, 'WB', setWbDiscount)));
+                container.appendChild(grid);
+            } catch (e) { console.error(e); }
+        }
+
+        async function setWbDiscount(id, percent) {
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/wb-discount`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({product_id: id, nm_id: id, percent})
+                });
+                const result = await resp.json();
+                showMsg(result.success ? 'Скидка сохранена' : 'Ошибка: ' + (result.error || ''), result.success);
+                if (result.success) loadWbProducts();
+            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
+        }
+
+        async function ozonSync() {
+            $('ozon-sync-result').textContent = 'Синхронизация…';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/ozon-sync`, {method: 'POST'});
+                const result = await resp.json();
+                $('ozon-sync-result').textContent = result.success
+                    ? `Загружено ${result.count} товаров${result.demo ? ' (демо-режим)' : ''}`
+                    : 'Ошибка: ' + (result.error || '');
+                if (result.success) loadOzonProducts();
+            } catch (e) { $('ozon-sync-result').textContent = 'Ошибка: ' + e.message; }
+        }
+
+        async function loadOzonProducts() {
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/ozon-products`);
+                const result = await resp.json();
+                if (!result.success) return;
+                const container = $('ozon-products');
+                container.innerHTML = result.demo
+                    ? '<p class="help">Демо-режим: для реальных товаров введите Client-ID и Api-Key выше и нажмите «Загрузить / обновить».</p>'
+                    : '';
+                const grid = document.createElement('div');
+                grid.className = 'prod-grid';
+                result.products.forEach(p => grid.appendChild(productCard(p, 'Ozon', setOzonDiscount)));
+                container.appendChild(grid);
+            } catch (e) { console.error(e); }
+        }
+
+        async function setOzonDiscount(id, percent) {
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/ozon-discount`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({product_id: id, offer_id: id, percent})
+                });
+                const result = await resp.json();
+                showMsg(result.success ? 'Скидка сохранена' : 'Ошибка: ' + (result.error || ''), result.success);
+                if (result.success) loadOzonProducts();
+            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
+        }
+
+        /* ================= Клиенты и заявки ================= */
+        async function loadCustomers() {
+            $('customers-list').innerHTML = '<p class="help">Загрузка…</p>';
+            $('orders-list').innerHTML = '<p class="help">Загрузка…</p>';
+            try {
+                const [cResp, oResp] = await Promise.all([
+                    fetch(`${location.origin}/admin/api/customers`),
+                    fetch(`${location.origin}/admin/api/orders`)
+                ]);
+                const cData = await cResp.json();
+                const oData = await oResp.json();
+                renderCustomers(cData.success ? cData.customers : []);
+                renderOrders(oData.success ? oData.orders : []);
+            } catch (e) {
+                $('customers-list').innerHTML = $('orders-list').innerHTML = '<p class="help">Ошибка: ' + e.message + '</p>';
+            }
+        }
+
+        function renderCustomers(customers) {
+            const container = $('customers-list');
+            if (!customers.length) { container.innerHTML = '<p class="help">Пока нет клиентов. Клиенты добавляются автоматически при заказе или регистрации.</p>'; return; }
+            let html = '<table class="adm"><thead><tr><th>ID</th><th>Имя</th><th>Телефон</th><th>Email</th><th>Добавлен</th></tr></thead><tbody>';
+            customers.forEach(c => {
+                html += `<tr><td>${c.id}</td><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone)}</td><td>${escapeHtml(c.email || '')}</td><td>${formatDate(c.created_at)}</td></tr>`;
+            });
+            container.innerHTML = html + '</tbody></table>';
+        }
+
+        function renderOrders(orders) {
+            const container = $('orders-list');
+            if (!orders.length) { container.innerHTML = '<p class="help">Пока нет заявок.</p>'; return; }
+            const statusOptions = {new: 'Новая', processing: 'В обработке', done: 'Выполнена', cancelled: 'Отменена'};
+            let html = '<table class="adm"><thead><tr><th>ID</th><th>Имя</th><th>Телефон</th><th>Товар</th><th>Цена</th><th>Статус</th><th>Дата</th></tr></thead><tbody>';
+            orders.forEach(o => {
+                const select = Object.entries(statusOptions).map(([k, v]) => `<option value="${k}" ${o.status === k ? 'selected' : ''}>${v}</option>`).join('');
+                html += `<tr><td>${o.id}</td><td>${escapeHtml(o.name)}</td><td>${escapeHtml(o.phone)}</td><td>${escapeHtml(o.product_name || '')} <small>(${o.product_id || ''})</small></td><td>${o.price} ₽</td><td><select onchange="updateOrderStatus(${o.id}, this.value)">${select}</select></td><td>${formatDate(o.created_at)}</td></tr>`;
+            });
+            container.innerHTML = html + '</tbody></table>';
+        }
+
+        async function updateOrderStatus(id, status) {
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/order-status`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({id, status})
+                });
+                const result = await resp.json();
+                showMsg(result.success ? 'Статус обновлён' : 'Ошибка: ' + (result.error || ''), result.success);
+            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
+        }
+
+        /* ================= Вкладки ================= */
+        document.querySelectorAll('nav button[data-tab]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('nav button[data-tab]').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('main section').forEach(s => s.classList.remove('active'));
+                btn.classList.add('active');
+                $(`tab-${btn.dataset.tab}`).classList.add('active');
+            });
+        });
+
+        /* ================= Инициализация ================= */
+        renderPagesList();
+        bindSiteFields();
+        renderMenuEditor();
+        renderSocialsEditor();
+        selectPage(0);
+        loadWbProducts();
+        loadOzonProducts();
+    </script>
+</body>
+</html>
