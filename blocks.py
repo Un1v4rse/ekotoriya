@@ -9,6 +9,11 @@
     button    — кнопка (text, url, color, align)
     video     — видео YouTube/Vimeo (url)
     products  — товары WB (source: wb|all, limit, title)
+    reviews   — отзывы покупателей (title, items: [{name, text, rating 1-5}])
+    form      — форма обратной связи (title, button, recipient)
+    map       — Яндекс.Карта по адресу (title, address)
+    faq       — вопросы-ответы (title, items: [{q, a}])
+    banner    — промо-баннер (title, subtitle, button, url, bg)
     divider   — разделитель
     html      — произвольный HTML (для перенесённого дизайна, редактирование по желанию)
 
@@ -16,8 +21,9 @@
 автоматически при сохранении в админке (app.py /admin/api/save).
 """
 import html
+import json
 import re
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, quote
 
 
 def esc(value):
@@ -39,6 +45,25 @@ def _vimeo_id(url):
         return ''
     m = re.search(r'vimeo\.com/(\d+)', url)
     return m.group(1) if m else ''
+
+
+def _parse_items(raw):
+    """Нормализовать список элементов блока: список словарей или JSON-строка."""
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except ValueError:
+            return []
+    return [it for it in (raw or []) if isinstance(it, dict)]
+
+
+def _stars(rating):
+    """Строка звёзд из оценки 1-5."""
+    try:
+        rating = max(1, min(5, int(rating)))
+    except (TypeError, ValueError):
+        rating = 5
+    return '★' * rating + '☆' * (5 - rating)
 
 
 def render_block(block):
@@ -115,6 +140,86 @@ def render_block(block):
 
     if btype == 'divider':
         return '<div class="cb cb-divider"><hr style="border:0;border-top:1px solid #e0e0e0;margin:2rem 0;"></div>'
+
+    if btype == 'reviews':
+        cards = []
+        for it in _parse_items(block.get('items')):
+            text = str(it.get('text') or '').strip()
+            if not text:
+                continue
+            cards.append(
+                '<div class="cb-review-card">'
+                f'<div class="cb-review-head"><span class="cb-review-name">{esc(it.get("name") or "Покупатель")}</span>'
+                f'<span class="cb-review-stars">{_stars(it.get("rating", 5))}</span></div>'
+                f'<p>{esc(text)}</p></div>')
+        if not cards:
+            return ''
+        title = (block.get('title') or '').strip()
+        title_html = f'<h2>{esc(title)}</h2>' if title else ''
+        return (f'<div class="cb cb-reviews"><div class="maxwidth-theme">{title_html}'
+                f'<div class="cb-reviews-grid">{"".join(cards)}</div></div></div>')
+
+    if btype == 'form':
+        title = (block.get('title') or '').strip()
+        button = (block.get('button') or '').strip() or 'Отправить'
+        recipient = (block.get('recipient') or '').strip()
+        note = f'Форма: {title}' if title else 'Форма обратной связи'
+        if recipient:
+            note += f' (для: {recipient})'
+        heading = f'<h2>{esc(title)}</h2>' if title else ''
+        # Обычный POST без JS: /api/order сам перенаправит обратно на страницу
+        return (f'<div class="cb cb-form"><div class="maxwidth-theme">{heading}'
+                f'<form action="/api/order" method="post" class="cb-form-fields">'
+                f'<input type="hidden" name="redirect" value="1">'
+                f'<input type="hidden" name="product_name" value="{esc(note)}">'
+                '<input type="text" name="name" placeholder="Ваше имя" required>'
+                '<input type="tel" name="phone" placeholder="Телефон" required>'
+                '<input type="email" name="email" placeholder="Email (необязательно)">'
+                f'<button type="submit">{esc(button)}</button>'
+                '</form></div></div>')
+
+    if btype == 'map':
+        address = (block.get('address') or '').strip()
+        if not address:
+            return ''
+        title = (block.get('title') or '').strip()
+        heading = f'<h2>{esc(title)}</h2>' if title else ''
+        src = f'https://yandex.ru/map-widget/v1/?text={quote(address)}&z=16'
+        return (f'<div class="cb cb-map"><div class="maxwidth-theme">{heading}'
+                f'<iframe src="{src}" loading="lazy" title="Карта"></iframe></div></div>')
+
+    if btype == 'faq':
+        items = []
+        for it in _parse_items(block.get('items')):
+            q = str(it.get('q') or '').strip()
+            a = str(it.get('a') or '').strip()
+            if not q or not a:
+                continue
+            items.append(f'<details><summary>{esc(q)}</summary><p>{esc(a)}</p></details>')
+        if not items:
+            return ''
+        title = (block.get('title') or '').strip()
+        title_html = f'<h2>{esc(title)}</h2>' if title else ''
+        return (f'<div class="cb cb-faq"><div class="maxwidth-theme">{title_html}'
+                f'{"".join(items)}</div></div>')
+
+    if btype == 'banner':
+        title = (block.get('title') or '').strip()
+        if not title:
+            return ''
+        subtitle = (block.get('subtitle') or '').strip()
+        button = (block.get('button') or '').strip()
+        url = (block.get('url') or '#').strip() or '#'
+        bg = (block.get('bg') or '#b49d84').strip() or '#b49d84'
+        if not re.fullmatch(r'#[0-9a-fA-F]{3,8}', bg):
+            bg = '#b49d84'
+        sub_html = f'<p class="cb-banner-sub">{esc(subtitle)}</p>' if subtitle else ''
+        btn_html = (f'<a class="cb-banner-btn" href="{esc(url)}">{esc(button)}</a>'
+                    if button else '')
+        return (f'<div class="cb cb-banner"><div class="maxwidth-theme">'
+                f'<div class="cb-banner-inner" style="background:{bg};">'
+                f'<h2 class="cb-banner-title">{esc(title)}</h2>{sub_html}{btn_html}'
+                '</div></div></div>')
 
     if btype == 'html':
         return block.get('html', '') or ''

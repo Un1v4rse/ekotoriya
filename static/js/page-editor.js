@@ -44,6 +44,31 @@
             mock: '<div class="gm-line"></div>',
             make: () => ({type: 'divider'}),
         },
+        reviews: {
+            icon: '💬', label: 'Отзывы', desc: 'Карточки отзывов покупателей с оценкой',
+            mock: '<div class="gm-bar" style="width:60%;height:8px;background:#9a8269;"></div><div class="gm-bar" style="width:95%;height:5px;"></div><div class="gm-bar" style="width:90%;height:5px;"></div><div class="gm-bar" style="width:40%;height:8px;background:#e8a33d;"></div>',
+            make: () => ({type: 'reviews', title: 'Отзывы покупателей', items: [{name: 'Анна', text: 'Отличное качество, быстрая доставка!', rating: 5}]}),
+        },
+        form: {
+            icon: '📩', label: 'Форма связи', desc: 'Форма обратной связи (заявка в админку)',
+            mock: '<div class="gm-bar" style="width:95%;height:10px;border:1px solid #ccc;background:#fff;"></div><div class="gm-bar" style="width:95%;height:10px;border:1px solid #ccc;background:#fff;"></div><div class="gm-btn">ОТПРАВИТЬ</div>',
+            make: () => ({type: 'form', title: 'Остались вопросы?', button: 'Отправить', recipient: ''}),
+        },
+        map: {
+            icon: '📍', label: 'Карта', desc: 'Яндекс.Карта по адресу',
+            mock: '<div class="gm-img" style="background:#dfe8ee;">📍</div>',
+            make: () => ({type: 'map', title: 'Как нас найти', address: 'Москва, Красная площадь, 1'}),
+        },
+        faq: {
+            icon: '❓', label: 'FAQ', desc: 'Вопросы и ответы (аккордеон)',
+            mock: '<div class="gm-bar" style="width:95%;height:8px;"></div><div class="gm-bar" style="width:95%;height:8px;"></div><div class="gm-bar" style="width:95%;height:8px;"></div>',
+            make: () => ({type: 'faq', title: 'Частые вопросы', items: [{q: 'Как сделать заказ?', a: 'Нажмите «Купить в 1 клик» на карточке товара и оставьте контакты — мы перезвоним.'}]}),
+        },
+        banner: {
+            icon: '📢', label: 'Баннер', desc: 'Промо-блок: заголовок, текст и кнопка',
+            mock: '<div style="width:100%;height:100%;background:#b49d84;border-radius:5px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.7rem;font-weight:700;">БАННЕР</div>',
+            make: () => ({type: 'banner', title: 'Скидка 10% на первый заказ', subtitle: 'Успейте до конца месяца', button: 'Выбрать товар', url: '/catalog/', bg: '#b49d84'}),
+        },
         html: {
             icon: '⚙', label: 'HTML', desc: 'Свой код (для специалистов)',
             mock: '<div class="gm-code">&lt;/&gt;</div>',
@@ -652,6 +677,42 @@
             container.appendChild(helpEl('Цены и скидки подтягиваются из раздела WB админки автоматически.'));
         } else if (type === 'divider') {
             container.appendChild(helpEl('Горизонтальная линия-разделитель. Настроек нет.'));
+        } else if (type === 'reviews') {
+            container.appendChild(field('Заголовок секции', textInput(block.title, v => set('title', v))));
+            container.appendChild(field('Отзывы (JSON)', textareaInput(JSON.stringify(block.items || [], null, 2), v => {
+                try { set('items', JSON.parse(v || '[]')); } catch (e) { /* невалидный JSON — оставляем прежнее */ }
+            }, 10)));
+            container.appendChild(helpEl('Один отзыв — объект {"name": "Имя", "text": "Текст", "rating": 5}. Оценка от 1 до 5.'));
+        } else if (type === 'form') {
+            container.appendChild(field('Заголовок над формой', textInput(block.title, v => set('title', v))));
+            container.appendChild(field('Подпись на кнопке', textInput(block.button, v => set('button', v), 'Отправить')));
+            container.appendChild(field('Кому передать заявку (телефон/email, необязательно)', textInput(block.recipient, v => set('recipient', v))));
+            container.appendChild(helpEl('Заявки попадают в раздел «Клиенты и заявки» админки. Форма работает и без JavaScript.'));
+        } else if (type === 'map') {
+            container.appendChild(field('Заголовок над картой', textInput(block.title, v => set('title', v))));
+            container.appendChild(field('Адрес или координаты', textInput(block.address, v => set('address', v), 'Москва, Красная площадь, 1')));
+            container.appendChild(helpEl('Карта Яндекса построится автоматически по адресу.'));
+        } else if (type === 'faq') {
+            container.appendChild(field('Заголовок секции', textInput(block.title, v => set('title', v))));
+            container.appendChild(field('Вопросы и ответы (JSON)', textareaInput(JSON.stringify(block.items || [], null, 2), v => {
+                try { set('items', JSON.parse(v || '[]')); } catch (e) { /* невалидный JSON — оставляем прежнее */ }
+            }, 10)));
+            container.appendChild(helpEl('Один пункт — объект {"q": "Вопрос", "a": "Ответ"}.'));
+        } else if (type === 'banner') {
+            container.appendChild(field('Заголовок', textInput(block.title, v => set('title', v))));
+            container.appendChild(field('Подзаголовок', textInput(block.subtitle, v => set('subtitle', v))));
+            container.appendChild(field('Текст на кнопке', textInput(block.button, v => set('button', v), 'Подробнее')));
+            container.appendChild(field('Ссылка кнопки', textInput(block.url, v => set('url', v), '/catalog/')));
+            const colorRow = el('div', 'field');
+            const l = document.createElement('label');
+            l.textContent = 'Цвет фона';
+            const color = document.createElement('input');
+            color.type = 'color';
+            color.value = block.bg || '#b49d84';
+            color.addEventListener('input', () => set('bg', color.value));
+            colorRow.appendChild(l);
+            colorRow.appendChild(color);
+            container.appendChild(colorRow);
         } else if (type === 'html') {
             if (block.legacy) {
                 container.appendChild(helpEl('Это содержимое перенесённой страницы. Вы можете добавить свои блоки выше или ниже, либо удалить этот блок и собрать страницу заново.'));

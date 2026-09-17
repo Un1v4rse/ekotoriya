@@ -386,7 +386,44 @@ header, .header, .top-block-wrapper, .top_blocks, .front .top_blocks, .footer {{
     font-family: {theme.get('font_family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif')};
 }}
 """
-    return Response(css, mimetype='text/css')
+    return Response(css + BLOCKS_CSS, mimetype='text/css')
+
+
+# Стили блоков конструктора страниц (cb-*): подключаются через /theme.css на всех страницах
+BLOCKS_CSS = """
+/* Отзывы */
+.cb-reviews { padding: 2rem 0; }
+.cb-reviews h2, .cb-form h2, .cb-map h2, .cb-faq h2 { font-size: 1.6rem; margin-bottom: 1.5rem; }
+.cb-reviews-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+.cb-review-card { border: 1px solid #e0e0e0; border-radius: 10px; padding: 1rem; background: #fff; }
+.cb-review-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
+.cb-review-name { font-weight: 600; }
+.cb-review-stars { color: #e8a33d; letter-spacing: 1px; }
+.cb-review-card p { margin: 0; font-size: 0.92rem; line-height: 1.5; }
+/* Форма обратной связи */
+.cb-form { padding: 2rem 0; }
+.cb-form-fields { display: flex; flex-wrap: wrap; gap: 0.6rem; max-width: 660px; }
+.cb-form-fields input[type="text"], .cb-form-fields input[type="tel"], .cb-form-fields input[type="email"] {
+    flex: 1 1 180px; padding: 0.55rem 0.7rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem;
+}
+.cb-form-fields button { background: #b49d84; color: #fff; border: 0; padding: 0.55rem 1.6rem; border-radius: 6px; font-weight: 600; cursor: pointer; }
+.cb-form-fields button:hover { background: #9a8269; }
+/* Карта */
+.cb-map { padding: 2rem 0; }
+.cb-map iframe { width: 100%; height: 420px; border: 0; border-radius: 10px; display: block; }
+/* FAQ (аккордеон) */
+.cb-faq { padding: 2rem 0; }
+.cb-faq details { border: 1px solid #e0e0e0; border-radius: 8px; background: #fff; margin-bottom: 0.6rem; padding: 0.4rem 1rem; }
+.cb-faq summary { font-weight: 600; cursor: pointer; padding: 0.5rem 0; }
+.cb-faq details p { margin: 0 0 0.8rem; line-height: 1.5; }
+/* Баннер/акция */
+.cb-banner { margin: 1.5rem 0; }
+.cb-banner-inner { border-radius: 12px; padding: 2.5rem 2rem; text-align: center; color: #fff; }
+.cb-banner-title { font-size: 1.6rem; font-weight: 700; margin: 0 0 0.5rem; }
+.cb-banner-sub { margin: 0 0 1.2rem; opacity: 0.92; }
+.cb-banner-btn { display: inline-block; background: #fff; color: #333; padding: 0.7rem 1.8rem; border-radius: 6px; text-decoration: none; font-weight: 600; }
+.cb-banner-btn:hover { opacity: 0.9; }
+"""
 
 
 @app.route('/robots.txt')
@@ -859,6 +896,9 @@ def api_order():
     except (TypeError, ValueError):
         price = 0
     order = customers.add_order(name, phone, email, product_id, product_name, price)
+    if request.form.get('redirect'):
+        # Обычная (не AJAX) отправка формы из блока конструктора: вернуть на страницу
+        return redirect(request.referrer or '/')
     return jsonify({'success': True, 'order': order})
 
 
