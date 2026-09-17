@@ -304,6 +304,41 @@ def sync(token=None, demo=False):
         return {'success': False, 'error': str(e)}
 
 
+def sync_light(token):
+    """Лёгкая синхронизация: только цены и остатки для уже загруженного каталога.
+
+    Без запроса карточек (Content API) — для частого автообновления по расписанию.
+    """
+    if not token:
+        return {'success': False, 'error': 'WB_API_TOKEN не задан'}
+    data = load_json(PRODUCTS_FILE)
+    products = data.get('products', [])
+    if not products:
+        return {'success': False, 'error': 'Каталог пуст — сначала запустите полную синхронизацию'}
+    nm_ids = [p['nm_id'] for p in products]
+    try:
+        price_list = fetch_prices(token, nm_ids)
+        prices_by_nm = {p['nmID']: p for p in price_list}
+        stocks = fetch_stocks(token, nm_ids)
+        for p in products:
+            info = prices_by_nm.get(p['nm_id'], {})
+            size = (info.get('sizes') or [{}])[0]
+            if size.get('price') or info.get('price'):
+                p['price'] = size.get('price') or info.get('price')
+            if size.get('discountedPrice') or info.get('discountedPrice'):
+                p['discount_price'] = size.get('discountedPrice') or info.get('discountedPrice')
+            if info.get('discount'):
+                p['wb_discount_percent'] = info['discount']
+            if p['nm_id'] in stocks:
+                p['stock'] = stocks[p['nm_id']]
+        save_json(PRODUCTS_FILE, {'products': products, 'demo': data.get('demo', False)})
+        log_sync('ok', 'Обновление цен и остатков завершено', count=len(products))
+        return {'success': True, 'count': len(products), 'light': True}
+    except Exception as e:
+        log_sync('error', f'Ошибка обновления цен/остатков: {e}')
+        return {'success': False, 'error': str(e)}
+
+
 def load_products():
     products = load_json(PRODUCTS_FILE).get('products', [])
     for p in products:

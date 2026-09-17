@@ -474,6 +474,20 @@
                         </label>
                     </div>
                     <div class="field">
+                        <label style="font-weight:400;display:flex;align-items:center;gap:0.4rem;">
+                            <input type="checkbox" id="wb-autosync-enabled" data-path="site.wb_autosync.enabled">
+                            Автосинхронизация по расписанию (сервер обновляет каталог сам)
+                        </label>
+                        <div style="display:flex;gap:1rem;margin-top:0.4rem;">
+                            <label style="font-weight:400;">Полная (карточки), раз в
+                                <input type="number" min="1" max="168" style="width:5rem;" data-path="site.wb_autosync.catalog_hours"> час.
+                            </label>
+                            <label style="font-weight:400;">Цены и остатки, каждые
+                                <input type="number" min="5" max="720" style="width:5rem;" data-path="site.wb_autosync.light_minutes"> мин.
+                            </label>
+                        </div>
+                    </div>
+                    <div class="field">
                         <button type="button" class="secondary" onclick="wbSync()">🔄 Загрузить / обновить товары с WB</button>
                         <span id="wb-sync-result" class="help" style="display:inline;margin-left:0.5rem;"></span>
                         <button type="button" class="secondary" onclick="toggleSyncLog()" style="margin-left:0.5rem;">📋 Журнал</button>

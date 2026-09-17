@@ -19,6 +19,8 @@ import os
 import re
 import secrets
 import shutil
+import threading
+import time
 from functools import wraps
 from pathlib import Path
 
@@ -979,5 +981,54 @@ def proxy_image():
     )
 
 
+WB_AUTOSYNC_DEFAULTS = {
+    'enabled': False,
+    'catalog_hours': 6,     # полная синхронизация (карточки + цены + остатки)
+    'light_minutes': 30,    # лёгкая (цены + остатки)
+}
+
+
+def get_autosync_settings():
+    """Настройки авто-синхронизации WB из content.json (с значениями по умолчанию)."""
+    settings = dict(WB_AUTOSYNC_DEFAULTS)
+    try:
+        saved = load_content().get('site', {}).get('wb_autosync') or {}
+        settings.update(saved)
+    except Exception:
+        pass
+    return settings
+
+
+def _autosync_loop():
+    """Фоновый цикл авто-синхронизации WB. Проверяет настройки раз в минуту."""
+    last_catalog = 0.0
+    last_light = 0.0
+    while True:
+        try:
+            s = get_autosync_settings()
+            if s.get('enabled'):
+                token = wb_sync.get_wb_token()
+                now = time.time()
+                catalog_every = max(1, int(s.get('catalog_hours', 6))) * 3600
+                light_every = max(5, int(s.get('light_minutes', 30))) * 60
+                if now - last_catalog >= catalog_every:
+                    wb_sync.sync(token=token, demo=not token)
+                    last_catalog = now
+                    last_light = now
+                elif now - last_light >= light_every:
+                    wb_sync.sync_light(token=token)
+                    last_light = now
+        except Exception:
+            pass
+        time.sleep(60)
+
+
+def start_autosync():
+    """Запускает поток авто-синхронизации (демон — не мешает остановке сервера)."""
+    t = threading.Thread(target=_autosync_loop, daemon=True, name='wb-autosync')
+    t.start()
+
+
 if __name__ == '__main__':
+    start_autosync()
     app.run(host='0.0.0.0', port=5000, debug=False)
