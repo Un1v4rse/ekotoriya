@@ -247,8 +247,9 @@ PRODUCTS_HYDRATOR = """<script>
                 ? '<div style="margin-top:0.5rem;font-size:0.82rem;font-weight:600;color:#b26a00;">Осталось мало</div>'
                 : '<div style="margin-top:0.5rem;font-size:0.82rem;font-weight:600;color:#137333;">В наличии</div>');
         var buyDisabled = stock<=0;
+        var photoSrc = (p.photo||'').charAt(0)==='/' ? p.photo : '/proxy/image?url='+encodeURIComponent(p.photo||'');
         return '<div class="wb-product-card" style="display:block;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;background:#fff;text-decoration:none;color:inherit;">'
-          +'<div style="padding:1rem;background:#f9f9f9;"><img src="/proxy/image?url='+encodeURIComponent(p.photo||'')+'" alt="" loading="lazy" style="width:100%;height:220px;object-fit:contain;display:block;"></div>'
+          +'<div style="padding:1rem;background:#f9f9f9;"><img src="'+photoSrc+'" alt="" loading="lazy" style="width:100%;height:220px;object-fit:contain;display:block;"></div>'
           +'<div style="padding:1rem;">'
           +'<div data-name="'+String(p.name||'').replace(/"/g,'&quot;')+'" style="font-weight:600;font-size:0.95rem;line-height:1.35;min-height:3.9em;overflow:hidden;">'+(p.name||'')+'</div>'
           +'<div style="margin-top:0.75rem;display:flex;align-items:baseline;gap:0.5rem;flex-wrap:wrap;">'+priceHtml+'</div>'

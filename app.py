@@ -102,9 +102,22 @@ ADMIN_CREDENTIALS = init_admin_credentials()
 
 @app.after_request
 def add_cache_headers(response):
-    """Add long-term cache for static assets and short/no cache for HTML pages."""
+    """Add long-term cache for static assets and short/no cache for HTML pages.
+
+    Error responses must never be cached long-term: a cached 404 (e.g. for a
+    lazy-loaded include that did not exist yet) would otherwise stick in the
+    browser for a year and break the site's lazy-load queue permanently.
+    """
     path = request.path
-    if path.startswith('/static/') or path == '/theme.css' or path.startswith('/proxy/image'):
+    if response.status_code >= 400:
+        response.headers['Cache-Control'] = 'no-store, must-revalidate'
+    elif path.startswith('/static/include/'):
+        # Lazy-loaded HTML fragments (Bitrix-style .php includes). Must be
+        # text/html: as text/javascript jQuery would eval the whole HTML
+        # response as a script and the site's lazy-load queue would stall.
+        response.headers['Content-Type'] = 'text/html; charset=utf-8'
+        response.headers['Cache-Control'] = 'no-store, must-revalidate'
+    elif path.startswith('/static/') or path == '/theme.css' or path.startswith('/proxy/image'):
         response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
     elif path.endswith(('.js', '.css', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.ico', '.woff', '.woff2')):
         response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
@@ -569,6 +582,7 @@ def page_route(path):
 
 
 @app.route('/admin')
+@app.route('/admin/')
 @admin_required
 def admin():
     content = load_content()
@@ -1137,7 +1151,7 @@ def proxy_image():
     cache_file = IMAGE_CACHE_DIR / f"{cache_key}{ext}"
     if not cache_file.exists():
         try:
-            r = requests.get(url, timeout=15, headers={
+            r = requests.get(url, timeout=6, headers={
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
             })

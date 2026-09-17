@@ -249,7 +249,7 @@ def build_page_template(slug, src_path):
     # Insert it right after the Content-Type meta so it is discovered early.
     if slug == 'index' and hero_img:
         preload = f'<link rel="preload" fetchpriority="high" as="image" href="{hero_img}">\n'
-        preload += '<style>\n  .main-slider__wrapper > .swiper-slide:first-child { width: 100% !important; height: 450px !important; opacity: 1 !important; visibility: visible !important; background-size: cover !important; background-position: center !important; }\n</style>\n'
+        preload += '<style>\n  /* До инициализации swiper первый слайд должен быть виден (защита от FOUC), но высоту не фиксируем — её задаёт swiper. */\n  .main-slider__wrapper > .swiper-slide:first-child { width: 100% !important; opacity: 1 !important; visibility: visible !important; background-size: cover !important; background-position: center !important; }\n</style>\n'
         html = re.sub(
             r'(<meta[^>]*http-equiv=["\']Content-Type["\'][^>]*>\s*)',
             r'\1' + preload,

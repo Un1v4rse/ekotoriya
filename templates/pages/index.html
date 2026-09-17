@@ -10,7 +10,9 @@
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <link rel="preload" fetchpriority="high" as="image" href="/static/upload/iblock/b01/xmi6kr95b3ietlvvphzwvv7rfdn64asp.webp">
 <style>
-  .main-slider__wrapper > .swiper-slide:first-child { width: 100% !important; height: 450px !important; opacity: 1 !important; visibility: visible !important; background-size: cover !important; background-position: center !important; }
+  /* До инициализации swiper первый слайд должен быть виден (защита от FOUC),
+     но высоту ему НЕ фиксируем — её задаёт swiper по контенту, как остальным слайдам. */
+  .main-slider__wrapper > .swiper-slide:first-child { width: 100% !important; opacity: 1 !important; visibility: visible !important; background-size: cover !important; background-position: center !important; }
 </style>
 <meta name="description" content="{{ page.meta_description }}" />
 <link href="/static/bitrix/css/aspro.max/notice.min.css" rel="stylesheet"/>

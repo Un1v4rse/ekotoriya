@@ -24,16 +24,28 @@ SYNC_LOG_FILE = BASE_DIR / 'data' / 'sync_log.json'
 
 API_BASE = 'https://api-seller.wildberries.ru'
 
-# Демо-товары (nmID Экотории, найденные через поиск)
+# Демо-товары (nmID Экотории, найденные через поиск).
+# Фото — локальные: CDN WB с некоторых сетей недоступен, демо-режим должен
+# работать без внешнего интернета. Реальная синхронизация подставит фото с WB API.
+DEMO_PHOTOS = [
+    '/static/upload/iblock/fa2/d9sr99y9x9vfwt2tzmwnldehl4vhsan3.jpg',
+    '/static/upload/iblock/3ac/8gh5pdovvlqk0wfxd24q1x1lqh6u5taf.jpg',
+    '/static/upload/iblock/5ec/r3d6id5qhom7q3w9hi8gnv3tz6i019pn.jpg',
+    '/static/upload/iblock/b01/xmi6kr95b3ietlvvphzwvv7rfdn64asp.webp',
+    '/static/upload/iblock/ce5/7j07hx29aexcub4ubhp7w2dwmq2i9rcp.jpg',
+    '/static/upload/iblock/53a/p1z6qr6ynng2we0a6qqfeoyuipohz5wz.jpg',
+    '/static/upload/iblock/5e4/snyln8vdyxvm30bgj1yb2lfz7e3hkhc9.jpg',
+    '/static/upload/iblock/ce5/7j07hx29aexcub4ubhp7w2dwmq2i9rcp.jpg',
+]
 DEMO_PRODUCTS = [
-    {'nm_id': 890129778, 'name': 'Непромокаемый наматрасник 200х200 на молнии высота 17-21 см Экотория', 'price': 3990, 'discount_price': 3591, 'photo': 'https://basket-01.wb.ru/vol890/part890/890129778/images/big/1.jpg'},
-    {'nm_id': 67928567, 'name': 'Наматрасник 160х200 на молнии высота 21-23 см чехол стеганый Экотория', 'price': 2890, 'discount_price': 2601, 'photo': 'https://basket-01.wb.ru/vol67/part679/67928567/images/big/1.jpg'},
-    {'nm_id': 381073941, 'name': 'Наматрасник 140х200 на молнии чехол стеганый Экотория', 'price': 2490, 'discount_price': 2241, 'photo': 'https://basket-04.wb.ru/vol381/part381/381073941/images/big/1.jpg'},
-    {'nm_id': 863971369, 'name': 'Наматрасник 200х200 на резинках чехол стеганый Экотория', 'price': 2790, 'discount_price': 2511, 'photo': 'https://basket-09.wb.ru/vol863/part863/863971369/images/big/1.jpg'},
-    {'nm_id': 182356719, 'name': 'Наматрасник 180х200 на молнии высота 21-23 см чехол стеганый Экотория', 'price': 3290, 'discount_price': 2961, 'photo': 'https://basket-02.wb.ru/vol182/part182/182356719/images/big/1.jpg'},
-    {'nm_id': 47521588, 'name': 'Наматрасник 140х200 на молнии высота 17-20 см чехол стеганый Экотория', 'price': 2190, 'discount_price': 1971, 'photo': 'https://basket-05.wb.ru/vol475/part475/47521588/images/big/1.jpg'},
-    {'nm_id': 820392828, 'name': 'Наматрасник 140х200 на резинках чехол стеганый 4D-Fix Экотория', 'price': 2290, 'discount_price': 2061, 'photo': 'https://basket-10.wb.ru/vol820/part820/820392828/images/big/1.jpg'},
-    {'nm_id': 1399155441, 'name': 'Наматрасник 160x200х20 см непромокаемый на молнии Экотория', 'price': 3690, 'discount_price': 3321, 'photo': 'https://basket-13.wb.ru/vol1399/part1399/1399155441/images/big/1.jpg'},
+    {'nm_id': 890129778, 'name': 'Непромокаемый наматрасник 200х200 на молнии высота 17-21 см Экотория', 'price': 3990, 'discount_price': 3591, 'photo': DEMO_PHOTOS[0]},
+    {'nm_id': 67928567, 'name': 'Наматрасник 160х200 на молнии высота 21-23 см чехол стеганый Экотория', 'price': 2890, 'discount_price': 2601, 'photo': DEMO_PHOTOS[1]},
+    {'nm_id': 381073941, 'name': 'Наматрасник 140х200 на молнии чехол стеганый Экотория', 'price': 2490, 'discount_price': 2241, 'photo': DEMO_PHOTOS[2]},
+    {'nm_id': 863971369, 'name': 'Наматрасник 200х200 на резинках чехол стеганый Экотория', 'price': 2790, 'discount_price': 2511, 'photo': DEMO_PHOTOS[3]},
+    {'nm_id': 182356719, 'name': 'Наматрасник 180х200 на молнии высота 21-23 см чехол стеганый Экотория', 'price': 3290, 'discount_price': 2961, 'photo': DEMO_PHOTOS[4]},
+    {'nm_id': 47521588, 'name': 'Наматрасник 140х200 на молнии высота 17-20 см чехол стеганый Экотория', 'price': 2190, 'discount_price': 1971, 'photo': DEMO_PHOTOS[5]},
+    {'nm_id': 820392828, 'name': 'Наматрасник 140х200 на резинках чехол стеганый 4D-Fix Экотория', 'price': 2290, 'discount_price': 2061, 'photo': DEMO_PHOTOS[6]},
+    {'nm_id': 1399155441, 'name': 'Наматрасник 160x200х20 см непромокаемый на молнии Экотория', 'price': 3690, 'discount_price': 3321, 'photo': DEMO_PHOTOS[7]},
 ]
 
 
