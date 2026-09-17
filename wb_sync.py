@@ -20,6 +20,7 @@ import requests
 BASE_DIR = Path(__file__).resolve().parent
 DATA_FILE = BASE_DIR / 'data' / 'content.json'
 PRODUCTS_FILE = BASE_DIR / 'data' / 'wb_products.json'
+SYNC_LOG_FILE = BASE_DIR / 'data' / 'sync_log.json'
 
 API_BASE = 'https://api-seller.wildberries.ru'
 
@@ -47,6 +48,25 @@ def save_json(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def log_sync(status, message, count=None):
+    """Дописывает запись в журнал синхронизации (data/sync_log.json, последние 200)."""
+    entries = load_json(SYNC_LOG_FILE).get('entries', [])
+    from datetime import datetime
+    entries.append({
+        'time': datetime.now().isoformat(timespec='seconds'),
+        'status': status,
+        'message': message,
+        'count': count,
+    })
+    save_json(SYNC_LOG_FILE, {'entries': entries[-200:]})
+
+
+def get_sync_log(limit=50):
+    """Последние записи журнала синхронизации."""
+    entries = load_json(SYNC_LOG_FILE).get('entries', [])
+    return entries[-limit:][::-1]
 
 
 def get_wb_token():
@@ -157,6 +177,68 @@ def fetch_prices(token, nm_ids):
     return []
 
 
+def fetch_warehouses(token):
+    """Список складов продавца: GET /api/v3/warehouses → [warehouseId, ...]."""
+    r = requests.get(
+        f'{API_BASE}/api/v3/warehouses',
+        headers={'Authorization': token}, timeout=60,
+    )
+    r.raise_for_status()
+    return [w.get('id') for w in r.json() if w.get('id')]
+
+
+def fetch_stocks(token, nm_ids):
+    """Остатки товаров: POST /api/v3/stocks/{warehouseId} для каждого склада.
+
+    Возвращает {nm_id: суммарный остаток по всем складам}. Best-effort:
+    при любой ошибке API возвращает {} (каталог не должен падать из-за
+    отсутствия прав на «Маркетплейс» — токен «Контент» складов не видит).
+    """
+    stocks = {}
+    skus = [str(n) for n in nm_ids]
+    headers = {'Authorization': token, 'Content-Type': 'application/json'}
+    try:
+        for warehouse_id in fetch_warehouses(token):
+            r = requests.post(
+                f'{API_BASE}/api/v3/stocks/{warehouse_id}',
+                headers=headers, json={'skus': skus}, timeout=60,
+            )
+            if r.status_code != 200:
+                continue
+            data = r.json()
+            items = data.get('stocks', []) if isinstance(data, dict) else data
+            for item in items or []:
+                nm = int(item.get('sku', 0) or 0)
+                if nm:
+                    stocks[nm] = stocks.get(nm, 0) + int(item.get('amount', 0) or 0)
+    except requests.RequestException as e:
+        log_sync('error', f'Остатки WB не загружены: {e}')
+    except Exception as e:
+        log_sync('error', f'Остатки WB не загружены: {e}')
+    return stocks
+
+
+def push_discount(token, nm_id, percent):
+    """Отправляет скидку в WB через API «Цены и скидки».
+
+    Пробуем новый метод /discount/v1/save, при 404/405 — старый
+    /api/v2/list/goods/set/discounts. Возвращает (ok, message).
+    """
+    headers = {'Authorization': token, 'Content-Type': 'application/json'}
+    body = [{'nmID': int(nm_id), 'discount': int(percent)}]
+    try:
+        r = requests.post(f'{API_BASE}/discount/v1/save', headers=headers, json=body, timeout=60)
+        if r.status_code in (404, 405):
+            r = requests.post(f'{API_BASE}/api/v2/list/goods/set/discounts', headers=headers, json=body, timeout=60)
+        if r.status_code in (200, 201, 204):
+            return True, 'Скидка отправлена в WB'
+        return False, f'WB API вернул {r.status_code}: {r.text[:200]}'
+    except requests.RequestException as e:
+        return False, f'Ошибка запроса к WB: {e}'
+    except Exception as e:
+        return False, str(e)
+
+
 def merge_with_existing(existing, new_items):
     existing_by_nm = {p['nm_id']: p for p in existing}
     merged = []
@@ -185,13 +267,16 @@ def sync(token=None, demo=False):
                 'photo': p['photo'],
                 'url': f'https://www.wildberries.ru/catalog/{p["nm_id"]}/detail.aspx',
                 'updated_at': '',
+                'stock': 10,
             })
         save_json(PRODUCTS_FILE, {'products': items, 'demo': True})
+        log_sync('ok', 'Демо-синхронизация завершена', count=len(items))
         return {'success': True, 'count': len(items), 'demo': True}
 
     try:
         cards = fetch_cards(token)
         if not cards:
+            log_sync('error', 'WB вернул пустой список карточек. Проверьте токен.')
             return {'success': False, 'error': 'WB вернул пустой список карточек. Проверьте токен.'}
 
         nm_ids = [c['nmID'] for c in cards]
@@ -203,11 +288,19 @@ def sync(token=None, demo=False):
         existing = load_json(PRODUCTS_FILE).get('products', [])
         merged = merge_with_existing(existing, new_items)
 
+        # Остатки — best-effort: без прав на «Маркетплейс» просто останутся 0
+        stocks = fetch_stocks(token, nm_ids)
+        for p in merged:
+            p['stock'] = stocks.get(p['nm_id'], 0)
+
         save_json(PRODUCTS_FILE, {'products': merged, 'demo': False})
+        log_sync('ok', f'Синхронизация с WB API завершена', count=len(merged))
         return {'success': True, 'count': len(merged), 'demo': False}
     except requests.exceptions.RequestException as e:
+        log_sync('error', f'Ошибка запроса к WB: {e}')
         return {'success': False, 'error': f'Ошибка запроса к WB: {e}'}
     except Exception as e:
+        log_sync('error', str(e))
         return {'success': False, 'error': str(e)}
 
 

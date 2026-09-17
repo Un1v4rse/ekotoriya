@@ -135,15 +135,23 @@ PRODUCTS_HYDRATOR = """<script>
               +'<span style="background:#c00;color:#fff;font-size:0.75rem;padding:0.15rem 0.5rem;border-radius:4px;margin-left:0.5rem;">−'+discount+'%</span>'
             : '<span style="font-weight:700;font-size:1.15rem;">'+money(p.price)+'</span>';
         var adminDisc = p.admin_discount_percent>0?'<div style="margin-top:0.5rem;font-size:0.8rem;color:#137333;">Доп. скидка '+p.admin_discount_percent+'% уже применена</div>':'';
+        var stock = (p.stock === undefined || p.stock === null) ? 10 : parseInt(p.stock, 10) || 0;
+        var stockBadge = stock<=0
+            ? '<div style="margin-top:0.5rem;font-size:0.82rem;font-weight:600;color:#c00;">Нет в наличии</div>'
+            : (stock<=5
+                ? '<div style="margin-top:0.5rem;font-size:0.82rem;font-weight:600;color:#b26a00;">Осталось мало</div>'
+                : '<div style="margin-top:0.5rem;font-size:0.82rem;font-weight:600;color:#137333;">В наличии</div>');
+        var buyDisabled = stock<=0;
         return '<div class="wb-product-card" style="display:block;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;background:#fff;text-decoration:none;color:inherit;">'
           +'<div style="padding:1rem;background:#f9f9f9;"><img src="/proxy/image?url='+encodeURIComponent(p.photo||'')+'" alt="" loading="lazy" style="width:100%;height:220px;object-fit:contain;display:block;"></div>'
           +'<div style="padding:1rem;">'
           +'<div data-name="'+String(p.name||'').replace(/"/g,'&quot;')+'" style="font-weight:600;font-size:0.95rem;line-height:1.35;min-height:3.9em;overflow:hidden;">'+(p.name||'')+'</div>'
           +'<div style="margin-top:0.75rem;display:flex;align-items:baseline;gap:0.5rem;flex-wrap:wrap;">'+priceHtml+'</div>'
           +adminDisc
+          +stockBadge
           +'<div style="margin-top:0.75rem;font-size:0.85rem;color:#666;">Артикул: '+(p.id||'')+'</div>'
           +'<button type="button" class="wb-like-btn" data-id="'+p.id+'" data-name="'+String(p.name||'').replace(/"/g,'&quot;')+'" style="margin-top:0.75rem;width:100%;background:#fff;color:#c00;border:1px solid #c00;padding:0.5rem;border-radius:6px;cursor:pointer;font-weight:600;">❤ В избранное</button>'
-          +'<button type="button" class="wb-buy-btn" data-id="'+p.id+'" data-name="'+String(p.name||'').replace(/"/g,'&quot;')+'" data-price="'+(p.final_price||p.price||0)+'" style="margin-top:0.5rem;width:100%;background:#b49d84;color:#fff;border:0;padding:0.6rem;border-radius:6px;cursor:pointer;font-weight:600;">Купить в 1 клик</button>'
+          +'<button type="button" class="wb-buy-btn" data-id="'+p.id+'" data-name="'+String(p.name||'').replace(/"/g,'&quot;')+'" data-price="'+(p.final_price||p.price||0)+'" data-stock="'+stock+'"'+(buyDisabled?' disabled style="margin-top:0.5rem;width:100%;background:#ccc;color:#fff;border:0;padding:0.6rem;border-radius:6px;cursor:not-allowed;font-weight:600;"':' style="margin-top:0.5rem;width:100%;background:#b49d84;color:#fff;border:0;padding:0.6rem;border-radius:6px;cursor:pointer;font-weight:600;"')+'>Купить в 1 клик</button>'
           +'<form class="wb-order-form" data-id="'+p.id+'" style="display:none;margin-top:0.75rem;padding:0.75rem;background:#f9f9f9;border-radius:6px;">'
           +'<input type="text" name="name" placeholder="Ваше имя" required style="width:100%;margin-bottom:0.4rem;padding:0.4rem;border:1px solid #ddd;border-radius:4px;">'
           +'<input type="tel" name="phone" placeholder="Телефон" required style="width:100%;margin-bottom:0.4rem;padding:0.4rem;border:1px solid #ddd;border-radius:4px;">'

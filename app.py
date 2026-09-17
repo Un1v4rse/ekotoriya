@@ -745,7 +745,59 @@ def admin_wb_discount():
     if not product_id:
         return jsonify({'success': False, 'error': 'product_id required'}), 400
     wb_sync.set_admin_discount(int(product_id), max(0, min(99, percent)))
-    return jsonify({'success': True})
+    pushed, push_message = _maybe_push_discount(int(product_id), percent)
+    return jsonify({'success': True, 'pushed': pushed, 'push_message': push_message})
+
+
+@app.route('/admin/api/wb-discount-bulk', methods=['POST'])
+@admin_required
+def admin_wb_discount_bulk():
+    """Ставит доп. скидку выбранным товарам локально и (опционально) в WB."""
+    data = request.get_json() or {}
+    nm_ids = data.get('nm_ids') or []
+    percent = data.get('percent', 0)
+    try:
+        percent = int(percent)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'percent must be integer'}), 400
+    if not nm_ids:
+        return jsonify({'success': False, 'error': 'nm_ids required'}), 400
+    percent = max(0, min(99, percent))
+    pushed_count, push_errors = 0, 0
+    for nm_id in nm_ids:
+        wb_sync.set_admin_discount(int(nm_id), percent)
+        pushed, _msg = _maybe_push_discount(int(nm_id), percent)
+        if pushed:
+            pushed_count += 1
+        elif _msg:
+            push_errors += 1
+    return jsonify({
+        'success': True,
+        'count': len(nm_ids),
+        'pushed': pushed_count,
+        'push_errors': push_errors,
+    })
+
+
+def _maybe_push_discount(nm_id, percent):
+    """Отправляет скидку в WB, если включён режим site.wb_push_discounts.
+
+    Возвращает (pushed, message); (False, None), если отправка не требуется.
+    """
+    content = load_content()
+    if not content.get('site', {}).get('wb_push_discounts'):
+        return False, None
+    token = wb_sync.get_wb_token()
+    if not token:
+        return False, 'WB-токен не задан, отправка пропущена'
+    return wb_sync.push_discount(token, nm_id, percent)
+
+
+@app.route('/admin/api/wb-sync-log')
+@admin_required
+def admin_wb_sync_log():
+    """Последние записи журнала синхронизации с WB."""
+    return jsonify({'success': True, 'entries': wb_sync.get_sync_log(limit=50)})
 
 
 @app.route('/api/wb-products')

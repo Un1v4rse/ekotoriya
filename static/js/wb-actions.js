@@ -4,6 +4,13 @@
         container.querySelectorAll('.wb-buy-btn').forEach(btn => {
             if (btn.dataset.wbBound) return;
             btn.dataset.wbBound = '1';
+            if (btn.dataset.stock === '0') {
+                // Товара нет в наличии — кнопка неактивна
+                btn.disabled = true;
+                btn.style.background = '#ccc';
+                btn.style.cursor = 'not-allowed';
+                return;
+            }
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();

@@ -468,8 +468,25 @@
                         <div class="help">Товары загружаются официальным API продавца WB (api-seller.wildberries.ru): карточки и фото — через «Контент», цены и скидки — через «Цены и скидки». Токен создаётся в кабинете WB: Настройки → Доступ к API. <a href="https://dev.wildberries.ru" target="_blank">Документация WB API ↗</a></div>
                     </div>
                     <div class="field">
+                        <label style="font-weight:400;display:flex;align-items:center;gap:0.4rem;">
+                            <input type="checkbox" id="wb-push-discounts" data-path="site.wb_push_discounts">
+                            Отправлять скидки в WB API (требуется токен с правами «Цены и скидки»)
+                        </label>
+                    </div>
+                    <div class="field">
                         <button type="button" class="secondary" onclick="wbSync()">🔄 Загрузить / обновить товары с WB</button>
                         <span id="wb-sync-result" class="help" style="display:inline;margin-left:0.5rem;"></span>
+                        <button type="button" class="secondary" onclick="toggleSyncLog()" style="margin-left:0.5rem;">📋 Журнал</button>
+                    </div>
+                    <div id="wb-sync-log" style="display:none;" class="table-wrap">
+                        <p class="help">Нажмите «Журнал», чтобы загрузить записи.</p>
+                    </div>
+                    <div class="field" style="margin-top:0.5rem;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                        <span class="help">Выбранным:</span>
+                        <input type="number" id="wb-bulk-percent" min="0" max="99" value="10" style="width:5rem;padding:0.35rem 0.5rem;" title="Процент скидки">
+                        <span class="help">%</span>
+                        <button type="button" class="secondary" onclick="applyBulkDiscount()">Применить скидку</button>
+                        <span id="wb-bulk-result" class="help" style="display:inline;"></span>
                     </div>
                     <div id="wb-products"></div>
                 </section>
@@ -1096,11 +1113,17 @@
                         el.appendChild(o);
                     });
                     el.value = current;
+                } else if (el.type === 'checkbox') {
+                    el.checked = val === true || val === 'true';
                 } else {
                     el.value = val || '';
                 }
                 el.addEventListener('input', () => {
-                    setDeep(data, el.dataset.path, el.value);
+                    if (el.type === 'checkbox') {
+                        setDeep(data, el.dataset.path, el.checked);
+                    } else {
+                        setDeep(data, el.dataset.path, el.value);
+                    }
                     if (el.id === 'site-logo') $('logo-preview').src = el.value;
                 });
             });
@@ -1404,6 +1427,9 @@
             const card = document.createElement('div');
             card.className = 'prod-card';
             card.innerHTML = `
+                <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.8rem;margin-bottom:0.3rem;">
+                    <input type="checkbox" class="wb-select" data-id="${p.id}"> выбрать
+                </label>
                 <img src="${p.photo}" alt="" loading="lazy">
                 <div class="pname">${escapeHtml(p.name)}</div>
                 <div><span class="old">${p.price} ₽</span><span class="new">${p.final_price} ₽</span></div>
@@ -1411,7 +1437,8 @@
                 <div class="disc-row">
                     <input type="number" min="0" max="99" value="${p.admin_discount_percent || 0}" class="disc-input" title="Доп. скидка, %">
                     <button type="button" class="secondary" style="padding:0.3rem 0.7rem;font-size:0.82rem;">OK</button>
-                </div>`;
+                </div>
+                <div class="wb-push-result help" style="display:none;"></div>`;
             card.querySelector('button').addEventListener('click', () => {
                 setDiscount(p.id, parseInt(card.querySelector('.disc-input').value || 0, 10));
             });
@@ -1443,8 +1470,59 @@
                 });
                 const result = await resp.json();
                 showMsg(result.success ? 'Скидка сохранена' : 'Ошибка: ' + (result.error || ''), result.success);
-                if (result.success) loadWbProducts();
+                if (result.success) {
+                    if (result.pushed) showMsg('Скидка сохранена и отправлена в WB', true);
+                    else if (result.push_message) showMsg('Скидка сохранена. WB: ' + result.push_message, false);
+                    loadWbProducts();
+                }
             } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
+        }
+
+        async function applyBulkDiscount() {
+            const ids = Array.from(document.querySelectorAll('.wb-select:checked')).map(cb => parseInt(cb.dataset.id, 10));
+            const percent = parseInt($('wb-bulk-percent').value || 0, 10);
+            const resultEl = $('wb-bulk-result');
+            if (!ids.length) { resultEl.textContent = 'Отметьте галочками хотя бы один товар'; return; }
+            resultEl.textContent = 'Применение…';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/wb-discount-bulk`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({percent, nm_ids: ids})
+                });
+                const result = await resp.json();
+                resultEl.textContent = result.success
+                    ? `Скидка ${percent}% применена к ${result.count} товарам` + (result.pushed ? `, отправлено в WB: ${result.pushed}` : '') + (result.push_errors ? `, ошибок отправки: ${result.push_errors}` : '')
+                    : 'Ошибка: ' + (result.error || '');
+                if (result.success) loadWbProducts();
+            } catch (e) { resultEl.textContent = 'Ошибка сети: ' + e.message; }
+        }
+
+        /* ================= Журнал синхронизации WB ================= */
+        async function toggleSyncLog() {
+            const box = $('wb-sync-log');
+            if (box.style.display === 'none') {
+                box.style.display = 'block';
+                await loadSyncLog();
+            } else {
+                box.style.display = 'none';
+            }
+        }
+
+        async function loadSyncLog() {
+            const box = $('wb-sync-log');
+            box.innerHTML = '<p class="help">Загрузка…</p>';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/wb-sync-log`);
+                const result = await resp.json();
+                if (!result.success) { box.innerHTML = '<p class="help">Ошибка загрузки журнала.</p>'; return; }
+                if (!result.entries.length) { box.innerHTML = '<p class="help">Журнал пуст — синхронизация ещё не запускалась.</p>'; return; }
+                let html = '<table class="adm"><thead><tr><th>Время</th><th>Статус</th><th>Сообщение</th><th>Товаров</th></tr></thead><tbody>';
+                result.entries.forEach(e => {
+                    html += `<tr><td>${escapeHtml(e.time || '')}</td><td>${e.status === 'ok' ? '✅ ok' : '❌ error'}</td><td>${escapeHtml(e.message || '')}</td><td>${e.count !== null && e.count !== undefined ? e.count : ''}</td></tr>`;
+                });
+                box.innerHTML = html + '</tbody></table>';
+            } catch (e) { box.innerHTML = '<p class="help">Ошибка сети: ' + e.message + '</p>'; }
         }
 
         /* ================= Клиенты и заявки ================= */
