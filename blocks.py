@@ -8,7 +8,7 @@
     image     — картинка (src, alt, caption, upload)
     button    — кнопка (text, url, color, align)
     video     — видео YouTube/Vimeo (url)
-    products  — товары WB/Ozon (source: wb|ozon|all, limit, title)
+    products  — товары WB (source: wb|all, limit, title)
     divider   — разделитель
     html      — произвольный HTML (для перенесённого дизайна, редактирование по желанию)
 
@@ -98,7 +98,7 @@ def render_block(block):
 
     if btype == 'products':
         source = block.get('source', 'all')
-        if source not in ('wb', 'ozon', 'all'):
+        if source not in ('wb', 'all'):
             source = 'all'
         limit = block.get('limit', 8)
         try:
@@ -162,10 +162,6 @@ PRODUCTS_HYDRATOR = """<script>
             if (source === 'wb' || source === 'all') {
                 var r1 = await fetch('/api/wb-products').then(function(r){return r.json();});
                 if (r1.success) products = products.concat(r1.products || []);
-            }
-            if (source === 'ozon' || source === 'all') {
-                var r2 = await fetch('/api/ozon-products').then(function(r){return r.json();});
-                if (r2.success) products = products.concat(r2.products || []);
             }
         } catch (e) { /* оставляем пусто */ }
         products.slice(0, limit).forEach(function(p){ container.insertAdjacentHTML('beforeend', cardHtml(p)); });

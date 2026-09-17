@@ -251,7 +251,7 @@
         .mrow button.del:hover { background: var(--danger); border-color: var(--danger); }
         .mrow button.addchild { width: auto; padding: 0 0.6rem; font-size: 0.78rem; }
 
-        /* Товары WB/Ozon */
+        /* Товары WB */
         .prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 1rem; margin-top: 1rem; }
         .prod-card { border: 1px solid var(--border); border-radius: 9px; padding: 0.9rem; background: #fff; }
         .prod-card img { width: 100%; height: 150px; object-fit: contain; background: #f8f8f8; border-radius: 6px; margin-bottom: 0.5rem; }
@@ -281,8 +281,13 @@
 <body>
     <header>
         <h1>🛠 Управление сайтом «Экотория»</h1>
-        <div><a href="/" target="_blank">Открыть сайт ↗</a></div>
+        <div>
+            <a href="/" target="_blank">Открыть сайт ↗</a>
+            <a href="/admin/change-password">🔑 Сменить пароль</a>
+            <a href="/admin/logout">Выйти ⏻</a>
+        </div>
     </header>
+    <script>window.CSRF_TOKEN = '{{ csrf_token }}';</script>
     <div class="wrap">
         <div class="grid">
             <nav>
@@ -314,7 +319,6 @@
                 <button data-tab="menu">☰ Меню сайта</button>
                 <button data-tab="socials">👍 Соцсети</button>
                 <button data-tab="wildberries">🛍 Wildberries</button>
-                <button data-tab="ozon">🛍 Ozon</button>
                 <button data-tab="customers">👥 Клиенты и заявки</button>
                 <button data-tab="seo">📈 Продвижение (SEO)</button>
                 <button data-tab="backup">💾 Резервная копия</button>
@@ -470,26 +474,6 @@
                     <div id="wb-products"></div>
                 </section>
 
-                <section id="tab-ozon">
-                    <h2>Ozon — товары и скидки</h2>
-                    <div class="row">
-                        <div class="field">
-                            <label for="ozon-client-id">Ozon Client-ID</label>
-                            <input type="text" id="ozon-client-id" data-path="site.ozon_client_id" placeholder="Демо-режим">
-                        </div>
-                        <div class="field">
-                            <label for="ozon-api-key">Ozon Api-Key</label>
-                            <input type="text" id="ozon-api-key" data-path="site.ozon_api_key" placeholder="Демо-режим">
-                        </div>
-                    </div>
-                    <div class="help">Без ключей работает демо-режим. <a href="https://seller.ozon.ru/app/settings#api-keys" target="_blank">Где взять ключи</a></div>
-                    <div class="field" style="margin-top:0.8rem;">
-                        <button type="button" class="secondary" onclick="ozonSync()">🔄 Загрузить / обновить товары с Ozon</button>
-                        <span id="ozon-sync-result" class="help" style="display:inline;margin-left:0.5rem;"></span>
-                    </div>
-                    <div id="ozon-products"></div>
-                </section>
-
                 <section id="tab-customers">
                     <h2>Клиенты и заявки</h2>
                     <div class="field">
@@ -610,7 +594,7 @@
             },
             products: {
                 icon: '🛒', label: 'Товары',
-                desc: 'Карточки WB/Ozon с ценами и кнопкой «Купить»',
+                desc: 'Карточки WB с ценами и кнопкой «Купить»',
                 mock: '<div class="gm-grid"><div class="gm-card-mini"><div class="im"></div><div class="tx"></div></div><div class="gm-card-mini"><div class="im"></div><div class="tx"></div></div><div class="gm-card-mini"><div class="im"></div><div class="tx"></div></div><div class="gm-card-mini"><div class="im"></div><div class="tx"></div></div></div>',
                 make: () => ({type: 'products', source: 'all', limit: 8, title: 'Товары'}),
             },
@@ -722,7 +706,7 @@
             try {
                 const resp = await fetch(location.origin + '/admin/api/preview', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
                     body: JSON.stringify({
                         slug: page.slug,
                         page: {
@@ -774,7 +758,7 @@
                 case 'button': return `${b.text || 'Кнопка'} → ${b.url || ''}`;
                 case 'video': return b.url || 'ссылка на видео';
                 case 'products': {
-                    const src = {all: 'WB + Ozon', wb: 'Wildberries', ozon: 'Ozon'}[b.source || 'all'];
+                    const src = {all: 'Wildberries', wb: 'Wildberries'}[b.source || 'all'];
                     return `${src}, ${b.limit || 8} карточек${b.title ? ' · ' + b.title : ''}`;
                 }
                 case 'divider': return 'линия-разделитель';
@@ -1025,7 +1009,7 @@
                     const fd = new FormData();
                     fd.append('file', file.files[0]);
                     try {
-                        const resp = await fetch(`${location.origin}/admin/api/upload`, {method: 'POST', body: fd});
+                        const resp = await fetch(`${location.origin}/admin/api/upload`, {method: 'POST', body: fd, headers: {'X-CSRF-Token': window.CSRF_TOKEN}});
                         const result = await resp.json();
                         if (result.success) {
                             set('src', result.url);
@@ -1075,9 +1059,8 @@
                 const row = document.createElement('div');
                 row.className = 'row';
                 row.appendChild(field('Откуда товары', selectInput([
-                    ['all', 'Все (WB + Ozon)'],
+                    ['all', 'Все товары WB'],
                     ['wb', 'Только Wildberries'],
-                    ['ozon', 'Только Ozon'],
                 ], block.source || 'all', v => set('source', v))));
                 const limit = document.createElement('input');
                 limit.type = 'number';
@@ -1131,7 +1114,7 @@
             fd.append('file', input.files[0]);
             $('logo-upload-result').textContent = 'Загрузка…';
             try {
-                const resp = await fetch(`${location.origin}/admin/api/upload`, {method: 'POST', body: fd});
+                const resp = await fetch(`${location.origin}/admin/api/upload`, {method: 'POST', body: fd, headers: {'X-CSRF-Token': window.CSRF_TOKEN}});
                 const result = await resp.json();
                 if (result.success) {
                     setDeep(data, 'site.logo', result.url);
@@ -1287,7 +1270,7 @@
             try {
                 const resp = await fetch(`${location.origin}/admin/api/save`, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
                     body: JSON.stringify(data)
                 });
                 const result = await resp.json();
@@ -1329,7 +1312,7 @@
             try {
                 const resp = await fetch(`${location.origin}/admin/api/add-page`, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
                     body: JSON.stringify({slug, url: '/' + slug + '/', title})
                 });
                 const result = await resp.json();
@@ -1356,7 +1339,7 @@
             try {
                 const resp = await fetch(`${location.origin}/admin/api/delete-page`, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
                     body: JSON.stringify({slug: page.slug})
                 });
                 const result = await resp.json();
@@ -1377,7 +1360,7 @@
         async function rebuild() {
             $('rebuild-result').textContent = 'Пересборка…';
             try {
-                const resp = await fetch(`${location.origin}/admin/api/rebuild`, {method: 'POST'});
+                const resp = await fetch(`${location.origin}/admin/api/rebuild`, {method: 'POST', headers: {'X-CSRF-Token': window.CSRF_TOKEN}});
                 const result = await resp.json();
                 $('rebuild-result').textContent = result.success
                     ? 'Готово. Обновите страницу админки (F5).'
@@ -1404,11 +1387,11 @@
             }
         }
 
-        /* ================= WB / Ozon ================= */
+        /* ================= WB ================= */
         async function wbSync() {
             $('wb-sync-result').textContent = 'Синхронизация…';
             try {
-                const resp = await fetch(`${location.origin}/admin/api/wb-sync`, {method: 'POST'});
+                const resp = await fetch(`${location.origin}/admin/api/wb-sync`, {method: 'POST', headers: {'X-CSRF-Token': window.CSRF_TOKEN}});
                 const result = await resp.json();
                 $('wb-sync-result').textContent = result.success
                     ? `Загружено ${result.count} товаров${result.demo ? ' (демо-режим)' : ' через WB API'}`
@@ -1424,7 +1407,7 @@
                 <img src="${p.photo}" alt="" loading="lazy">
                 <div class="pname">${escapeHtml(p.name)}</div>
                 <div><span class="old">${p.price} ₽</span><span class="new">${p.final_price} ₽</span></div>
-                <div class="help">Скидка ${market}: ${p[market === 'WB' ? 'wb_discount_percent' : 'ozon_discount_percent']}%</div>
+                <div class="help">Скидка ${market}: ${p.wb_discount_percent}%</div>
                 <div class="disc-row">
                     <input type="number" min="0" max="99" value="${p.admin_discount_percent || 0}" class="disc-input" title="Доп. скидка, %">
                     <button type="button" class="secondary" style="padding:0.3rem 0.7rem;font-size:0.82rem;">OK</button>
@@ -1455,53 +1438,12 @@
             try {
                 const resp = await fetch(`${location.origin}/admin/api/wb-discount`, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
                     body: JSON.stringify({product_id: id, nm_id: id, percent})
                 });
                 const result = await resp.json();
                 showMsg(result.success ? 'Скидка сохранена' : 'Ошибка: ' + (result.error || ''), result.success);
                 if (result.success) loadWbProducts();
-            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
-        }
-
-        async function ozonSync() {
-            $('ozon-sync-result').textContent = 'Синхронизация…';
-            try {
-                const resp = await fetch(`${location.origin}/admin/api/ozon-sync`, {method: 'POST'});
-                const result = await resp.json();
-                $('ozon-sync-result').textContent = result.success
-                    ? `Загружено ${result.count} товаров${result.demo ? ' (демо-режим)' : ''}`
-                    : 'Ошибка: ' + (result.error || '');
-                if (result.success) loadOzonProducts();
-            } catch (e) { $('ozon-sync-result').textContent = 'Ошибка: ' + e.message; }
-        }
-
-        async function loadOzonProducts() {
-            try {
-                const resp = await fetch(`${location.origin}/admin/api/ozon-products`);
-                const result = await resp.json();
-                if (!result.success) return;
-                const container = $('ozon-products');
-                container.innerHTML = result.demo
-                    ? '<p class="help">Демо-режим: для реальных товаров введите Client-ID и Api-Key выше и нажмите «Загрузить / обновить».</p>'
-                    : '';
-                const grid = document.createElement('div');
-                grid.className = 'prod-grid';
-                result.products.forEach(p => grid.appendChild(productCard(p, 'Ozon', setOzonDiscount)));
-                container.appendChild(grid);
-            } catch (e) { console.error(e); }
-        }
-
-        async function setOzonDiscount(id, percent) {
-            try {
-                const resp = await fetch(`${location.origin}/admin/api/ozon-discount`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({product_id: id, offer_id: id, percent})
-                });
-                const result = await resp.json();
-                showMsg(result.success ? 'Скидка сохранена' : 'Ошибка: ' + (result.error || ''), result.success);
-                if (result.success) loadOzonProducts();
             } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
         }
 
@@ -1549,7 +1491,7 @@
             try {
                 const resp = await fetch(`${location.origin}/admin/api/order-status`, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
                     body: JSON.stringify({id, status})
                 });
                 const result = await resp.json();
@@ -1574,7 +1516,6 @@
         renderSocialsEditor();
         selectPage(0);
         loadWbProducts();
-        loadOzonProducts();
     </script>
 </body>
 </html>

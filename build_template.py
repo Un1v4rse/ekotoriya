@@ -215,11 +215,11 @@ def build_page_template(slug, src_path):
     # Insert product catalog blocks and recommendations.
     blocks = ''
     if slug == 'index':
-        blocks += "{% include 'wb_catalog_block.html' %}\n{% include 'ozon_catalog_block.html' %}\n{% include 'recommendations_block.html' %}\n"
+        blocks += "{% include 'wb_catalog_block.html' %}\n{% include 'recommendations_block.html' %}\n"
     if slug == 'catalog__namatrasniki':
-        blocks += "{% include 'wb_catalog_block.html' %}\n{% include 'ozon_catalog_block.html' %}\n{% include 'recommendations_block.html' %}\n"
+        blocks += "{% include 'wb_catalog_block.html' %}\n{% include 'recommendations_block.html' %}\n"
     if slug == 'catalog':
-        blocks += "{% include 'wb_catalog_block.html' %}\n{% include 'ozon_catalog_block.html' %}\n"
+        blocks += "{% include 'wb_catalog_block.html' %}\n"
     if blocks and '</body>' in html:
         html = html.replace('</body>', blocks + '<script src=\"/static/js/wb-actions.js\"></script>\n</body>', 1)
 

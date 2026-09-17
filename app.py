@@ -7,27 +7,29 @@
 
 Админка:
     http://127.0.0.1:5000/admin
-    логин: admin
-    пароль: admin
+    Логин/пароль: env ADMIN_USER/ADMIN_PASS, иначе — файл data/admin_credentials.json.
+    При первом запуске с дефолтным паролем генерируется случайный пароль,
+    который выводится в консоль один раз и требует смены при входе.
+    Сессионный ключ: env SECRET_KEY (без него сессии сбрасываются при перезапуске).
 """
 import hashlib
 import json
 import mimetypes
 import os
 import re
+import secrets
 import shutil
 from functools import wraps
 from pathlib import Path
 
 import requests
-from flask import Flask, render_template, render_template_string, request, redirect, url_for, jsonify, Response, send_from_directory
+from flask import Flask, render_template, render_template_string, request, redirect, url_for, session, jsonify, Response, send_from_directory
 
 # Static assets with unusual extensions (Bitrix legacy)
 mimetypes.add_type('text/javascript', '.php')
 mimetypes.add_type('text/css', '.less')
 
 import customers
-import ozon_sync
 import wb_sync
 import blocks as blocks_module
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -36,13 +38,64 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_FILE = BASE_DIR / 'data' / 'content.json'
 IMAGE_CACHE_DIR = BASE_DIR / 'data' / 'image_cache'
 IMAGE_CACHE_DIR.mkdir(exist_ok=True)
-ADMIN_USER = os.environ.get('ADMIN_USER', 'admin')
-ADMIN_PASS = os.environ.get('ADMIN_PASS', 'admin')
-ADMIN_PASS_HASH = generate_password_hash(ADMIN_PASS)
+ADMIN_CREDENTIALS_FILE = BASE_DIR / 'data' / 'admin_credentials.json'
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'ekotoriya-secret-key')
+# SECRET_KEY только из окружения: без него сессии не переживают перезапуск.
+if os.environ.get('SECRET_KEY'):
+    app.secret_key = os.environ['SECRET_KEY']
+else:
+    app.secret_key = secrets.token_hex(32)
+    print('[admin] SECRET_KEY не задан в окружении: сгенерирован случайный ключ, '
+          'сессии будут сбрасываться при перезапуске сервера.')
 app.json.ensure_ascii = False
+
+
+def load_admin_credentials():
+    """Читает логин/хэш пароля из data/admin_credentials.json (если файл есть)."""
+    if ADMIN_CREDENTIALS_FILE.exists():
+        try:
+            return json.loads(ADMIN_CREDENTIALS_FILE.read_text(encoding='utf-8'))
+        except (ValueError, OSError):
+            pass
+    return None
+
+
+def save_admin_credentials(user, password_hash, must_change_password=False):
+    """Сохраняет учётные данные в файл и возвращает их dict."""
+    data = {'user': user, 'hash': password_hash, 'must_change_password': must_change_password}
+    ADMIN_CREDENTIALS_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
+    return data
+
+
+def init_admin_credentials():
+    """Определяет учётные данные админа.
+
+    Приоритет: env ADMIN_USER/ADMIN_PASS (перезаписывают файл). Дальше —
+    сохранённый файл. Если пароль дефолтный (admin/admin из env или из
+    умолчаний), генерируем случайный, показываем ОДИН раз в консоли и
+    требуем смены пароля при первом входе.
+    """
+    env_user = os.environ.get('ADMIN_USER')
+    env_pass = os.environ.get('ADMIN_PASS')
+    if env_user and env_pass and env_pass != 'admin':
+        return save_admin_credentials(env_user, generate_password_hash(env_pass))
+    saved = load_admin_credentials()
+    if saved and saved.get('user') and saved.get('hash'):
+        return saved
+    user = 'admin'
+    password = secrets.token_urlsafe(9)
+    creds = save_admin_credentials(user, generate_password_hash(password), must_change_password=True)
+    print('=' * 64)
+    print('[admin] Пароль по умолчанию небезопасен — сгенерирован случайный пароль:')
+    print(f'[admin]   логин:    {user}')
+    print(f'[admin]   пароль:   {password}')
+    print('[admin] Пароль показывается один раз; при первом входе его нужно будет сменить.')
+    print('=' * 64)
+    return creds
+
+
+ADMIN_CREDENTIALS = init_admin_credentials()
 
 
 @app.after_request
@@ -69,21 +122,102 @@ def save_content(data):
 
 
 def check_auth(username, password):
-    return username == ADMIN_USER and check_password_hash(ADMIN_PASS_HASH, password)
+    return username == ADMIN_CREDENTIALS.get('user') and check_password_hash(ADMIN_CREDENTIALS['hash'], password)
+
+
+def get_csrf_token():
+    """CSRF-токен сессии (генерируется один раз за сессию)."""
+    token = session.get('csrf_token')
+    if not token:
+        token = secrets.token_hex(16)
+        session['csrf_token'] = token
+    return token
+
+
+@app.before_request
+def csrf_guard():
+    """Проверка CSRF-токена для изменяющих запросов под /admin/*.
+
+    Токен берём из заголовка X-CSRF-Token или поля csrf_token формы
+    и сравниваем со значением в сессии. Форма входа не требует токена.
+    """
+    if not request.path.startswith('/admin/'):
+        return None
+    if request.path == '/admin/login':
+        return None
+    if request.method not in ('POST', 'PUT', 'DELETE'):
+        return None
+    token = request.headers.get('X-CSRF-Token', '') or request.form.get('csrf_token', '')
+    if not token or token != session.get('csrf_token'):
+        if request.path.startswith('/admin/api/'):
+            return jsonify({'success': False, 'error': 'Неверный или отсутствующий CSRF-токен'}), 403
+        return 'Неверный или отсутствующий CSRF-токен', 403
+    return None
 
 
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        auth = request.authorization
-        if not auth or not check_auth(auth.username, auth.password):
-            return Response(
-                'Требуется авторизация',
-                401,
-                {'WWW-Authenticate': 'Basic realm="Admin Panel"'}
-            )
+        if not session.get('admin_user'):
+            if request.path.startswith('/admin/api/'):
+                return jsonify({'success': False, 'error': 'Требуется авторизация'}), 401
+            return redirect(url_for('admin_login', next=request.path))
+        # Пароль не сменён после первого входа — никуда, кроме формы смены, нельзя
+        if (ADMIN_CREDENTIALS.get('must_change_password')
+                and request.path not in ('/admin/change-password', '/admin/logout')):
+            if request.path.startswith('/admin/api/'):
+                return jsonify({'success': False, 'error': 'Требуется смена пароля'}), 403
+            return redirect(url_for('admin_change_password'))
         return f(*args, **kwargs)
     return decorated
+
+
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    """Форма входа в админку: сессионная авторизация вместо Basic Auth."""
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username', '')
+        password = request.form.get('password', '')
+        if check_auth(username, password):
+            session['admin_user'] = username
+            session.pop('csrf_token', None)  # новый токен для новой сессии
+            if ADMIN_CREDENTIALS.get('must_change_password'):
+                return redirect(url_for('admin_change_password'))
+            return redirect(request.args.get('next') or url_for('admin'))
+        error = 'Неверный логин или пароль'
+    return render_template('admin_login.html', error=error)
+
+
+@app.route('/admin/logout')
+def admin_logout():
+    """Выход из админки: полная очистка сессии."""
+    session.clear()
+    return redirect(url_for('admin_login'))
+
+
+@app.route('/admin/change-password', methods=['GET', 'POST'])
+@admin_required
+def admin_change_password():
+    """Смена пароля админки (принудительная после первого входа)."""
+    error = None
+    if request.method == 'POST':
+        old = request.form.get('old_password', '')
+        new = request.form.get('new_password', '')
+        repeat = request.form.get('repeat_password', '')
+        user = session['admin_user']
+        if not check_auth(user, old):
+            error = 'Текущий пароль указан неверно'
+        elif len(new) < 8:
+            error = 'Новый пароль должен быть не короче 8 символов'
+        elif new != repeat:
+            error = 'Новые пароли не совпадают'
+        else:
+            creds = save_admin_credentials(user, generate_password_hash(new), must_change_password=False)
+            ADMIN_CREDENTIALS.update(creds)
+            session.pop('csrf_token', None)
+            return redirect(url_for('admin'))
+    return render_template('admin_change_password.html', error=error, csrf_token=get_csrf_token())
 
 
 def get_page_by_slug(content, slug):
@@ -146,10 +280,7 @@ def make_context(content, page):
     wb_products = wb_sync.load_products()
     for p in wb_products:
         p['final_price'] = wb_sync.final_price(p)
-    ozon_products = ozon_sync.load_products()
-    for p in ozon_products:
-        p['final_price'] = ozon_sync.final_price(p)
-    all_products = wb_products + ozon_products
+    all_products = wb_products
     popular = customers.get_popular_products(all_products, limit=8)
     ctx = {
         'site': content.get('site', {}),
@@ -158,8 +289,6 @@ def make_context(content, page):
         'socials': content.get('socials', []),
         'wb_products': wb_products,
         'wb_demo': wb_sync.load_json(wb_sync.PRODUCTS_FILE).get('demo', False),
-        'ozon_products': ozon_products,
-        'ozon_demo': ozon_sync.load_json(ozon_sync.PRODUCTS_FILE).get('demo', False),
         'recommended_products': popular,
     }
     return ctx
@@ -321,7 +450,7 @@ def admin():
         sp = dict(p)
         sp['content_html'] = ''
         slim['pages'].append(sp)
-    return render_template('admin.html', content=slim)
+    return render_template('admin.html', content=slim, csrf_token=get_csrf_token())
 
 
 @app.route('/admin/api/page-html')
@@ -363,6 +492,7 @@ def admin_edit_page(slug):
     html = render_template(page['template'], **make_context(content, edit_page))
     inject = (
         '<link rel="stylesheet" href="/static/css/page-editor.css">\n'
+        f'<script>window.CSRF_TOKEN = "{get_csrf_token()}";</script>\n'
         f'<script src="/static/js/page-editor.js" data-slug="{slug}" defer></script>\n'
     )
     if '</body>' in html:
@@ -724,51 +854,6 @@ def admin_api_order_status():
     return jsonify({'success': True, 'order': order})
 
 
-@app.route('/admin/api/ozon-products')
-@admin_required
-def admin_ozon_products():
-    """Return current Ozon products with final prices."""
-    products = ozon_sync.load_products()
-    for p in products:
-        p['final_price'] = ozon_sync.final_price(p)
-    return jsonify({'success': True, 'products': products, 'demo': ozon_sync.load_json(ozon_sync.PRODUCTS_FILE).get('demo', False)})
-
-
-@app.route('/admin/api/ozon-sync', methods=['POST'])
-@admin_required
-def admin_ozon_sync():
-    """Sync products from Ozon Seller API."""
-    client_id, api_key = ozon_sync.get_ozon_credentials()
-    result = ozon_sync.sync(client_id=client_id, api_key=api_key, demo=not client_id or not api_key)
-    return jsonify(result)
-
-
-@app.route('/admin/api/ozon-discount', methods=['POST'])
-@admin_required
-def admin_ozon_discount():
-    """Set additional discount percent for an Ozon product."""
-    data = request.get_json() or {}
-    product_id = data.get('product_id') or data.get('offer_id')
-    percent = data.get('percent', 0)
-    try:
-        percent = int(percent)
-    except (TypeError, ValueError):
-        return jsonify({'success': False, 'error': 'percent must be integer'}), 400
-    if not product_id:
-        return jsonify({'success': False, 'error': 'product_id required'}), 400
-    ozon_sync.set_admin_discount(product_id, max(0, min(99, percent)))
-    return jsonify({'success': True})
-
-
-@app.route('/api/ozon-products')
-def api_ozon_products():
-    """Public endpoint for Ozon products."""
-    products = ozon_sync.load_products()
-    for p in products:
-        p['final_price'] = ozon_sync.final_price(p)
-    return jsonify({'success': True, 'products': products})
-
-
 def ensure_placeholder():
     """Create a local placeholder image for products without available photos."""
     placeholder = BASE_DIR / 'static' / 'noimage.png'
@@ -803,7 +888,7 @@ def proxy_image():
     if not url or not (url.startswith('http://') or url.startswith('https://')):
         return send_from_directory(BASE_DIR / 'static', 'noimage.png')
     # Safety: only allow known market image hosts
-    allowed_hosts = ('basket-', 'cdn1.ozone.ru', 'cdn', 'ozone.ru', 'wildberries.ru', 'wb.ru')
+    allowed_hosts = ('basket-', 'cdn', 'wildberries.ru', 'wb.ru')
     from urllib.parse import urlparse
     host = urlparse(url).netloc.lower()
     if not any(h in host for h in allowed_hosts):
@@ -843,4 +928,4 @@ def proxy_image():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)

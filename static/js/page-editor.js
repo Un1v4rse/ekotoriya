@@ -35,7 +35,7 @@
             make: () => ({type: 'video', url: ''}),
         },
         products: {
-            icon: '🛒', label: 'Товары', desc: 'Карточки WB/Ozon с кнопкой «Купить»',
+            icon: '🛒', label: 'Товары', desc: 'Карточки WB с кнопкой «Купить»',
             mock: '<div class="gm-grid"><div class="gm-card-mini"><div class="im"></div><div class="tx"></div></div><div class="gm-card-mini"><div class="im"></div><div class="tx"></div></div><div class="gm-card-mini"><div class="im"></div><div class="tx"></div></div><div class="gm-card-mini"><div class="im"></div><div class="tx"></div></div></div>',
             make: () => ({type: 'products', source: 'all', limit: 8, title: ''}),
         },
@@ -486,7 +486,7 @@
         try {
             const resp = await fetch(`${location.origin}/admin/api/preview-marked`, {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
                 body: JSON.stringify({blocks}),
             });
             const result = await resp.json();
@@ -592,7 +592,7 @@
                 const fd = new FormData();
                 fd.append('file', file.files[0]);
                 try {
-                    const resp = await fetch(`${location.origin}/admin/api/upload`, {method: 'POST', body: fd});
+                    const resp = await fetch(`${location.origin}/admin/api/upload`, {method: 'POST', body: fd, headers: {'X-CSRF-Token': window.CSRF_TOKEN}});
                     const result = await resp.json();
                     if (result.success) {
                         set('src', result.url);
@@ -640,7 +640,7 @@
         } else if (type === 'products') {
             container.appendChild(field('Заголовок над товарами (можно пусто)', textInput(block.title, v => set('title', v), 'Наши товары')));
             container.appendChild(field('Откуда товары', selectInput([
-                ['all', 'Все (WB + Ozon)'], ['wb', 'Только Wildberries'], ['ozon', 'Только Ozon'],
+                ['all', 'Все товары WB'], ['wb', 'Только Wildberries'],
             ], block.source || 'all', v => set('source', v))));
             const limit = document.createElement('input');
             limit.type = 'number';
@@ -649,7 +649,7 @@
             limit.value = block.limit || 8;
             limit.addEventListener('input', () => set('limit', parseInt(limit.value || 8, 10)));
             container.appendChild(field('Сколько карточек показать', limit));
-            container.appendChild(helpEl('Цены и скидки подтягиваются из разделов WB/Ozon админки автоматически.'));
+            container.appendChild(helpEl('Цены и скидки подтягиваются из раздела WB админки автоматически.'));
         } else if (type === 'divider') {
             container.appendChild(helpEl('Горизонтальная линия-разделитель. Настроек нет.'));
         } else if (type === 'html') {
@@ -667,7 +667,7 @@
         try {
             const resp = await fetch(`${location.origin}/admin/api/page-save`, {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
                 body: JSON.stringify({slug: SLUG, page: pageMeta, blocks}),
             });
             const result = await resp.json();

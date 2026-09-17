@@ -133,7 +133,7 @@ def _product_key(p):
 def get_popular_products(products, limit=8, like_weight=1):
     """Return top products by orders + likes frequency from customer base.
 
-    products — list of product dicts (WB or Ozon).
+    products — list of product dicts (WB).
     like_weight — how many orders one like counts as.
     """
     orders = get_orders()
