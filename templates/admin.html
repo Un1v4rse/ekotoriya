@@ -444,6 +444,34 @@
                             </select>
                         </div>
                     </div>
+                    <div class="row3">
+                        <div class="field">
+                            <label for="theme-border-radius">Скругления (кнопки, карточки)</label>
+                            <input type="text" id="theme-border-radius" data-path="site.theme.border_radius" placeholder="6px">
+                        </div>
+                        <div class="field">
+                            <label for="theme-container-width">Ширина контента</label>
+                            <input type="text" id="theme-container-width" data-path="site.theme.container_width" placeholder="1400px">
+                        </div>
+                        <div class="field">
+                            <label for="theme-card-bg">Фон карточек товаров</label>
+                            <input type="color" id="theme-card-bg" data-path="site.theme.card_bg">
+                        </div>
+                    </div>
+                    <div class="row3">
+                        <div class="field">
+                            <label for="theme-button-text">Цвет текста на кнопках</label>
+                            <input type="color" id="theme-button-text" data-path="site.theme.button_text_color">
+                        </div>
+                        <div class="field">
+                            <label for="theme-link">Цвет ссылок</label>
+                            <input type="color" id="theme-link" data-path="site.theme.link_color">
+                        </div>
+                        <div class="field">
+                            <label for="theme-heading-font">Шрифт заголовков</label>
+                            <select id="theme-heading-font" data-path="site.theme.heading_font_family"></select>
+                        </div>
+                    </div>
                 </section>
 
                 <section id="tab-menu">
@@ -531,6 +559,21 @@
                         </div>
                     </div>
                     <div class="help">Счётчики подключаются к каждой странице автоматически. Заодно для поисковиков работают <a href="/robots.txt" target="_blank">robots.txt ↗</a> и <a href="/sitemap.xml" target="_blank">sitemap.xml ↗</a> (обновляются сами).</div>
+                    <div class="field" style="margin-top:0.8rem;">
+                        <label for="seo-product-title">Шаблон заголовка карточки товара</label>
+                        <input type="text" id="seo-product-title" data-path="site.seo.product_title_template" placeholder="{name} — купить в интернет-магазине Экотория">
+                        <div class="help">Переменные: {name} — название товара, {brand} — бренд, {price} — цена со скидкой.</div>
+                    </div>
+                    <div class="field">
+                        <label for="seo-product-desc">Шаблон описания карточки товара</label>
+                        <input type="text" id="seo-product-desc" data-path="site.seo.product_description_template" placeholder="{name}. Бренд {brand}. Цена {price} ₽. Доставка по России.">
+                        <div class="help">Те же переменные: {name}, {brand}, {price}.</div>
+                    </div>
+                    <div class="field">
+                        <label for="seo-redirects">301-редиректы (строка = «откуда → куда»)</label>
+                        <textarea id="seo-redirects" rows="4" data-path="site.seo.redirects" placeholder="/old-page/ → /catalog/"></textarea>
+                        <div class="help">Одна строка — один редирект: /старый-адрес/ → /новый-адрес/. Строки без «→» игнорируются.</div>
+                    </div>
                     <details class="dev">
                         <summary>Дополнительно (для специалистов)</summary>
                         <div class="field" style="margin-top:0.8rem;">
@@ -1188,10 +1231,16 @@
         function bindSiteFields() {
             document.querySelectorAll('[data-path]').forEach(el => {
                 const val = getDeep(data, el.dataset.path);
-                if (el.id === 'theme-font-family') {
+                if (el.id === 'theme-font-family' || el.id === 'theme-heading-font') {
                     el.innerHTML = '';
-                    let current = val || FONTS[0][0];
-                    if (!FONTS.some(([v]) => v === current)) FONTS.unshift([current, current]);
+                    let current = val || (el.id === 'theme-heading-font' ? '' : FONTS[0][0]);
+                    if (el.id === 'theme-heading-font') {
+                        const o0 = document.createElement('option');
+                        o0.value = '';
+                        o0.textContent = 'Как основной шрифт';
+                        el.appendChild(o0);
+                    }
+                    if (current && !FONTS.some(([v]) => v === current)) FONTS.unshift([current, current]);
                     FONTS.forEach(([v, label]) => {
                         const o = document.createElement('option');
                         o.value = v;
@@ -1199,13 +1248,26 @@
                         el.appendChild(o);
                     });
                     el.value = current;
+                } else if (el.id === 'seo-redirects') {
+                    // Объект {"/from/": "/to/"} ↔ строки «/from/ → /to/»
+                    const r = val || {};
+                    el.value = Object.entries(r).map(([f, t]) => f + ' → ' + t).join('\n');
                 } else if (el.type === 'checkbox') {
                     el.checked = val === true || val === 'true';
                 } else {
                     el.value = val || '';
                 }
                 el.addEventListener('input', () => {
-                    if (el.type === 'checkbox') {
+                    if (el.id === 'seo-redirects') {
+                        const map = {};
+                        el.value.split('\n').forEach(line => {
+                            const parts = line.split('→');
+                            if (parts.length === 2 && parts[0].trim() && parts[1].trim()) {
+                                map[parts[0].trim()] = parts[1].trim();
+                            }
+                        });
+                        setDeep(data, el.dataset.path, map);
+                    } else if (el.type === 'checkbox') {
                         setDeep(data, el.dataset.path, el.checked);
                     } else {
                         setDeep(data, el.dataset.path, el.value);

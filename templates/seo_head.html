@@ -1,0 +1,6 @@
+{% if seo_product %}
+<script type="application/ld+json">{{ seo_product | tojson }}</script>
+{% endif %}
+<script type="application/ld+json">{{ seo_org | tojson }}</script>
+<meta property="og:description" content="{{ page.meta_description or site.meta_description }}" />
+<meta property="og:image" content="{{ seo_og_image }}" />

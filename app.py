@@ -246,6 +246,12 @@ THEME_DEFAULTS = {
     'bg_color': '#ffffff',
     'font_family': '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
     'font_size': '16px',
+    'border_radius': '6px',
+    'card_bg': '#ffffff',
+    'button_text_color': '#ffffff',
+    'link_color': '#9a8269',
+    'heading_font_family': '',
+    'container_width': '1400px',
     'version': 1,
 }
 
@@ -254,6 +260,9 @@ SEO_DEFAULTS = {
     'google_analytics_id': '',
     'robots_txt': 'User-agent: *\nDisallow: /admin\nAllow: /\n',
     'extra_head': '',
+    'product_title_template': '{name} — купить в интернет-магазине Экотория',
+    'product_description_template': '{name}. Бренд {brand}. Цена {price} ₽. Доставка по России.',
+    'redirects': {},
 }
 
 
@@ -278,20 +287,54 @@ def load_content():
         return ensure_site_defaults(json.load(f))
 
 
+def _absolute_url(url, host_url):
+    """Сделать URL абсолютным (для Schema.org/OG нужны полные адреса)."""
+    url = str(url or '').strip()
+    if not url:
+        return ''
+    if url.startswith('http://') or url.startswith('https://'):
+        return url
+    return host_url.rstrip('/') + (url if url.startswith('/') else '/' + url)
+
+
+def _seo_org(content, host_url):
+    """Organization (JSON-LD): название, логотип, контакты — на всех страницах."""
+    site = content.get('site', {})
+    org = {
+        '@context': 'https://schema.org',
+        '@type': 'Organization',
+        'name': site.get('title', ''),
+        'url': host_url,
+    }
+    logo = _absolute_url(site.get('logo'), host_url)
+    if logo:
+        org['logo'] = logo
+    if site.get('phone'):
+        org['telephone'] = site['phone']
+    if site.get('email'):
+        org['email'] = site['email']
+    return org
+
+
 def make_context(content, page):
     wb_products = wb_sync.load_products()
     for p in wb_products:
         p['final_price'] = wb_sync.final_price(p)
     all_products = wb_products
     popular = customers.get_popular_products(all_products, limit=8)
+    host_url = request.host_url
+    site = content.get('site', {})
     ctx = {
-        'site': content.get('site', {}),
+        'site': site,
         'page': page,
         'menu': content.get('menu', []),
         'socials': content.get('socials', []),
         'wb_products': wb_products,
         'wb_demo': wb_sync.load_json(wb_sync.PRODUCTS_FILE).get('demo', False),
         'recommended_products': popular,
+        'seo_org': _seo_org(content, host_url),
+        'seo_og_image': _absolute_url(site.get('logo'), host_url) or (host_url.rstrip('/') + '/static/noimage.png'),
+        'seo_product': None,
     }
     return ctx
 
@@ -364,26 +407,68 @@ def personal_stub():
     return render_template_string('<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Личный кабинет</title><link rel="stylesheet" href="/theme.css"></head><body style="padding:2rem;font-family:sans-serif;"><h1>Личный кабинет</h1><p>Личный кабинет в разработке. Для проверки заказов свяжитесь с нами по телефону {{ site.phone }}.</p><p><a href="/">Вернуться на главную</a></p></body></html>', site=load_content().get('site', {}))
 
 
+def _css_color(value, default):
+    """Безопасный HEX-цвет для theme.css (защита от подстановки CSS-кода)."""
+    value = str(value or '').strip()
+    return value if re.fullmatch(r'#[0-9a-fA-F]{3,8}', value) else default
+
+
+def _css_size(value, default):
+    """Безопасный CSS-размер: число + px/rem/em/%/vw/vh (без скобок и точек с запятой)."""
+    value = str(value or '').strip()
+    return value if re.fullmatch(r'\d+(\.\d+)?(px|rem|em|%|vw|vh)', value) else default
+
+
 @app.route('/theme.css')
 def theme_css():
     """Generate CSS from site theme settings."""
     content = load_content()
     theme = content.get('site', {}).get('theme', {})
+    font_family = theme.get('font_family') or THEME_DEFAULTS['font_family']
+    if not re.fullmatch(r'[^{}<>;]+', font_family):
+        font_family = THEME_DEFAULTS['font_family']
+    heading_font = theme.get('heading_font_family') or font_family
     css = f""":root {{
-    --theme-primary: {theme.get('primary_color', '#b49d84')};
-    --theme-secondary: {theme.get('secondary_color', '#9a8269')};
-    --theme-accent: {theme.get('accent_color', '#137333')};
-    --theme-text: {theme.get('text_color', '#333333')};
-    --theme-bg: {theme.get('bg_color', '#ffffff')};
+    --theme-primary: {_css_color(theme.get('primary_color'), '#b49d84')};
+    --theme-secondary: {_css_color(theme.get('secondary_color'), '#9a8269')};
+    --theme-accent: {_css_color(theme.get('accent_color'), '#137333')};
+    --theme-text: {_css_color(theme.get('text_color'), '#333333')};
+    --theme-bg: {_css_color(theme.get('bg_color'), '#ffffff')};
+    --theme-border-radius: {_css_size(theme.get('border_radius'), '6px')};
+    --theme-card-bg: {_css_color(theme.get('card_bg'), '#ffffff')};
+    --theme-button-text: {_css_color(theme.get('button_text_color'), '#ffffff')};
+    --theme-link: {_css_color(theme.get('link_color'), '#9a8269')};
+    --theme-heading-font: {heading_font};
+    --theme-container-width: {_css_size(theme.get('container_width'), '1400px')};
 }}
 body {{
-    font-family: {theme.get('font_family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif')};
-    font-size: {theme.get('font_size', '16px')};
+    font-family: {font_family};
+    font-size: {_css_size(theme.get('font_size'), '16px')};
     color: var(--theme-text);
     background-color: var(--theme-bg);
 }}
 header, .header, .top-block-wrapper, .top_blocks, .front .top_blocks, .footer {{
-    font-family: {theme.get('font_family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif')};
+    font-family: {font_family};
+}}
+h1, h2, h3, .h1, .h2, .h3 {{
+    font-family: var(--theme-heading-font);
+}}
+a {{
+    color: var(--theme-link);
+}}
+.maxwidth-theme {{
+    max-width: var(--theme-container-width);
+}}
+/* Скругления и фоны по теме (важнее инлайн-стилей блоков) */
+.cb-banner-btn, .cb-form-fields button, .cb-review-card, .cb-faq details,
+.wb-product-card, .prod-card {{
+    border-radius: var(--theme-border-radius) !important;
+}}
+.wb-product-card {{
+    background: var(--theme-card-bg) !important;
+}}
+.cb-form-fields button {{
+    color: var(--theme-button-text);
 }}
 """
     return Response(css + BLOCKS_CSS, mimetype='text/css')
@@ -456,6 +541,12 @@ def page_route(path):
     content = load_content()
     # Normalize path
     path = path.strip('/')
+    # 301-редиректы из настроек SEO: точное совпадение пути {"/old/": "/new/"}
+    redirects = content.get('site', {}).get('seo', {}).get('redirects') or {}
+    if isinstance(redirects, dict):
+        target = redirects.get('/' + path + '/') or redirects.get('/' + path)
+        if target:
+            return redirect(target, code=301)
     # Try direct URL match first
     url = '/' + path + '/'
     page = get_page_by_url(content, url)
@@ -856,9 +947,61 @@ def wb_product_page(nm_id):
         return 'Товар не найден', 404
     product['final_price'] = wb_sync.final_price(product)
     content = load_content()
-    return render_template('pages/catalog__namatrasniki.html',
-                           **make_context(content, get_page_by_slug(content, 'catalog__namatrasniki')),
-                           wb_product=product)
+
+    # SEO title/description из шаблонов с переменными {name} {brand} {price}
+    seo = content.get('site', {}).get('seo', {})
+    values = {
+        'name': product.get('name', ''),
+        'brand': product.get('brand') or 'Экотория',
+        'price': product.get('final_price') or product.get('price') or 0,
+    }
+
+    def _format(tpl):
+        try:
+            return str(tpl or '').format(**values)
+        except (KeyError, ValueError):
+            return str(tpl or '')
+
+    page = dict(get_page_by_slug(content, 'catalog__namatrasniki'))
+    page['title'] = _format(seo.get('product_title_template')) or page.get('title', '')
+    page['meta_description'] = _format(seo.get('product_description_template')) or page.get('meta_description', '')
+
+    ctx = make_context(content, page)
+    ctx['seo_product'] = _seo_product(product, request.host_url)
+    ctx['seo_og_image'] = _absolute_url(product.get('photo'), request.host_url) or ctx['seo_og_image']
+    return render_template('pages/catalog__namatrasniki.html', **ctx, wb_product=product)
+
+
+def _seo_product(product, host_url):
+    """Product (JSON-LD) для карточки товара WB."""
+    stock = product.get('stock', 0)
+    data = {
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        'name': product.get('name', ''),
+        'brand': {'@type': 'Brand', 'name': product.get('brand') or 'Экотория'},
+        'offers': {
+            '@type': 'Offer',
+            'price': product.get('final_price') or product.get('price') or 0,
+            'priceCurrency': 'RUB',
+            'availability': 'https://schema.org/InStock' if stock and stock > 0 else 'https://schema.org/OutOfStock',
+            'url': product.get('url') or '',
+        },
+    }
+    image = _absolute_url(product.get('photo'), host_url)
+    if image:
+        data['image'] = image
+    rating = product.get('rating') or product.get('review_rating')
+    if rating:
+        try:
+            data['aggregateRating'] = {
+                '@type': 'AggregateRating',
+                'ratingValue': float(rating),
+                'reviewCount': int(product.get('review_count') or product.get('ratings_count') or 1),
+            }
+        except (TypeError, ValueError):
+            pass
+    return data
 
 
 @app.route('/api/register', methods=['POST'])

@@ -110,12 +110,11 @@
                     <script data-skip-moving="true" src="/static/bitrix/templates/aspro_max/js/speed.min.js"></script>
 <link rel="shortcut icon" href="/static/favicon.ico" type="image/x-icon" />
 <link rel="apple-touch-icon" sizes="180x180" href="/static/include/apple-touch-icon.png" />
-<meta property="og:image" content="https://ekotoriya.ru/upload/iblock/200/p143wuvhmwktjcrs0xsgvkm49x4cp9qv.jpg" />
-<link rel="image_src" href="https://ekotoriya.ru/upload/iblock/200/p143wuvhmwktjcrs0xsgvkm49x4cp9qv.jpg"  />
+<meta property="og:image" content="{{ seo_og_image }}" />
 <meta property="og:title" content="{{ page.title }}" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="{{ page.url }}" />
-<meta property="og:description" content="Предлагаем купить наматрасники от производителя Экотория. Качественные наматрасники, чехлы на матрасы в нашем интернет-магазине по оптовой и розничной цене. Доставка по всей России. " />
+{% include 'seo_head.html' %}
 <script src="/static/bitrix/templates/aspro_max/js/fetch/bottom_panel.min.js" defer=""></script>
 
 <script  src="/static/bitrix/cache/js/s1/aspro_max/template_0207ee9c8e76dae83deee4d42ca52773/template_0207ee9c8e76dae83deee4d42ca52773_v1.js"></script>
