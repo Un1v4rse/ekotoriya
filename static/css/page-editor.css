@@ -237,3 +237,20 @@ body.pe-active { padding-top: 46px; }
 #pe-gallery .gm-card-mini .tx { background: #ddd; height: 5px; border-radius: 2px; margin-top: 4px; }
 #pe-gallery .gm-line { width: 80%; height: 2px; background: #cfcfcf; }
 #pe-gallery .gm-code { color: #999; font-family: monospace; font-size: 1rem; }
+
+/* Визуальный редактор списка пунктов (галерея, преимущества, таблица…) */
+.pe-items { display: flex; flex-direction: column; gap: 0.6rem; }
+.pe-item { border: 1px solid #e5ddd2; border-radius: 9px; padding: 0.6rem; position: relative; background: #fbf8f4; }
+.pe-item-field { margin-bottom: 0.45rem; }
+.pe-item-field:last-child { margin-bottom: 0; }
+.pe-item-field label { font-size: 0.76rem !important; color: #7a7166; }
+.pe-item-del {
+    position: absolute; top: 6px; right: 6px;
+    border: 0; background: transparent; cursor: pointer; font-size: 0.85rem; opacity: 0.55;
+}
+.pe-item-del:hover { opacity: 1; }
+.pe-item-add {
+    border: 1px dashed #b49d84; background: #fff; color: #9a8269;
+    border-radius: 9px; padding: 0.5rem; cursor: pointer; font-size: 0.85rem; font-weight: 600;
+}
+.pe-item-add:hover { background: #f7f3ee; }

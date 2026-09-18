@@ -521,6 +521,58 @@ BLOCKS_CSS = """
 .cb-banner-sub { margin: 0 0 1.2rem; opacity: 0.92; }
 .cb-banner-btn { display: inline-block; background: #fff; color: #333; padding: 0.7rem 1.8rem; border-radius: 6px; text-decoration: none; font-weight: 600; }
 .cb-banner-btn:hover { opacity: 0.9; }
+/* Текст + картинка */
+.cb-text-image { padding: 2rem 0; }
+.cb-section { }
+.cb-ti-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: center; }
+.cb-ti-grid h2 { font-size: 1.6rem; margin: 0 0 1rem; }
+.cb-ti-grid p { line-height: 1.6; margin: 0 0 0.8rem; }
+@media (max-width: 767px) { .cb-ti-grid { grid-template-columns: 1fr; } }
+/* Галерея */
+.cb-gallery { padding: 2rem 0; }
+.cb-gallery h2 { font-size: 1.6rem; margin-bottom: 1.5rem; }
+.cb-gallery-grid { display: grid; gap: 1rem; }
+.cb-gallery-c2 .cb-gallery-grid { grid-template-columns: repeat(2, 1fr); }
+.cb-gallery-c3 .cb-gallery-grid { grid-template-columns: repeat(3, 1fr); }
+.cb-gallery-c4 .cb-gallery-grid { grid-template-columns: repeat(4, 1fr); }
+.cb-gallery-item img { width: 100%; height: 220px; object-fit: cover; border-radius: 10px; display: block; }
+@media (max-width: 767px) { .cb-gallery-c3 .cb-gallery-grid, .cb-gallery-c4 .cb-gallery-grid { grid-template-columns: repeat(2, 1fr); } }
+/* Преимущества (тизеры) */
+.cb-features { padding: 2rem 0; }
+.cb-features h2 { font-size: 1.6rem; margin-bottom: 1.5rem; }
+.cb-features-grid { display: grid; gap: 1rem; }
+.cb-features-c2 .cb-features-grid { grid-template-columns: repeat(2, 1fr); }
+.cb-features-c3 .cb-features-grid { grid-template-columns: repeat(3, 1fr); }
+.cb-features-c4 .cb-features-grid { grid-template-columns: repeat(4, 1fr); }
+.cb-features-c5 .cb-features-grid { grid-template-columns: repeat(5, 1fr); }
+.cb-feature-card { text-align: center; padding: 1.2rem 0.8rem; }
+.cb-feature-icon { height: 42px; width: auto; margin-bottom: 0.6rem; }
+.cb-feature-title { font-weight: 600; margin-bottom: 0.3rem; }
+.cb-feature-text { font-size: 0.88rem; color: #666; line-height: 1.45; }
+@media (max-width: 767px) { .cb-features-c4 .cb-features-grid, .cb-features-c5 .cb-features-grid { grid-template-columns: repeat(2, 1fr); } }
+/* Таблица */
+.cb-table { padding: 2rem 0; }
+.cb-table h2 { font-size: 1.6rem; margin-bottom: 1.5rem; }
+.cb-table-wrap { overflow-x: auto; }
+.cb-table table { width: 100%; border-collapse: collapse; background: #fff; }
+.cb-table td { border: 1px solid #e0e0e0; padding: 0.6rem 0.9rem; font-size: 0.95rem; }
+/* Текст в колонках */
+.cb-text-columns { padding: 2rem 0; }
+.cb-text-columns h2 { font-size: 1.6rem; margin-bottom: 1.5rem; }
+.cb-cols-grid { display: grid; gap: 2rem; }
+.cb-cols-2 .cb-cols-grid { grid-template-columns: repeat(2, 1fr); }
+.cb-cols-3 .cb-cols-grid { grid-template-columns: repeat(3, 1fr); }
+.cb-cols-4 .cb-cols-grid { grid-template-columns: repeat(4, 1fr); }
+.cb-col p { line-height: 1.6; margin: 0 0 0.8rem; }
+@media (max-width: 767px) { .cb-cols-3 .cb-cols-grid, .cb-cols-4 .cb-cols-grid { grid-template-columns: 1fr; } }
+/* Контакты */
+.cb-contacts { padding: 2rem 0; }
+.cb-contacts h2 { font-size: 1.6rem; margin-bottom: 1.5rem; }
+.cb-contacts-card { border: 1px solid #e0e0e0; border-radius: 10px; background: #fff; padding: 1.2rem 1.4rem; max-width: 640px; }
+.cb-contact-row { display: flex; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid #f0f0f0; }
+.cb-contact-row:last-child { border-bottom: 0; }
+.cb-contact-row > span:first-child { width: 130px; color: #888; flex-shrink: 0; }
+.cb-contact-row a { color: #b49d84; }
 """
 
 

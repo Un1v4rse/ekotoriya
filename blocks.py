@@ -66,6 +66,28 @@ def _stars(rating):
     return '★' * rating + '☆' * (5 - rating)
 
 
+def _color(value, default=''):
+    """Валидация hex-цвета; неподходящее значение -> default."""
+    value = (value or '').strip()
+    return value if re.fullmatch(r'#[0-9a-fA-F]{3,8}', value) else default
+
+
+def _style_attr(block):
+    """Инлайн-стили контейнера блока: фон, вертикальные отступы, цвет текста."""
+    styles = []
+    bg = _color(block.get('bg'))
+    if bg:
+        styles.append(f'background:{bg}')
+    padding = str(block.get('padding', '')).strip()
+    if re.fullmatch(r'\d{1,3}', padding):
+        styles.append(f'padding-top:{padding}px')
+        styles.append(f'padding-bottom:{padding}px')
+    color = _color(block.get('text_color'))
+    if color:
+        styles.append(f'color:{color}')
+    return f' style="{";".join(styles)}"' if styles else ''
+
+
 def render_block(block):
     btype = block.get('type', 'text')
     if btype == 'heading':
@@ -223,6 +245,132 @@ def render_block(block):
 
     if btype == 'html':
         return block.get('html', '') or ''
+
+    if btype == 'section':
+        # Секция перенесённого дизайна: готовый HTML целиком (миграция со
+        # скопированных страниц). Редактируется прямо на странице как единица.
+        # При заданных фоне/отступах/цвете оборачивается в стилизуемый контейнер.
+        html = block.get('html', '') or ''
+        style = _style_attr(block)
+        if style:
+            return f'<div class="cb-section"{style}>{html}</div>'
+        return html
+
+    if btype == 'text_image':
+        title = (block.get('title') or '').strip()
+        text = (block.get('text') or '').strip()
+        src = (block.get('src') or '').strip()
+        image_pos = 'right' if block.get('image_pos') == 'right' else 'left'
+        if not text and not src:
+            return ''
+        heading = f'<h2>{esc(title)}</h2>' if title else ''
+        paragraphs = ''.join(f'<p>{esc(p).replace(chr(10), "<br>")}</p>'
+                             for p in re.split(r'\n\s*\n', text) if p.strip())
+        img_html = (f'<img src="{esc(src)}" alt="{esc(title)}" loading="lazy" '
+                    f'style="width:100%;height:auto;border-radius:10px;display:block;">') if src else ''
+        col_img = f'<div class="cb-ti-img">{img_html}</div>' if img_html else ''
+        col_text = f'<div class="cb-ti-text">{heading}{paragraphs}</div>'
+        cols = col_img + col_text if image_pos == 'left' else col_text + col_img
+        return (f'<div class="cb cb-text-image"{_style_attr(block)}><div class="maxwidth-theme">'
+                f'<div class="cb-ti-grid">{cols}</div></div></div>')
+
+    if btype == 'gallery':
+        imgs = []
+        for it in _parse_items(block.get('items')):
+            src = (it.get('src') or '').strip()
+            if src:
+                imgs.append(f'<div class="cb-gallery-item"><img src="{esc(src)}" alt="{esc(it.get("alt") or "")}" loading="lazy"></div>')
+        if not imgs:
+            return ''
+        cols = str(block.get('cols', 3))
+        cols = cols if cols in ('2', '3', '4') else '3'
+        title = (block.get('title') or '').strip()
+        heading = f'<h2>{esc(title)}</h2>' if title else ''
+        return (f'<div class="cb cb-gallery cb-gallery-c{cols}"{_style_attr(block)}>'
+                f'<div class="maxwidth-theme">{heading}'
+                f'<div class="cb-gallery-grid">{"".join(imgs)}</div></div></div>')
+
+    if btype == 'features':
+        items = []
+        for it in _parse_items(block.get('items')):
+            title = str(it.get('title') or '').strip()
+            text = str(it.get('text') or '').strip()
+            if not title and not text:
+                continue
+            icon = (it.get('icon') or '').strip()
+            icon_html = f'<img class="cb-feature-icon" src="{esc(icon)}" alt="" loading="lazy">' if icon else ''
+            items.append(
+                '<div class="cb-feature-card">'
+                f'{icon_html}<div class="cb-feature-title">{esc(title)}</div>'
+                f'<div class="cb-feature-text">{esc(text)}</div></div>')
+        if not items:
+            return ''
+        cols = str(block.get('cols', 4))
+        cols = cols if cols in ('2', '3', '4', '5') else '4'
+        title = (block.get('title') or '').strip()
+        heading = f'<h2>{esc(title)}</h2>' if title else ''
+        return (f'<div class="cb cb-features cb-features-c{cols}"{_style_attr(block)}>'
+                f'<div class="maxwidth-theme">{heading}'
+                f'<div class="cb-features-grid">{"".join(items)}</div></div></div>')
+
+    if btype == 'table':
+        rows = []
+        for it in _parse_items(block.get('items')):
+            cells = it.get('cells')
+            if isinstance(cells, str):
+                cells = [c.strip() for c in cells.split('|')]
+            cells = cells or []
+            if not cells:
+                continue
+            rows.append('<tr>' + ''.join(f'<td>{esc(c)}</td>' for c in cells) + '</tr>')
+        if not rows:
+            return ''
+        title = (block.get('title') or '').strip()
+        heading = f'<h2>{esc(title)}</h2>' if title else ''
+        return (f'<div class="cb cb-table"{_style_attr(block)}><div class="maxwidth-theme">'
+                f'{heading}<div class="cb-table-wrap"><table>{"".join(rows)}</table></div></div></div>')
+
+    if btype == 'spacer':
+        h = str(block.get('height', '40')).strip()
+        h = h if re.fullmatch(r'\d{1,3}', h) else '40'
+        return f'<div class="cb cb-spacer" style="height:{h}px;"></div>'
+
+    if btype == 'text_columns':
+        cols_raw = _parse_items(block.get('items'))
+        cols = []
+        for it in cols_raw:
+            t = str(it.get('text') or '').strip()
+            if not t:
+                continue
+            paragraphs = ''.join(f'<p>{esc(p).replace(chr(10), "<br>")}</p>'
+                                 for p in re.split(r'\n\s*\n', t) if p.strip())
+            cols.append(f'<div class="cb-col">{paragraphs}</div>')
+        if not cols:
+            return ''
+        n = str(min(4, max(2, len(cols))))
+        title = (block.get('title') or '').strip()
+        heading = f'<h2>{esc(title)}</h2>' if title else ''
+        return (f'<div class="cb cb-text-columns cb-cols-{n}"{_style_attr(block)}>'
+                f'<div class="maxwidth-theme">{heading}<div class="cb-cols-grid">{"".join(cols)}</div></div></div>')
+
+    if btype == 'contacts':
+        title = (block.get('title') or '').strip()
+        heading = f'<h2>{esc(title)}</h2>' if title else ''
+        phone = (block.get('phone') or '').strip()
+        email = (block.get('email') or '').strip()
+        address = (block.get('address') or '').strip()
+        worktime = (block.get('worktime') or '').strip()
+        rows = ''
+        if phone:
+            rows += f'<div class="cb-contact-row"><span>Телефон</span><a href="tel:{esc(re.sub(r"[^+\d]", "", phone))}">{esc(phone)}</a></div>'
+        if email:
+            rows += f'<div class="cb-contact-row"><span>Email</span><a href="mailto:{esc(email)}">{esc(email)}</a></div>'
+        if address:
+            rows += f'<div class="cb-contact-row"><span>Адрес</span><span>{esc(address)}</span></div>'
+        if worktime:
+            rows += f'<div class="cb-contact-row"><span>Режим работы</span><span>{esc(worktime)}</span></div>'
+        return (f'<div class="cb cb-contacts"{_style_attr(block)}><div class="maxwidth-theme">'
+                f'{heading}<div class="cb-contacts-card">{rows}</div></div></div>')
 
     return ''
 

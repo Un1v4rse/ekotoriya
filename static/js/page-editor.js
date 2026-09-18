@@ -74,6 +74,47 @@
             mock: '<div class="gm-code">&lt;/&gt;</div>',
             make: () => ({type: 'html', html: ''}),
         },
+        section: {
+            icon: '🧩', label: 'Секция дизайна', desc: 'Фрагмент перенесённого дизайна страницы',
+            hidden: true,
+            mock: '',
+            make: () => ({type: 'section', name: 'Секция', html: ''}),
+        },
+        text_image: {
+            icon: '📰', label: 'Текст + фото', desc: 'Заголовок и текст рядом с картинкой',
+            mock: '<div style="display:flex;gap:8px;width:100%;height:100%;align-items:center;"><div class="gm-img" style="flex:0 0 45%;height:70%;">🖼</div><div style="flex:1;display:flex;flex-direction:column;gap:5px;"><div class="gm-bar" style="width:70%;height:8px;background:#9a8269;"></div><div class="gm-bar" style="width:95%;height:5px;"></div><div class="gm-bar" style="width:90%;height:5px;"></div><div class="gm-bar" style="width:60%;height:5px;"></div></div></div>',
+            make: () => ({type: 'text_image', title: 'Заголовок', text: 'Опишите здесь преимущества вашего продукта или расскажите о компании.', src: '', image_pos: 'left'}),
+        },
+        gallery: {
+            icon: '🖼', label: 'Галерея', desc: 'Сетка фотографий 2–4 в ряд',
+            mock: '<div class="gm-grid"><div class="gm-img" style="height:34px;border-radius:3px;"></div><div class="gm-img" style="height:34px;border-radius:3px;"></div><div class="gm-img" style="height:34px;border-radius:3px;"></div><div class="gm-img" style="height:34px;border-radius:3px;"></div></div>',
+            make: () => ({type: 'gallery', title: '', cols: 3, items: [{src: '', alt: ''}]}),
+        },
+        features: {
+            icon: '✨', label: 'Преимущества', desc: 'Карточки «почему мы»: иконка, заголовок, текст',
+            mock: '<div class="gm-grid"><div class="gm-card-mini"><div class="tx" style="height:8px;background:#9a8269;"></div><div class="tx"></div></div><div class="gm-card-mini"><div class="tx" style="height:8px;background:#9a8269;"></div><div class="tx"></div></div><div class="gm-card-mini"><div class="tx" style="height:8px;background:#9a8269;"></div><div class="tx"></div></div><div class="gm-card-mini"><div class="tx" style="height:8px;background:#9a8269;"></div><div class="tx"></div></div></div>',
+            make: () => ({type: 'features', title: 'Наши преимущества', cols: 4, items: [{title: 'Качество', text: 'Гарантия на всю продукцию', icon: ''}]}),
+        },
+        table: {
+            icon: '📊', label: 'Таблица', desc: 'Таблица с размерами и ценами',
+            mock: '<div style="width:100%;display:flex;flex-direction:column;gap:4px;"><div style="display:flex;gap:4px;"><div class="gm-bar" style="flex:1;height:10px;background:#9a8269;"></div><div class="gm-bar" style="flex:1;height:10px;background:#9a8269;"></div><div class="gm-bar" style="flex:1;height:10px;background:#9a8269;"></div></div><div style="display:flex;gap:4px;"><div class="gm-bar" style="flex:1;height:8px;"></div><div class="gm-bar" style="flex:1;height:8px;"></div><div class="gm-bar" style="flex:1;height:8px;"></div></div><div style="display:flex;gap:4px;"><div class="gm-bar" style="flex:1;height:8px;"></div><div class="gm-bar" style="flex:1;height:8px;"></div><div class="gm-bar" style="flex:1;height:8px;"></div></div></div>',
+            make: () => ({type: 'table', title: '', items: [{cells: 'Параметр | Значение'}, {cells: 'Размер | 160×200'}]}),
+        },
+        spacer: {
+            icon: '↕', label: 'Отступ', desc: 'Вертикальный отступ между блоками',
+            mock: '<div style="display:flex;flex-direction:column;gap:4px;width:100%;align-items:center;"><div class="gm-bar" style="width:90%;height:4px;"></div><span style="color:#aaa;font-size:0.65rem;">40 px</span><div class="gm-bar" style="width:90%;height:4px;"></div></div>',
+            make: () => ({type: 'spacer', height: 40}),
+        },
+        text_columns: {
+            icon: '📑', label: 'Текст в колонки', desc: 'Текст, разбитый на 2–4 колонки',
+            mock: '<div style="display:flex;gap:6px;width:100%;height:100%;"><div style="flex:1;display:flex;flex-direction:column;gap:4px;"><div class="gm-bar" style="height:5px;"></div><div class="gm-bar" style="height:5px;"></div><div class="gm-bar" style="height:5px;"></div></div><div style="flex:1;display:flex;flex-direction:column;gap:4px;"><div class="gm-bar" style="height:5px;"></div><div class="gm-bar" style="height:5px;"></div><div class="gm-bar" style="height:5px;"></div></div></div>',
+            make: () => ({type: 'text_columns', title: '', items: [{text: 'Первая колонка текста.'}, {text: 'Вторая колонка текста.'}]}),
+        },
+        contacts: {
+            icon: '☎', label: 'Контакты', desc: 'Карточка с телефоном, email и адресом',
+            mock: '<div style="width:100%;height:100%;background:#f4f4f8;border-radius:6px;display:flex;flex-direction:column;justify-content:center;gap:5px;padding:10px;"><div class="gm-bar" style="width:50%;height:7px;background:#9a8269;"></div><div class="gm-bar" style="width:80%;height:5px;"></div><div class="gm-bar" style="width:70%;height:5px;"></div><div class="gm-bar" style="width:60%;height:5px;"></div></div>',
+            make: () => ({type: 'contacts', title: 'Свяжитесь с нами', phone: '8 800 201-08-24', email: 'info@ekotoriya.ru', address: '', worktime: 'Пн–Пт, 9:00–18:00'}),
+        },
     };
 
     let blocks = [];
@@ -274,17 +315,23 @@
         return !!(b && b.legacy);
     }
 
+    function blockLabel(b) {
+        if (b.legacy) return '🧩 Дизайн страницы';
+        if (b.type === 'section') return '🧩 ' + (b.name || 'Секция дизайна');
+        const cfg = BLOCK_TYPES[b.type] || BLOCK_TYPES.text;
+        return cfg.icon + ' ' + cfg.label;
+    }
+
     function renderToolbar(idx) {
         const b = blocks[idx];
         if (!b) return;
         const type = b.legacy ? 'html' : (b.type || 'text');
-        const cfg = BLOCK_TYPES[type] || BLOCK_TYPES.text;
-        toolbar.innerHTML = `<span class="pe-tb-name">${b.legacy ? '🧩 Дизайн страницы' : cfg.icon + ' ' + cfg.label}</span>` +
+        toolbar.innerHTML = `<span class="pe-tb-name">${blockLabel(b)}</span>` +
             '<button type="button" data-act="drag" title="Перетащить, чтобы переместить блок">⠿</button>' +
             '<button type="button" data-act="up" title="Выше">↑</button>' +
             '<button type="button" data-act="down" title="Ниже">↓</button>' +
             (b.legacy ? '' : '<button type="button" data-act="dup" title="Дублировать">⧉</button>') +
-            ((type === 'heading' || type === 'text') && !b.legacy ? '<button type="button" data-act="edit" title="Редактировать текст прямо на странице">✏</button>' : '') +
+            ((type === 'heading' || type === 'text' || type === 'section') && !b.legacy ? '<button type="button" data-act="edit" title="Редактировать текст прямо на странице">✏</button>' : '') +
             '<button type="button" data-act="settings" title="Настройки">⚙</button>' +
             '<button type="button" data-act="del" class="pe-tb-del" title="Удалить">🗑</button>';
         toolbar.querySelectorAll('button').forEach(btn => {
@@ -421,13 +468,23 @@
         textEdit.idx = idx;
         textEdit.targets = [];
         const sel = b.type === 'heading' ? 'h1, h2, h3, h4' : 'p';
-        entry.elements.forEach(elm => {
-            (elm.matches(sel) ? [elm] : [...elm.querySelectorAll(sel)]).forEach(t => {
-                t.contentEditable = 'true';
-                t.classList.add('pe-editable-on');
-                textEdit.targets.push(t);
+        if (b.type === 'section') {
+            // Вся секция целиком доступна для правки: любой текст, заголовки,
+            // подписи. Сохраняем итоговый HTML обратно в блок.
+            entry.elements.forEach(elm => {
+                elm.contentEditable = 'true';
+                elm.classList.add('pe-editable-on');
+                textEdit.targets.push(elm);
             });
-        });
+        } else {
+            entry.elements.forEach(elm => {
+                (elm.matches(sel) ? [elm] : [...elm.querySelectorAll(sel)]).forEach(t => {
+                    t.contentEditable = 'true';
+                    t.classList.add('pe-editable-on');
+                    textEdit.targets.push(t);
+                });
+            });
+        }
         highlight.style.display = 'none';
         addBtn.style.display = 'none';
         if (textEdit.targets[0]) textEdit.targets[0].focus();
@@ -457,6 +514,8 @@
                 if (t) b.text = t.textContent.trim();
             } else if (b.type === 'text') {
                 b.text = textEdit.targets.map(t => t.innerText.trim()).filter(Boolean).join('\n\n');
+            } else if (b.type === 'section') {
+                b.html = textEdit.targets.map(t => t.innerHTML).join('');
             }
             markDirty();
             scheduleRefresh();
@@ -473,6 +532,7 @@
         const grid = galleryOverlay.querySelector('.pe-gallery-grid');
         grid.innerHTML = '';
         Object.entries(BLOCK_TYPES).forEach(([type, cfg]) => {
+            if (cfg.hidden) return;
             const card = el('div', 'gcard');
             card.innerHTML = `<div class="gmock">${cfg.mock}</div><div class="gname">${cfg.icon} ${cfg.label}</div><div class="gdesc">${cfg.desc}</div>`;
             card.addEventListener('click', () => {
@@ -491,6 +551,8 @@
     function afterStructuralChange(selectIdx) {
         markDirty();
         closeDrawer();
+        toolbar.innerHTML = '';      // убрать «устаревшие» кнопки со старыми индексами
+        toolbar.style.display = 'none';
         if (hasLegacy) {
             // Перенесённый дизайн содержит скрипты — только полная перезагрузка отрендерит его корректно
             location.reload();
@@ -542,8 +604,7 @@
         const b = blocks[idx];
         if (!b) return;
         const type = b.legacy ? 'html' : (b.type || 'text');
-        const cfg = BLOCK_TYPES[type] || BLOCK_TYPES.text;
-        $('pe-drawer-title').textContent = (b.legacy ? '🧩 Дизайн страницы' : cfg.icon + ' ' + cfg.label);
+        $('pe-drawer-title').textContent = blockLabel(b);
         const body = $('pe-drawer-body');
         body.innerHTML = '';
         renderBlockSettings(b, idx, body);
@@ -591,6 +652,71 @@
         s.value = value;
         s.addEventListener('change', () => onchange(s.value));
         return s;
+    }
+    function colorInput(value, onchange) {
+        const c = document.createElement('input');
+        c.type = 'color';
+        c.value = value || '#b49d84';
+        c.addEventListener('input', () => onchange(c.value));
+        return c;
+    }
+    function numberInput(value, onchange, min, max) {
+        const n = document.createElement('input');
+        n.type = 'number';
+        n.min = min; n.max = max;
+        n.value = value;
+        n.addEventListener('input', () => onchange(parseInt(n.value || min, 10)));
+        return n;
+    }
+    /* Визуальный редактор списка пунктов (без JSON): строки с полями,
+     * кнопки удаления и «+ Добавить пункт».
+     * defs: [{key, label, type?: 'text'|'textarea', placeholder?, def?}] */
+    function itemsEditor(items, defs, onchange) {
+        items = Array.isArray(items) ? items : [];
+        const wrap = el('div', 'pe-items');
+        function render() {
+            wrap.innerHTML = '';
+            items.forEach((item, k) => {
+                const row = el('div', 'pe-item');
+                defs.forEach(d => {
+                    const f = el('div', 'pe-item-field');
+                    const l = document.createElement('label');
+                    l.textContent = d.label;
+                    let inp;
+                    if (d.type === 'textarea') { inp = document.createElement('textarea'); inp.rows = 2; }
+                    else { inp = document.createElement('input'); inp.type = 'text'; }
+                    inp.value = item[d.key] || '';
+                    if (d.placeholder) inp.placeholder = d.placeholder;
+                    inp.addEventListener('input', () => { item[d.key] = inp.value; onchange(items); });
+                    f.appendChild(l);
+                    f.appendChild(inp);
+                    row.appendChild(f);
+                });
+                const del = el('button', 'pe-item-del', {type: 'button', title: 'Удалить пункт'});
+                del.textContent = '🗑';
+                del.addEventListener('click', () => { items.splice(k, 1); onchange(items); render(); });
+                row.appendChild(del);
+                wrap.appendChild(row);
+            });
+            const add = el('button', 'pe-item-add', {type: 'button'});
+            add.textContent = '+ Добавить пункт';
+            add.addEventListener('click', () => {
+                const ni = {};
+                defs.forEach(d => { ni[d.key] = d.def || ''; });
+                items.push(ni);
+                onchange(items);
+                render();
+            });
+            wrap.appendChild(add);
+        }
+        render();
+        return wrap;
+    }
+    function styleFields(container, block, set) {
+        // Общие настройки оформления: фон, отступы сверху/снизу, цвет текста
+        container.appendChild(field('Фон (необязательно)', colorInput(block.bg, v => set('bg', v))));
+        container.appendChild(field('Отступ сверху и снизу, px', numberInput(block.padding || 0, v => set('padding', v), 0, 200)));
+        container.appendChild(field('Цвет текста (необязательно)', colorInput(block.text_color, v => set('text_color', v))));
     }
 
     function renderBlockSettings(block, idx, container) {
@@ -718,6 +844,62 @@
                 container.appendChild(helpEl('Это содержимое перенесённой страницы. Вы можете добавить свои блоки выше или ниже, либо удалить этот блок и собрать страницу заново.'));
             }
             container.appendChild(field('HTML-код', textareaInput(block.html, v => set('html', v), 14)));
+        } else if (type === 'section') {
+            container.appendChild(field('Название секции (для списка блоков)', textInput(block.name, v => set('name', v))));
+            styleFields(container, block, set);
+            container.appendChild(helpEl('Текст и картинки внутри секции правятся прямо на странице кнопкой ✏ в панели блока. Фон, отступы и цвет текста применяются, только если заданы.'));
+        } else if (type === 'text_image') {
+            container.appendChild(field('Заголовок', textInput(block.title, v => set('title', v))));
+            container.appendChild(field('Текст', textareaInput(block.text, v => set('text', v), 7)));
+            container.appendChild(field('Ссылка на картинку', textInput(block.src, v => set('src', v), 'https://… или /static/img/…')));
+            container.appendChild(field('Картинка', selectInput([
+                ['left', 'Слева от текста'], ['right', 'Справа от текста'],
+            ], block.image_pos || 'left', v => set('image_pos', v))));
+            styleFields(container, block, set);
+        } else if (type === 'gallery') {
+            container.appendChild(field('Заголовок (можно пусто)', textInput(block.title, v => set('title', v))));
+            container.appendChild(field('Фото в ряд', selectInput([
+                ['2', '2'], ['3', '3'], ['4', '4'],
+            ], block.cols || '3', v => set('cols', v))));
+            container.appendChild(field('Фотографии', itemsEditor(block.items, [
+                {key: 'src', label: 'Ссылка на фото', placeholder: '/static/img/…'},
+                {key: 'alt', label: 'Подпись (для поисковиков)', placeholder: 'Необязательно'},
+            ], v => set('items', v))));
+            styleFields(container, block, set);
+        } else if (type === 'features') {
+            container.appendChild(field('Заголовок секции', textInput(block.title, v => set('title', v))));
+            container.appendChild(field('Карточек в ряд', selectInput([
+                ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5'],
+            ], block.cols || '4', v => set('cols', v))));
+            container.appendChild(field('Преимущества', itemsEditor(block.items, [
+                {key: 'title', label: 'Заголовок', placeholder: 'Гарантия качества'},
+                {key: 'text', label: 'Пояснение', type: 'textarea', placeholder: 'Гарантия на всю продукцию 1 год'},
+                {key: 'icon', label: 'Иконка (ссылка, необязательно)', placeholder: '/static/img/icon.svg'},
+            ], v => set('items', v))));
+            styleFields(container, block, set);
+        } else if (type === 'table') {
+            container.appendChild(field('Заголовок (можно пусто)', textInput(block.title, v => set('title', v))));
+            container.appendChild(field('Строки таблицы', itemsEditor(block.items, [
+                {key: 'cells', label: 'Ячейки через вертикальную черту', placeholder: 'Наматрасник 160×200 | 2 601 ₽'},
+            ], v => set('items', v))));
+            container.appendChild(helpEl('Первая строка обычно — шапка таблицы. Колонки разделяйте символом |.'));
+            styleFields(container, block, set);
+        } else if (type === 'spacer') {
+            container.appendChild(field('Высота отступа, px', numberInput(block.height || 40, v => set('height', v), 5, 300)));
+        } else if (type === 'text_columns') {
+            container.appendChild(field('Заголовок (можно пусто)', textInput(block.title, v => set('title', v))));
+            container.appendChild(field('Колонки текста', itemsEditor(block.items, [
+                {key: 'text', label: 'Текст колонки', type: 'textarea', placeholder: 'Пустая строка — новый абзац'},
+            ], v => set('items', v))));
+            container.appendChild(helpEl('Колонок может быть от 2 до 4 — лишние не отображаются.'));
+            styleFields(container, block, set);
+        } else if (type === 'contacts') {
+            container.appendChild(field('Заголовок', textInput(block.title, v => set('title', v))));
+            container.appendChild(field('Телефон', textInput(block.phone, v => set('phone', v), '8 800 000-00-00')));
+            container.appendChild(field('Email', textInput(block.email, v => set('email', v), 'info@site.ru')));
+            container.appendChild(field('Адрес', textInput(block.address, v => set('address', v))));
+            container.appendChild(field('Режим работы', textInput(block.worktime, v => set('worktime', v), 'Пн–Пт, 9:00–18:00')));
+            styleFields(container, block, set);
         }
     }
 

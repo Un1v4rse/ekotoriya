@@ -220,8 +220,13 @@ def build_page_template(slug, src_path):
         blocks += "{% include 'wb_catalog_block.html' %}\n{% include 'recommendations_block.html' %}\n"
     if slug == 'catalog':
         blocks += "{% include 'wb_catalog_block.html' %}\n"
-    if blocks and '</body>' in html:
-        html = html.replace('</body>', blocks + '<script src=\"/static/js/wb-actions.js\"></script>\n</body>', 1)
+    if blocks and '<footer id="footer">' in html:
+        # Внутри основной вёрстки, ПЕРЕД футером (у </body> блоки оказались бы ниже футера)
+        html = html.replace('<footer id="footer">', blocks + '<footer id="footer">', 1)
+    elif blocks and '</body>' in html:
+        html = html.replace('</body>', blocks + '</body>', 1)
+    if blocks and 'wb-actions.js' not in html:
+        html = html.replace('</body>', '<script src="/static/js/wb-actions.js"></script>\n</body>', 1)
 
     # Escape accidental Jinja2 syntax in the original HTML (e.g. Bitrix templates use {{ }}).
     # First protect our own placeholders, then escape remaining delimiters.
