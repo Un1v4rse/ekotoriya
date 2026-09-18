@@ -551,6 +551,7 @@ BLOCKS_CSS = """
 .cb-features-c5 .cb-features-grid { grid-template-columns: repeat(5, 1fr); }
 .cb-feature-card { text-align: center; padding: 1.2rem 0.8rem; }
 .cb-feature-icon { height: 42px; width: auto; margin-bottom: 0.6rem; }
+span.cb-feature-icon { display: block; height: auto; width: 100%; }
 .cb-feature-title { font-weight: 600; margin-bottom: 0.3rem; }
 .cb-feature-text { font-size: 0.88rem; color: #666; line-height: 1.45; }
 @media (max-width: 767px) { .cb-features-c4 .cb-features-grid, .cb-features-c5 .cb-features-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -560,6 +561,7 @@ BLOCKS_CSS = """
 .cb-table-wrap { overflow-x: auto; }
 .cb-table table { width: 100%; border-collapse: collapse; background: #fff; }
 .cb-table td { border: 1px solid #e0e0e0; padding: 0.6rem 0.9rem; font-size: 0.95rem; }
+.cb-table th { border: 1px solid #e0e0e0; padding: 0.6rem 0.9rem; font-size: 0.95rem; background: #b49d84; color: #fff; text-align: left; font-weight: 600; }
 /* Текст в колонках */
 .cb-text-columns { padding: 2rem 0; }
 .cb-text-columns h2 { font-size: 1.6rem; margin-bottom: 1.5rem; }

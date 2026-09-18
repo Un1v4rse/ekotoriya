@@ -184,6 +184,14 @@ body.pe-active { padding-top: var(--pe-topbar-h); }
 .pe-addbtn .plus { font-size: 1rem; line-height: 0.8; font-weight: 700; }
 .pe-addbtn:hover { background: var(--pe-accent-dark); transform: translate(-50%, 50%) scale(1.05); }
 
+/* Невидимый «мост» от блока к кнопке: держит hover на пути к курсора */
+#pe-addbtn-bridge {
+    position: absolute;
+    z-index: 99989;
+    display: none;
+    cursor: pointer;
+}
+
 /* ---------------- Линия вставки при перетаскивании ---------------- */
 .pe-drop-line {
     position: absolute;

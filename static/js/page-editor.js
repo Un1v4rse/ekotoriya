@@ -150,6 +150,19 @@
     const addBtn = el('button', 'pe-addbtn', {type: 'button', title: 'Добавить блок ниже'});
     addBtn.innerHTML = '<span class="plus">+</span> Добавить блок';
 
+    // «Мост» между блоком и кнопкой: пока курсор идёт от блока к кнопке
+    // (или висит над кнопкой), hover не сбрасывается и кнопка не пропадает.
+    const addBtnBridge = el('div', '', {id: 'pe-addbtn-bridge'});
+    let addBtnHover = false;
+    addBtn.addEventListener('mouseenter', () => { addBtnHover = true; });
+    addBtn.addEventListener('mouseleave', () => { addBtnHover = false; updateOverlayPositions(); });
+    addBtnBridge.addEventListener('mouseenter', () => { addBtnHover = true; });
+    addBtnBridge.addEventListener('mouseleave', () => { addBtnHover = false; updateOverlayPositions(); });
+    addBtnBridge.addEventListener('click', e => {
+        e.stopPropagation();
+        openGallery(insertIndexAfter(addBtnBridge.dataset.target));
+    });
+
     // Левая панель «Структура страницы» — список всех блоков:
     // выбор, прокрутка к блоку, перемещение стрелками, добавление.
     const structure = el('div', '', {id: 'pe-structure'});
@@ -181,7 +194,7 @@
         if (booted) return;
         booted = true;
         document.body.classList.add('pe-active');
-        document.body.append(topbar, highlight, dropLine, addBtn, badgesLayer, structure, drawer, pageProps, galleryOverlay);
+        document.body.append(topbar, highlight, dropLine, addBtn, addBtnBridge, badgesLayer, structure, drawer, pageProps, galleryOverlay);
         $('pe-btn-save').addEventListener('click', save);
         $('pe-btn-exit').addEventListener('click', exitEditor);
         $('pe-btn-props').addEventListener('click', () => pageProps.classList.toggle('open'));
@@ -335,7 +348,7 @@
         document.addEventListener('scroll', updateOverlayPositions, {passive: true});
         window.addEventListener('resize', updateOverlayPositions);
         document.addEventListener('click', e => {
-            if (e.target && e.target.closest && e.target.closest('#pe-topbar, #pe-drawer, #pe-pageprops, #pe-gallery-overlay, .pe-toolbar, .pe-addbtn')) return;
+            if (e.target && e.target.closest && e.target.closest('#pe-topbar, #pe-drawer, #pe-pageprops, #pe-gallery-overlay, .pe-toolbar, .pe-addbtn, #pe-addbtn-bridge')) return;
             const idx = blockIndexFromPoint(e.clientX, e.clientY);
             select(idx);
         }, true);
@@ -355,6 +368,7 @@
 
     function onMouseMove(e) {
         if (dragState.active || textEdit.active) return;
+        if (addBtnHover) return; // курсор на кнопке/«мосте» — hover не трогаем
         const idx = blockIndexFromPoint(e.clientX, e.clientY);
         if (idx !== hoverIdx) {
             hoverIdx = idx;
@@ -364,9 +378,10 @@
 
     function updateOverlayPositions() {
         if (dragState.active || textEdit.active) return;
-        const showIdx = selectedIdx >= 0 ? selectedIdx : hoverIdx;
+        const btnIdx = addBtnHover ? (addBtn.dataset.target != null ? +addBtn.dataset.target : -1) : -1;
+        const showIdx = selectedIdx >= 0 ? selectedIdx : (hoverIdx >= 0 ? hoverIdx : (addBtnHover ? btnIdx : -1));
         const anyHover = hoverIdx >= 0 && hoverIdx !== selectedIdx;
-        if (showIdx < 0) { highlight.style.display = 'none'; addBtn.style.display = 'none'; return; }
+        if (showIdx < 0) { highlight.style.display = 'none'; addBtn.style.display = 'none'; addBtnBridge.style.display = 'none'; return; }
         const r = entryRect(showIdx);
         if (!r || r.bottom - r.top < 2) { highlight.style.display = 'none'; return; }
         highlight.style.display = 'block';
@@ -383,16 +398,22 @@
             toolbar.style.display = 'none';
         }
 
-        // Кнопка «+ Добавить блок» внизу подсветки
-        if (hoverIdx >= 0 && !hasLegacyBlockAt(hoverIdx)) {
-            addBtn.dataset.target = hoverIdx;
+        // Кнопка «+ Добавить блок» внизу подсветки + «мост» до неё
+        const showBtnIdx = hoverIdx >= 0 ? hoverIdx : (addBtnHover ? btnIdx : -1);
+        if (showBtnIdx >= 0 && !hasLegacyBlockAt(showBtnIdx)) {
+            addBtn.dataset.target = showBtnIdx;
+            addBtnBridge.dataset.target = showBtnIdx;
             addBtn.style.display = 'flex';
             addBtn.style.left = ((r.left + r.right) / 2) + 'px';
             addBtn.style.top = r.bottom + 'px';
-        } else if (hoverIdx >= 0) {
-            addBtn.style.display = 'none';
+            addBtnBridge.style.display = 'block';
+            addBtnBridge.style.left = r.left + 'px';
+            addBtnBridge.style.top = (r.bottom - 6) + 'px';
+            addBtnBridge.style.width = (r.right - r.left) + 'px';
+            addBtnBridge.style.height = '30px';
         } else {
             addBtn.style.display = 'none';
+            addBtnBridge.style.display = 'none';
         }
 
         positionBadges();
@@ -781,10 +802,19 @@
                     l.textContent = d.label;
                     let inp;
                     if (d.type === 'textarea') { inp = document.createElement('textarea'); inp.rows = 2; }
+                    else if (d.type === 'select') {
+                        inp = document.createElement('select');
+                        (d.options || []).forEach(([val, label]) => {
+                            const o = document.createElement('option');
+                            o.value = val; o.textContent = label;
+                            inp.appendChild(o);
+                        });
+                    }
                     else { inp = document.createElement('input'); inp.type = 'text'; }
-                    inp.value = item[d.key] || '';
+                    inp.value = item[d.key] || (d.def != null ? d.def : '');
                     if (d.placeholder) inp.placeholder = d.placeholder;
                     inp.addEventListener('input', () => { item[d.key] = inp.value; onchange(items); });
+                    inp.addEventListener('change', () => { item[d.key] = inp.value; onchange(items); });
                     f.appendChild(l);
                     f.appendChild(inp);
                     row.appendChild(f);
@@ -816,6 +846,33 @@
         container.appendChild(field('Цвет текста (необязательно)', colorInput(block.text_color, v => set('text_color', v))));
     }
 
+    /* Поле загрузки картинки с компьютера. onDone получает URL загруженного файла. */
+    function uploadField(label, onDone) {
+        const file = document.createElement('input');
+        file.type = 'file';
+        file.accept = 'image/*';
+        const st = el('div', 'help');
+        file.addEventListener('change', async () => {
+            if (!file.files.length) return;
+            st.textContent = 'Загрузка…';
+            const fd = new FormData();
+            fd.append('file', file.files[0]);
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/upload`, {method: 'POST', body: fd, headers: {'X-CSRF-Token': window.CSRF_TOKEN}});
+                const result = await resp.json();
+                if (result.success) {
+                    st.textContent = 'Загружено.';
+                    onDone(result.url);
+                } else {
+                    st.textContent = 'Ошибка: ' + (result.error || '');
+                }
+            } catch (e) { st.textContent = 'Ошибка сети: ' + e.message; }
+        });
+        const f = field(label, file);
+        f.appendChild(st);
+        return f;
+    }
+
     function renderBlockSettings(block, idx, container) {
         const set = (k, v) => { block[k] = v; markDirty(); scheduleRefresh(); };
         const type = block.legacy ? 'html' : (block.type || 'text');
@@ -825,35 +882,24 @@
             container.appendChild(field('Размер', selectInput([
                 ['h1', 'Самый крупный (H1)'], ['h2', 'Крупный (H2)'], ['h3', 'Средний (H3)'],
             ], block.level || 'h2', v => set('level', v))));
+            container.appendChild(field('Положение', selectInput([
+                ['left', 'Слева'], ['center', 'По центру'], ['right', 'Справа'],
+            ], block.align || 'left', v => set('align', v))));
+            container.appendChild(field('Цвет текста (необязательно)', colorInput(block.text_color, v => set('text_color', v))));
             container.appendChild(helpEl('Совет: текст можно править прямо на странице кнопкой ✏ в панели блока.'));
         } else if (type === 'text') {
             container.appendChild(field('Текст', textareaInput(block.text, v => set('text', v), 8)));
+            container.appendChild(field('Положение', selectInput([
+                ['left', 'Слева'], ['center', 'По центру'], ['right', 'Справа'],
+            ], block.align || 'left', v => set('align', v))));
+            container.appendChild(field('Цвет текста (необязательно)', colorInput(block.text_color, v => set('text_color', v))));
             container.appendChild(helpEl('Пустая строка — новый абзац. Можно править прямо на странице кнопкой ✏.'));
         } else if (type === 'image') {
-            const file = document.createElement('input');
-            file.type = 'file';
-            file.accept = 'image/*';
-            const st = el('div', 'help');
-            file.addEventListener('change', async () => {
-                if (!file.files.length) return;
-                st.textContent = 'Загрузка…';
-                const fd = new FormData();
-                fd.append('file', file.files[0]);
-                try {
-                    const resp = await fetch(`${location.origin}/admin/api/upload`, {method: 'POST', body: fd, headers: {'X-CSRF-Token': window.CSRF_TOKEN}});
-                    const result = await resp.json();
-                    if (result.success) {
-                        set('src', result.url);
-                        st.textContent = 'Загружено.';
-                        const img = container.querySelector('.preview-img img');
-                        if (img) img.src = result.url;
-                    } else {
-                        st.textContent = 'Ошибка: ' + (result.error || '');
-                    }
-                } catch (e) { st.textContent = 'Ошибка сети: ' + e.message; }
-            });
-            container.appendChild(field('Загрузить с компьютера', file));
-            container.appendChild(st);
+            container.appendChild(uploadField('Загрузить с компьютера', url => {
+                set('src', url);
+                const img = container.querySelector('.preview-img img');
+                if (img) img.src = url;
+            }));
             container.appendChild(field('…или ссылка на картинку', textInput(block.src, v => {
                 set('src', v);
                 const img = container.querySelector('.preview-img img');
@@ -866,6 +912,10 @@
             container.appendChild(pv);
             container.appendChild(field('Подпись для поисковиков (alt)', textInput(block.alt, v => set('alt', v))));
             container.appendChild(field('Подпись под картинкой', textInput(block.caption, v => set('caption', v))));
+            container.appendChild(field('Положение', selectInput([
+                ['center', 'По центру'], ['left', 'Слева'], ['right', 'Справа'],
+            ], block.align || 'center', v => set('align', v))));
+            container.appendChild(field('Ширина (необязательно, % или px)', textInput(block.width, v => set('width', v), 'например 60% или 400px')));
         } else if (type === 'button') {
             container.appendChild(field('Текст на кнопке', textInput(block.text, v => set('text', v))));
             container.appendChild(field('Куда ведёт (адрес страницы)', textInput(block.url, v => set('url', v), '/catalog/')));
@@ -902,10 +952,12 @@
             container.appendChild(helpEl('Горизонтальная линия-разделитель. Настроек нет.'));
         } else if (type === 'reviews') {
             container.appendChild(field('Заголовок секции', textInput(block.title, v => set('title', v))));
-            container.appendChild(field('Отзывы (JSON)', textareaInput(JSON.stringify(block.items || [], null, 2), v => {
-                try { set('items', JSON.parse(v || '[]')); } catch (e) { /* невалидный JSON — оставляем прежнее */ }
-            }, 10)));
-            container.appendChild(helpEl('Один отзыв — объект {"name": "Имя", "text": "Текст", "rating": 5}. Оценка от 1 до 5.'));
+            container.appendChild(field('Отзывы', itemsEditor(block.items, [
+                {key: 'name', label: 'Имя покупателя', placeholder: 'Ольга'},
+                {key: 'rating', label: 'Оценка', type: 'select', options: [['5', '★★★★★ (5)'], ['4', '★★★★ (4)'], ['3', '★★★ (3)'], ['2', '★★ (2)'], ['1', '★ (1)']], def: '5'},
+                {key: 'text', label: 'Текст отзыва', type: 'textarea', placeholder: 'Наматрасник сел идеально…'},
+            ], v => set('items', v))));
+            container.appendChild(helpEl('Карточки отзывов показываются сеткой. Оценка отображается звёздами.'));
         } else if (type === 'form') {
             container.appendChild(field('Заголовок над формой', textInput(block.title, v => set('title', v))));
             container.appendChild(field('Подпись на кнопке', textInput(block.button, v => set('button', v), 'Отправить')));
@@ -914,28 +966,26 @@
         } else if (type === 'map') {
             container.appendChild(field('Заголовок над картой', textInput(block.title, v => set('title', v))));
             container.appendChild(field('Адрес или координаты', textInput(block.address, v => set('address', v), 'Москва, Красная площадь, 1')));
-            container.appendChild(helpEl('Карта Яндекса построится автоматически по адресу.'));
+            container.appendChild(field('Масштаб карты', numberInput(block.zoom || 16, v => set('zoom', v), 9, 18)));
+            container.appendChild(helpEl('Карта Яндекса построится автоматически по адресу. Масштаб: 9 — весь город, 18 — отдельное здание.'));
         } else if (type === 'faq') {
             container.appendChild(field('Заголовок секции', textInput(block.title, v => set('title', v))));
-            container.appendChild(field('Вопросы и ответы (JSON)', textareaInput(JSON.stringify(block.items || [], null, 2), v => {
-                try { set('items', JSON.parse(v || '[]')); } catch (e) { /* невалидный JSON — оставляем прежнее */ }
-            }, 10)));
-            container.appendChild(helpEl('Один пункт — объект {"q": "Вопрос", "a": "Ответ"}.'));
+            container.appendChild(field('Вопросы и ответы', itemsEditor(block.items, [
+                {key: 'q', label: 'Вопрос', placeholder: 'Как стирать непромокаемый наматрасник?'},
+                {key: 'a', label: 'Ответ', type: 'textarea', placeholder: 'Режим деликатной стирки при 30°…'},
+            ], v => set('items', v))));
+            container.appendChild(helpEl('Каждый пункт — раскрывающаяся пара «вопрос → ответ».'));
         } else if (type === 'banner') {
             container.appendChild(field('Заголовок', textInput(block.title, v => set('title', v))));
             container.appendChild(field('Подзаголовок', textInput(block.subtitle, v => set('subtitle', v))));
             container.appendChild(field('Текст на кнопке', textInput(block.button, v => set('button', v), 'Подробнее')));
             container.appendChild(field('Ссылка кнопки', textInput(block.url, v => set('url', v), '/catalog/')));
-            const colorRow = el('div', 'field');
-            const l = document.createElement('label');
-            l.textContent = 'Цвет фона';
-            const color = document.createElement('input');
-            color.type = 'color';
-            color.value = block.bg || '#b49d84';
-            color.addEventListener('input', () => set('bg', color.value));
-            colorRow.appendChild(l);
-            colorRow.appendChild(color);
-            container.appendChild(colorRow);
+            container.appendChild(field('Цвет фона', colorInput(block.bg || '#b49d84', v => set('bg', v))));
+            container.appendChild(field('Цвет текста', colorInput(block.text_color || '#ffffff', v => set('text_color', v))));
+            container.appendChild(uploadField('Фоновая картинка с компьютера', url => set('image', url)));
+            container.appendChild(field('…или ссылка на фоновую картинку', textInput(block.image, v => set('image', v), 'https://…')));
+            container.appendChild(field('Высота баннера, px (необязательно)', numberInput(block.height || 0, v => set('height', v), 0, 800)));
+            container.appendChild(helpEl('Если задана фоновая картинка, она покроет баннер; цвет фона останется под ней.'));
         } else if (type === 'html') {
             if (block.legacy) {
                 container.appendChild(helpEl('Это содержимое перенесённой страницы. Вы можете добавить свои блоки выше или ниже, либо удалить этот блок и собрать страницу заново.'));
@@ -948,7 +998,22 @@
         } else if (type === 'text_image') {
             container.appendChild(field('Заголовок', textInput(block.title, v => set('title', v))));
             container.appendChild(field('Текст', textareaInput(block.text, v => set('text', v), 7)));
-            container.appendChild(field('Ссылка на картинку', textInput(block.src, v => set('src', v), 'https://… или /static/img/…')));
+            container.appendChild(uploadField('Картинка с компьютера', url => {
+                set('src', url);
+                const img = container.querySelector('.preview-img img');
+                if (img) img.src = url;
+            }));
+            container.appendChild(field('…или ссылка на картинку', textInput(block.src, v => {
+                set('src', v);
+                const img = container.querySelector('.preview-img img');
+                if (img) img.src = v;
+            }, 'https://… или /static/img/…')));
+            const pv = el('div', 'preview-img');
+            const img = document.createElement('img');
+            img.src = block.src || '';
+            pv.appendChild(img);
+            container.appendChild(pv);
+            container.appendChild(field('Подпись для поисковиков (alt)', textInput(block.alt, v => set('alt', v))));
             container.appendChild(field('Картинка', selectInput([
                 ['left', 'Слева от текста'], ['right', 'Справа от текста'],
             ], block.image_pos || 'left', v => set('image_pos', v))));
@@ -958,10 +1023,17 @@
             container.appendChild(field('Фото в ряд', selectInput([
                 ['2', '2'], ['3', '3'], ['4', '4'],
             ], block.cols || '3', v => set('cols', v))));
+            container.appendChild(uploadField('Добавить фото с компьютера', url => {
+                const items = Array.isArray(block.items) ? block.items : [];
+                items.push({src: url, alt: ''});
+                set('items', items);
+                openDrawer(idx); // перерисовать список фото
+            }));
             container.appendChild(field('Фотографии', itemsEditor(block.items, [
                 {key: 'src', label: 'Ссылка на фото', placeholder: '/static/img/…'},
                 {key: 'alt', label: 'Подпись (для поисковиков)', placeholder: 'Необязательно'},
             ], v => set('items', v))));
+            container.appendChild(helpEl('Фото подписывайте — так лучше для поисковиков. Загруженные с компьютера добавляются в конец списка.'));
             styleFields(container, block, set);
         } else if (type === 'features') {
             container.appendChild(field('Заголовок секции', textInput(block.title, v => set('title', v))));
@@ -971,15 +1043,19 @@
             container.appendChild(field('Преимущества', itemsEditor(block.items, [
                 {key: 'title', label: 'Заголовок', placeholder: 'Гарантия качества'},
                 {key: 'text', label: 'Пояснение', type: 'textarea', placeholder: 'Гарантия на всю продукцию 1 год'},
-                {key: 'icon', label: 'Иконка (ссылка, необязательно)', placeholder: '/static/img/icon.svg'},
+                {key: 'icon', label: 'Иконка: эмодзи (🏆) или ссылка', placeholder: '🚚 или /static/img/icon.svg'},
             ], v => set('items', v))));
+            container.appendChild(helpEl('Иконку можно задать эмодзи (быстро) или картинкой по ссылке.'));
             styleFields(container, block, set);
         } else if (type === 'table') {
             container.appendChild(field('Заголовок (можно пусто)', textInput(block.title, v => set('title', v))));
+            container.appendChild(field('Первая строка — шапка таблицы', selectInput([
+                ['1', 'Да, выделить жирным'], ['0', 'Нет, обычная строка'],
+            ], block.header_row ? '1' : '0', v => set('header_row', v === '1'))));
             container.appendChild(field('Строки таблицы', itemsEditor(block.items, [
                 {key: 'cells', label: 'Ячейки через вертикальную черту', placeholder: 'Наматрасник 160×200 | 2 601 ₽'},
             ], v => set('items', v))));
-            container.appendChild(helpEl('Первая строка обычно — шапка таблицы. Колонки разделяйте символом |.'));
+            container.appendChild(helpEl('Колонки разделяйте символом |. Например: Название | Размер | Цена.'));
             styleFields(container, block, set);
         } else if (type === 'spacer') {
             container.appendChild(field('Высота отступа, px', numberInput(block.height || 40, v => set('height', v), 5, 300)));

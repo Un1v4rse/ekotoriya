@@ -94,7 +94,10 @@ def render_block(block):
         level = block.get('level', 'h2')
         if level not in ('h1', 'h2', 'h3'):
             level = 'h2'
-        return (f'<div class="cb cb-heading"><{level}>'
+        align = {'left': 'left', 'center': 'center', 'right': 'right'}.get(block.get('align'), 'left')
+        color = (block.get('text_color') or '').strip()
+        color_css = f'color:{color};' if re.fullmatch(r'#[0-9a-fA-F]{3,8}', color) else ''
+        return (f'<div class="cb cb-heading" style="text-align:{align};{color_css}"><{level}>'
                 f'{esc(block.get("text"))}</{level}></div>')
 
     if btype == 'text':
@@ -102,7 +105,10 @@ def render_block(block):
         if not paragraphs:
             return ''
         inner = ''.join(f'<p>{esc(p).replace(chr(10), "<br>")}</p>' for p in paragraphs)
-        return f'<div class="cb cb-text">{inner}</div>'
+        align = {'left': 'left', 'center': 'center', 'right': 'right'}.get(block.get('align'), 'left')
+        color = (block.get('text_color') or '').strip()
+        color_css = f'color:{color};' if re.fullmatch(r'#[0-9a-fA-F]{3,8}', color) else ''
+        return f'<div class="cb cb-text" style="text-align:{align};{color_css}">{inner}</div>'
 
     if btype == 'image':
         src = (block.get('src') or '').strip()
@@ -111,9 +117,12 @@ def render_block(block):
         alt = esc(block.get('alt', ''))
         caption = (block.get('caption') or '').strip()
         cap_html = f'<figcaption style="font-size:0.85rem;color:#888;text-align:center;margin-top:0.5rem;">{esc(caption)}</figcaption>' if caption else ''
-        return (f'<div class="cb cb-image" style="margin:1.5rem 0;text-align:center;">'
-                f'<figure style="margin:0;display:inline-block;max-width:100%;">'
-                f'<img src="{esc(src)}" alt="{alt}" loading="lazy" style="max-width:100%;height:auto;border-radius:8px;">'
+        align = {'left': 'left', 'center': 'center', 'right': 'right'}.get(block.get('align'), 'center')
+        width = (str(block.get('width') or '').strip())
+        width_css = f'width:{width};max-width:100%;' if re.fullmatch(r'\d{1,4}(\.\d+)?(px|%|rem|em)', width) else 'max-width:100%;'
+        return (f'<div class="cb cb-image" style="margin:1.5rem 0;text-align:{align};">'
+                f'<figure style="margin:0;display:inline-block;{width_css}">'
+                f'<img src="{esc(src)}" alt="{alt}" loading="lazy" style="width:100%;height:auto;border-radius:8px;">'
                 f'{cap_html}</figure></div>')
 
     if btype == 'button':
@@ -206,7 +215,9 @@ def render_block(block):
             return ''
         title = (block.get('title') or '').strip()
         heading = f'<h2>{esc(title)}</h2>' if title else ''
-        src = f'https://yandex.ru/map-widget/v1/?text={quote(address)}&z=16'
+        zoom = str(block.get('zoom') or '16')
+        zoom = zoom if re.fullmatch(r'\d{1,2}', zoom) and 9 <= int(zoom) <= 18 else '16'
+        src = f'https://yandex.ru/map-widget/v1/?text={quote(address)}&z={zoom}'
         return (f'<div class="cb cb-map"><div class="maxwidth-theme">{heading}'
                 f'<iframe src="{src}" loading="lazy" title="Карта"></iframe></div></div>')
 
@@ -235,12 +246,23 @@ def render_block(block):
         bg = (block.get('bg') or '#b49d84').strip() or '#b49d84'
         if not re.fullmatch(r'#[0-9a-fA-F]{3,8}', bg):
             bg = '#b49d84'
+        text_color = (block.get('text_color') or '#ffffff').strip()
+        if not re.fullmatch(r'#[0-9a-fA-F]{3,8}', text_color):
+            text_color = '#ffffff'
+        image = (block.get('image') or '').strip()
+        height = str(block.get('height') or '').strip()
+        height_css = f'min-height:{int(height)}px;' if re.fullmatch(r'\d{2,3}', height) else ''
+        if image:
+            bg_css = (f'background:linear-gradient(rgba(0,0,0,0.25),rgba(0,0,0,0.25)),'
+                      f'url("{esc(image)}") center/cover no-repeat {bg};')
+        else:
+            bg_css = f'background:{bg};'
         sub_html = f'<p class="cb-banner-sub">{esc(subtitle)}</p>' if subtitle else ''
         btn_html = (f'<a class="cb-banner-btn" href="{esc(url)}">{esc(button)}</a>'
                     if button else '')
         return (f'<div class="cb cb-banner"><div class="maxwidth-theme">'
-                f'<div class="cb-banner-inner" style="background:{bg};">'
-                f'<h2 class="cb-banner-title">{esc(title)}</h2>{sub_html}{btn_html}'
+                f'<div class="cb-banner-inner" style="{bg_css}{height_css}color:{text_color};">'
+                f'<h2 class="cb-banner-title" style="color:{text_color};">{esc(title)}</h2>{sub_html}{btn_html}'
                 '</div></div></div>')
 
     if btype == 'html':
@@ -266,7 +288,7 @@ def render_block(block):
         heading = f'<h2>{esc(title)}</h2>' if title else ''
         paragraphs = ''.join(f'<p>{esc(p).replace(chr(10), "<br>")}</p>'
                              for p in re.split(r'\n\s*\n', text) if p.strip())
-        img_html = (f'<img src="{esc(src)}" alt="{esc(title)}" loading="lazy" '
+        img_html = (f'<img src="{esc(src)}" alt="{esc(block.get("alt") or title)}" loading="lazy" '
                     f'style="width:100%;height:auto;border-radius:10px;display:block;">') if src else ''
         col_img = f'<div class="cb-ti-img">{img_html}</div>' if img_html else ''
         col_text = f'<div class="cb-ti-text">{heading}{paragraphs}</div>'
@@ -298,7 +320,14 @@ def render_block(block):
             if not title and not text:
                 continue
             icon = (it.get('icon') or '').strip()
-            icon_html = f'<img class="cb-feature-icon" src="{esc(icon)}" alt="" loading="lazy">' if icon else ''
+            if icon:
+                if re.fullmatch(r'[\w\-. /:%?&=]+', icon) and ('/' in icon or icon.startswith('http')):
+                    icon_html = f'<img class="cb-feature-icon" src="{esc(icon)}" alt="" loading="lazy">'
+                else:
+                    # Эмодзи или короткий текст вместо картинки
+                    icon_html = f'<span class="cb-feature-icon" style="font-size:2rem;line-height:1;">{esc(icon)}</span>'
+            else:
+                icon_html = ''
             items.append(
                 '<div class="cb-feature-card">'
                 f'{icon_html}<div class="cb-feature-title">{esc(title)}</div>'
@@ -315,14 +344,19 @@ def render_block(block):
 
     if btype == 'table':
         rows = []
-        for it in _parse_items(block.get('items')):
+        raw = _parse_items(block.get('items'))
+        header_row = bool(block.get('header_row'))
+        for ri, it in enumerate(raw):
             cells = it.get('cells')
             if isinstance(cells, str):
                 cells = [c.strip() for c in cells.split('|')]
             cells = cells or []
             if not cells:
                 continue
-            rows.append('<tr>' + ''.join(f'<td>{esc(c)}</td>' for c in cells) + '</tr>')
+            if header_row and ri == 0:
+                rows.append('<tr>' + ''.join(f'<th>{esc(c)}</th>' for c in cells) + '</tr>')
+            else:
+                rows.append('<tr>' + ''.join(f'<td>{esc(c)}</td>' for c in cells) + '</tr>')
         if not rows:
             return ''
         title = (block.get('title') or '').strip()
