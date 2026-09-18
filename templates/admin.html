@@ -88,11 +88,13 @@
         .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.9rem; }
         .actions {
             position: sticky;
-            bottom: 0;
+            bottom: 12px;
             background: var(--card);
-            border-top: 1px solid var(--border);
-            padding: 0.9rem 0 0;
-            margin-top: 1.2rem;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+            padding: 0.9rem 1.1rem;
+            margin: 1.2rem 0 12px;
             display: flex;
             gap: 0.8rem;
             align-items: center;
@@ -331,7 +333,7 @@
                             <div class="page-meta" id="page-meta"></div>
                         </div>
                         <a href="#" id="page-open-link" target="_blank" class="secondary" style="text-decoration:none;display:inline-block;">Открыть на сайте ↗</a>
-                        <a href="#" id="page-edit-link" target="_blank" class="secondary" style="text-decoration:none;display:inline-block;background:var(--accent);color:#fff;border-color:var(--accent);">✏ Редактировать на странице</a>
+                        <a href="#" id="page-edit-link" target="_blank" class="secondary" style="text-decoration:none;display:inline-block;background:var(--accent);color:#fff;border-color:var(--accent);padding:0.6rem 1.1rem;border-radius:7px;font-size:0.9rem;">✏ Редактировать на странице</a>
                     </div>
 
                     <details class="page-params">

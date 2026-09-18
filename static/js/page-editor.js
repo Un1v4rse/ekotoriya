@@ -132,6 +132,7 @@
     topbar.innerHTML =
         '<span class="pe-title">🛠 Редактирование страницы</span>' +
         '<span class="pe-status" id="pe-status"></span>' +
+        '<button type="button" id="pe-btn-structure">☰ Структура</button>' +
         '<button type="button" id="pe-btn-props">⚙ Параметры страницы</button>' +
         '<button type="button" class="pe-save" id="pe-btn-save">💾 Сохранить</button>' +
         '<button type="button" class="pe-exit" id="pe-btn-exit">✖ Выйти</button>';
@@ -141,8 +142,22 @@
     highlight.appendChild(toolbar);
     const dropLine = el('div', '', {id: '', class: 'pe-drop-line'});
 
+    // Плашки с названиями блоков (слева вверху каждого блока) —
+    // главный ориентир «что на странице можно двигать и править».
+    const badgesLayer = el('div', '', {id: 'pe-badges'});
+    const badges = new Map();   // idx -> element
+
     const addBtn = el('button', 'pe-addbtn', {type: 'button', title: 'Добавить блок ниже'});
-    addBtn.textContent = '+';
+    addBtn.innerHTML = '<span class="plus">+</span> Добавить блок';
+
+    // Левая панель «Структура страницы» — список всех блоков:
+    // выбор, прокрутка к блоку, перемещение стрелками, добавление.
+    const structure = el('div', '', {id: 'pe-structure'});
+    structure.innerHTML =
+        '<div class="pe-structure-head"><span>Структура страницы</span>' +
+        '<button type="button" id="pe-structure-close">✕</button></div>' +
+        '<div class="pe-structure-list" id="pe-structure-list"></div>' +
+        '<button type="button" class="pe-structure-add" id="pe-structure-add">+ Добавить блок в конец</button>';
 
     const drawer = el('div', '', {id: 'pe-drawer'});
     drawer.innerHTML = '<div class="pe-drawer-head"><span id="pe-drawer-title">Настройки блока</span>' +
@@ -166,15 +181,18 @@
         if (booted) return;
         booted = true;
         document.body.classList.add('pe-active');
-        document.body.append(topbar, highlight, dropLine, addBtn, drawer, pageProps, galleryOverlay);
+        document.body.append(topbar, highlight, dropLine, addBtn, badgesLayer, structure, drawer, pageProps, galleryOverlay);
         $('pe-btn-save').addEventListener('click', save);
         $('pe-btn-exit').addEventListener('click', exitEditor);
         $('pe-btn-props').addEventListener('click', () => pageProps.classList.toggle('open'));
+        $('pe-btn-structure').addEventListener('click', () => structure.classList.toggle('open'));
+        $('pe-structure-close').addEventListener('click', () => structure.classList.remove('open'));
+        $('pe-structure-add').addEventListener('click', () => openGallery(blocks.length));
         $('pe-drawer-close').addEventListener('click', closeDrawer);
         addBtn.addEventListener('click', () => openGallery(insertIndexAfter(addBtn.dataset.target)));
         galleryOverlay.querySelector('.pe-gallery-close').addEventListener('click', closeGallery);
         galleryOverlay.addEventListener('click', e => { if (e.target === galleryOverlay) closeGallery(); });
-        document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeGallery(); closeDrawer(); pageProps.classList.remove('open'); } });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeGallery(); closeDrawer(); pageProps.classList.remove('open'); structure.classList.remove('open'); } });
 
         fetch(`${location.origin}/admin/api/page-blocks?slug=${encodeURIComponent(SLUG)}`)
             .then(r => r.json())
@@ -225,6 +243,74 @@
             if (cur && n.nodeType === Node.ELEMENT_NODE) cur.elements.push(n);
         });
         blockMap.sort((a, b) => a.i - b.i);
+        renderBadges();
+        renderStructure();
+    }
+
+    /* ---------------- Плашки блоков ---------------- */
+    function renderBadges() {
+        badgesLayer.innerHTML = '';
+        badges.clear();
+        blockMap.forEach(entry => {
+            const b = blocks[entry.i];
+            const badge = el('div', 'pe-badge');
+            badge.innerHTML = '<span class="pe-badge-num">' + (entry.i + 1) + '</span>' + escapeHtml(blockLabel(b));
+            badge.title = 'Перетащите, чтобы переместить блок; клик — выделить';
+            badge.addEventListener('mousedown', e => { e.preventDefault(); select(entry.i); startDrag(entry.i, e); });
+            badge.addEventListener('click', e => { e.stopPropagation(); select(entry.i); });
+            badgesLayer.appendChild(badge);
+            badges.set(entry.i, badge);
+        });
+        positionBadges();
+    }
+
+    function positionBadges() {
+        if (dragState.active) return;   // во время drag плашки не дёргаем
+        blockMap.forEach(entry => {
+            const badge = badges.get(entry.i);
+            if (!badge) return;
+            const r = entryRect(entry.i);
+            if (!r || r.bottom - r.top < 2) { badge.style.display = 'none'; return; }
+            badge.style.display = 'flex';
+            badge.style.top = r.top + 'px';
+            badge.style.left = r.left + 'px';
+            badge.classList.toggle('pe-badge-selected', entry.i === selectedIdx);
+        });
+    }
+
+    /* ---------------- Панель «Структура страницы» ---------------- */
+    function renderStructure() {
+        const list = $('pe-structure-list');
+        if (!list) return;
+        list.innerHTML = '';
+        blocks.forEach((b, idx) => {
+            const item = el('div', 'pe-structure-item' + (idx === selectedIdx ? ' pe-structure-active' : ''));
+            item.innerHTML =
+                '<span class="si-num">' + (idx + 1) + '</span>' +
+                '<span class="si-name">' + escapeHtml(blockLabel(b)) + '</span>' +
+                '<span class="si-actions">' +
+                '<button type="button" data-act="up" title="Выше">↑</button>' +
+                '<button type="button" data-act="down" title="Ниже">↓</button>' +
+                '<button type="button" data-act="del" title="Удалить">🗑</button>' +
+                '</span>';
+            item.addEventListener('click', e => {
+                const act = e.target && e.target.dataset ? e.target.dataset.act : null;
+                if (act === 'up') { moveBy(idx, -1); return; }
+                if (act === 'down') { moveBy(idx, 1); return; }
+                if (act === 'del') { removeBlock(idx); return; }
+                select(idx);
+                const entry = entryAt(idx);
+                if (entry && entry.elements.length) {
+                    const top = entry.elements[0].getBoundingClientRect().top + window.scrollY - 80;
+                    window.scrollTo({top, behavior: 'smooth'});
+                }
+            });
+            list.appendChild(item);
+        });
+    }
+
+    function escapeHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
     }
 
     function entryAt(idx) { return blockMap.find(e => e.i === idx); }
@@ -297,7 +383,7 @@
             toolbar.style.display = 'none';
         }
 
-        // Кнопка «+» внизу подсветки
+        // Кнопка «+ Добавить блок» внизу подсветки
         if (hoverIdx >= 0 && !hasLegacyBlockAt(hoverIdx)) {
             addBtn.dataset.target = hoverIdx;
             addBtn.style.display = 'flex';
@@ -308,6 +394,8 @@
         } else {
             addBtn.style.display = 'none';
         }
+
+        positionBadges();
     }
 
     function hasLegacyBlockAt(idx) {
@@ -326,14 +414,14 @@
         const b = blocks[idx];
         if (!b) return;
         const type = b.legacy ? 'html' : (b.type || 'text');
-        toolbar.innerHTML = `<span class="pe-tb-name">${blockLabel(b)}</span>` +
-            '<button type="button" data-act="drag" title="Перетащить, чтобы переместить блок">⠿</button>' +
-            '<button type="button" data-act="up" title="Выше">↑</button>' +
-            '<button type="button" data-act="down" title="Ниже">↓</button>' +
-            (b.legacy ? '' : '<button type="button" data-act="dup" title="Дублировать">⧉</button>') +
-            ((type === 'heading' || type === 'text' || type === 'section') && !b.legacy ? '<button type="button" data-act="edit" title="Редактировать текст прямо на странице">✏</button>' : '') +
-            '<button type="button" data-act="settings" title="Настройки">⚙</button>' +
-            '<button type="button" data-act="del" class="pe-tb-del" title="Удалить">🗑</button>';
+        toolbar.innerHTML = `<span class="pe-tb-name">${escapeHtml(blockLabel(b))}</span>` +
+            '<button type="button" data-act="drag" class="pe-tb-drag" title="Зажмите и перетащите, чтобы переместить блок">⠿</button>' +
+            '<button type="button" data-act="up" title="Переместить выше">↑</button>' +
+            '<button type="button" data-act="down" title="Переместить ниже">↓</button>' +
+            (b.legacy ? '' : '<button type="button" data-act="dup" title="Дублировать блок">⧉ Копировать</button>') +
+            ((type === 'heading' || type === 'text' || type === 'section') && !b.legacy ? '<button type="button" data-act="edit" title="Править текст прямо на странице">✏ Текст</button>' : '') +
+            '<button type="button" data-act="settings" title="Настройки блока">⚙ Настройки</button>' +
+            '<button type="button" data-act="del" class="pe-tb-del" title="Удалить блок">🗑 Удалить</button>';
         toolbar.querySelectorAll('button').forEach(btn => {
             btn.addEventListener('click', e => {
                 e.stopPropagation();
@@ -366,6 +454,10 @@
         e.preventDefault();
         dragState.active = true;
         dragState.from = idx;
+        const badge = badges.get(idx);
+        if (badge) badge.classList.add('pe-badge-dragging');
+        const entry = entryAt(idx);
+        if (entry) entry.elements.forEach(elm => { elm.style.opacity = '0.45'; });
         document.body.style.userSelect = 'none';
         document.addEventListener('mousemove', onDragMove);
         document.addEventListener('mouseup', onDragEnd);
@@ -409,6 +501,10 @@
         document.removeEventListener('mouseup', onDragEnd);
         document.body.style.userSelect = '';
         dropLine.style.display = 'none';
+        const badge = badges.get(dragState.from);
+        if (badge) badge.classList.remove('pe-badge-dragging');
+        const entry = entryAt(dragState.from);
+        if (entry) entry.elements.forEach(elm => { elm.style.opacity = ''; });
         if (dragState.active && dragState.target) {
             const {index, before} = dragState.target;
             moveBlockTo(dragState.from, index, before);
@@ -416,6 +512,7 @@
         dragState.active = false;
         dragState.from = -1;
         dragState.target = null;
+        positionBadges();
     }
 
     function moveBlockTo(from, targetIndex, before) {

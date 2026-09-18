@@ -111,6 +111,10 @@ def add_cache_headers(response):
     path = request.path
     if response.status_code >= 400:
         response.headers['Cache-Control'] = 'no-store, must-revalidate'
+    elif path in ('/static/js/page-editor.js', '/static/css/page-editor.css', '/static/js/wb-actions.js'):
+        # Активно разрабатываемые ассеты редактора — кэшировать нельзя,
+        # иначе браузер держит старую версию после обновлений.
+        response.headers['Cache-Control'] = 'no-store, must-revalidate'
     elif path.startswith('/static/include/'):
         # Lazy-loaded HTML fragments (Bitrix-style .php includes). Must be
         # text/html: as text/javascript jQuery would eval the whole HTML
@@ -686,10 +690,11 @@ def admin_edit_page(slug):
     edit_page = dict(page)
     edit_page['content_html'] = blocks_module.render_blocks_marked(blocks)
     html = render_template(page['template'], **make_context(content, edit_page))
+    editor_ver = int(os.path.getmtime(os.path.join(BASE_DIR, 'static', 'js', 'page-editor.js')))
     inject = (
-        '<link rel="stylesheet" href="/static/css/page-editor.css">\n'
+        f'<link rel="stylesheet" href="/static/css/page-editor.css?v={editor_ver}">\n'
         f'<script>window.CSRF_TOKEN = "{get_csrf_token()}";</script>\n'
-        f'<script src="/static/js/page-editor.js" data-slug="{slug}" defer></script>\n'
+        f'<script src="/static/js/page-editor.js?v={editor_ver}" data-slug="{slug}" defer></script>\n'
     )
     if '</body>' in html:
         html = html.replace('</body>', inject + '</body>', 1)

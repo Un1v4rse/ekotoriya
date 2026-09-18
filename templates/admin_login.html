@@ -44,8 +44,40 @@
             border: 1px solid var(--border);
             border-radius: 6px;
             font-size: 0.95rem;
-            margin-bottom: 1rem;
         }
+        .field { margin-bottom: 1rem; }
+        .password-wrap { position: relative; }
+        .password-wrap input { padding-right: 2.4rem; }
+        .toggle-pass {
+            position: absolute;
+            right: 0.4rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: 0;
+            cursor: pointer;
+            padding: 0.3rem;
+            line-height: 0;
+            color: #888;
+            width: auto;
+        }
+        .toggle-pass svg { width: 20px; height: 20px; display: block; }
+        .toggle-pass:hover { color: var(--accent-dark); }
+        /* «Зачёркнутый» глаз, когда пароль открыт: та же иконка + диагональная черта */
+        .toggle-pass .eye-slash {
+            display: none;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 24px;
+            height: 2px;
+            background: currentColor;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            border-radius: 1px;
+            pointer-events: none;
+        }
+        .toggle-pass.showing { color: var(--accent-dark); }
+        .toggle-pass.showing .eye-slash { display: block; }
         input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
         button {
             width: 100%;
@@ -78,10 +110,28 @@
         <div class="error">{{ error }}</div>
         {% endif %}
         <label for="username">Логин</label>
-        <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+        <div class="field">
+            <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+        </div>
         <label for="password">Пароль</label>
-        <input type="password" id="password" name="password" autocomplete="current-password" required>
+        <div class="field password-wrap">
+            <input type="password" id="password" name="password" autocomplete="current-password" required>
+            <button type="button" class="toggle-pass" id="toggle-pass" title="Показать пароль" aria-label="Показать пароль"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span class="eye-slash"></span></button>
+        </div>
         <button type="submit">Войти</button>
     </form>
+    <script>
+        (function () {
+            const btn = document.getElementById('toggle-pass');
+            const input = document.getElementById('password');
+            btn.addEventListener('click', function () {
+                const show = input.type === 'password';
+                input.type = show ? 'text' : 'password';
+                btn.classList.toggle('showing', show);
+                btn.title = show ? 'Скрыть пароль' : 'Показать пароль';
+                input.focus();
+            });
+        })();
+    </script>
 </body>
 </html>

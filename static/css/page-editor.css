@@ -1,20 +1,33 @@
-/* Редактор страницы прямо на сайте (оверлей, подключается только в режиме /admin/page/<slug>) */
+/* ==========================================================================
+   Редактор страницы прямо на сайте (режим /admin/page/<slug>)
+   Визуальный язык — как в Tilda: яркие синие рамки, плашки с названиями
+   блоков, панель действий у выбранного блока, кнопки «+ Добавить блок»
+   между блоками, левая панель «Структура страницы».
+   ========================================================================== */
 
+:root {
+    --pe-accent: #2979ff;
+    --pe-accent-dark: #1c5fd6;
+    --pe-topbar-h: 46px;
+}
+
+/* ---------------- Топбар ---------------- */
 #pe-topbar {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
+    height: var(--pe-topbar-h);
     z-index: 100000;
-    background: #2b2620;
+    background: #232a36;
     color: #fff;
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    padding: 0.5rem 1rem;
+    padding: 0 1rem;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     font-size: 0.88rem;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 #pe-topbar .pe-title { font-weight: 700; margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #pe-topbar button {
@@ -25,103 +38,291 @@
     font-size: 0.85rem;
     font-weight: 600;
     font-family: inherit;
-    background: #4a4238;
+    background: #3a4454;
     color: #fff;
-}
-#pe-topbar button:hover { background: #5d5447; }
-#pe-topbar button.pe-save { background: #b49d84; color: #fff; }
-#pe-topbar button.pe-save:hover { background: #9a8269; }
-#pe-topbar button.pe-exit { background: transparent; border: 1px solid #6a6154; }
-#pe-topbar .pe-status { color: #b8ad9d; font-size: 0.8rem; }
-body.pe-active { padding-top: 46px; }
-
-/* Подсветка блока под курсором / выбранного */
-.pe-highlight {
-    position: absolute;
-    z-index: 99990;
-    pointer-events: none;
-    outline: 2px solid rgba(180, 157, 132, 0.9);
-    outline-offset: -1px;
-    background: rgba(180, 157, 132, 0.07);
-    display: none;
-}
-.pe-highlight.pe-hover { outline-style: dashed; outline-width: 1px; background: rgba(180, 157, 132, 0.04); }
-.pe-highlight.pe-selected { outline-width: 2px; background: rgba(180, 157, 132, 0.1); }
-
-/* Панель инструментов блока */
-.pe-toolbar {
-    position: absolute;
-    top: -34px;
-    left: 0;
-    display: none;
-    align-items: center;
-    gap: 2px;
-    background: #2b2620;
-    border-radius: 7px 7px 0 0;
-    padding: 3px 6px;
-    pointer-events: auto;
     white-space: nowrap;
 }
-.pe-toolbar .pe-tb-name { color: #cfc3b2; font-size: 0.72rem; font-weight: 700; margin-right: 4px; }
+#pe-topbar button:hover { background: #4a566b; }
+#pe-topbar button.pe-save { background: var(--pe-accent); color: #fff; }
+#pe-topbar button.pe-save:hover { background: var(--pe-accent-dark); }
+#pe-topbar button.pe-exit { background: transparent; border: 1px solid #55617a; }
+#pe-topbar .pe-status { color: #9fb3d9; font-size: 0.8rem; }
+body.pe-active { padding-top: var(--pe-topbar-h); }
+
+/* ---------------- Плашки блоков (слева вверху каждого блока) ---------------- */
+.pe-badge {
+    position: absolute;
+    z-index: 99980;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--pe-accent);
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 1;
+    padding: 6px 10px 6px 6px;
+    border-radius: 0 7px 7px 0;
+    cursor: grab;
+    user-select: none;
+    white-space: nowrap;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-shadow: 0 2px 8px rgba(41, 121, 255, 0.45);
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.pe-badge:hover { background: var(--pe-accent-dark); }
+.pe-badge .pe-badge-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 9px;
+    background: #fff;
+    color: var(--pe-accent);
+    font-size: 10.5px;
+    font-weight: 700;
+    flex: 0 0 auto;
+}
+.pe-badge.pe-badge-selected { background: #0d47a1; box-shadow: 0 3px 12px rgba(13, 71, 161, 0.6); }
+.pe-badge.pe-badge-dragging {
+    cursor: grabbing;
+    background: #0d47a1;
+    opacity: 0.85;
+    transform: rotate(-1deg) scale(1.03);
+    box-shadow: 0 8px 22px rgba(13, 71, 161, 0.5);
+}
+
+/* ---------------- Подсветка блока ---------------- */
+.pe-highlight {
+    position: absolute;
+    z-index: 99970;
+    pointer-events: none;
+    outline: 2px solid var(--pe-accent);
+    outline-offset: -1px;
+    background: rgba(41, 121, 255, 0.05);
+    display: none;
+    transition: top 0.08s linear, left 0.08s linear, width 0.08s linear, height 0.08s linear;
+}
+.pe-highlight.pe-selected {
+    outline: 3px solid var(--pe-accent);
+    background: rgba(41, 121, 255, 0.08);
+}
+
+/* ---------------- Панель действий выбранного блока ---------------- */
+.pe-toolbar {
+    position: absolute;
+    top: -42px;
+    left: -3px;
+    display: none;
+    align-items: stretch;
+    gap: 0;
+    background: var(--pe-accent);
+    border-radius: 8px 8px 0 0;
+    padding: 0;
+    pointer-events: auto;
+    white-space: nowrap;
+    box-shadow: 0 -3px 14px rgba(41, 121, 255, 0.4);
+    overflow: hidden;
+}
+.pe-toolbar .pe-tb-name {
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.18);
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .pe-toolbar button {
     border: 0;
     background: transparent;
     color: #fff;
     cursor: pointer;
-    font-size: 0.82rem;
-    width: 26px;
-    height: 26px;
-    border-radius: 5px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: inherit;
+    padding: 0 10px;
+    height: 40px;
     line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border-left: 1px solid rgba(255, 255, 255, 0.22);
 }
-.pe-toolbar button:hover { background: #b49d84; }
-.pe-toolbar button.pe-tb-del:hover { background: #c00; }
+.pe-toolbar button:hover { background: rgba(255, 255, 255, 0.18); }
+.pe-toolbar button.pe-tb-drag { cursor: grab; }
+.pe-toolbar button.pe-tb-del:hover { background: #d32f2f; }
 
-/* Кнопка «+» между блоками */
+/* ---------------- Кнопка «+ Добавить блок» ---------------- */
 .pe-addbtn {
     position: absolute;
-    z-index: 99991;
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    border: 2px solid #fff;
-    background: #b49d84;
-    color: #fff;
-    font-size: 1.15rem;
-    font-weight: 700;
-    cursor: pointer;
+    z-index: 99990;
     display: none;
     align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+    gap: 6px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--pe-accent);
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 7px 16px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(41, 121, 255, 0.5);
     transform: translate(-50%, 50%);
+    white-space: nowrap;
 }
-.pe-addbtn:hover { background: #9a8269; transform: translate(-50%, 50%) scale(1.1); }
+.pe-addbtn .plus { font-size: 1rem; line-height: 0.8; font-weight: 700; }
+.pe-addbtn:hover { background: var(--pe-accent-dark); transform: translate(-50%, 50%) scale(1.05); }
 
-/* Линия вставки при перетаскивании */
+/* ---------------- Линия вставки при перетаскивании ---------------- */
 .pe-drop-line {
     position: absolute;
     z-index: 99995;
-    height: 3px;
-    background: #b49d84;
+    height: 4px;
+    background: var(--pe-accent);
     display: none;
     pointer-events: none;
-    box-shadow: 0 0 6px rgba(180,157,132,0.8);
+    border-radius: 2px;
+    box-shadow: 0 0 10px rgba(41, 121, 255, 0.9);
+}
+.pe-drop-line::after {
+    content: "Переместить сюда";
+    position: absolute;
+    right: 0;
+    top: -24px;
+    background: var(--pe-accent);
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 5px;
+    white-space: nowrap;
 }
 
-/* Индикатор inline-редактирования текста */
-.pe-editable-on { outline: 2px dashed #b49d84 !important; outline-offset: 2px; cursor: text !important; min-height: 1em; }
+/* ---------------- Индикатор inline-редактирования текста ---------------- */
+.pe-editable-on {
+    outline: 2px dashed var(--pe-accent) !important;
+    outline-offset: 2px;
+    cursor: text !important;
+    min-height: 1em;
+}
 
-/* Правая панель настроек блока */
+/* ---------------- Левая панель «Структура страницы» ---------------- */
+#pe-structure {
+    position: fixed;
+    top: var(--pe-topbar-h);
+    left: 0;
+    bottom: 0;
+    width: 290px;
+    z-index: 99999;
+    background: #fff;
+    box-shadow: 4px 0 18px rgba(0, 0, 0, 0.16);
+    transform: translateX(-105%);
+    transition: transform 0.22s ease;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    color: #333;
+}
+#pe-structure.open { transform: translateX(0); }
+#pe-structure .pe-structure-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: #f2f6ff;
+    border-bottom: 1px solid #dde6f5;
+    font-weight: 700;
+    font-size: 0.92rem;
+}
+#pe-structure .pe-structure-head button {
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-size: 1rem;
+    color: #888;
+}
+#pe-structure .pe-structure-list { overflow-y: auto; flex: 1; padding: 0.5rem; }
+#pe-structure .pe-structure-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.45rem 0.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    border: 1px solid transparent;
+}
+#pe-structure .pe-structure-item:hover { background: #f2f6ff; }
+#pe-structure .pe-structure-item.pe-structure-active {
+    background: #e3eeff;
+    border-color: var(--pe-accent);
+}
+#pe-structure .pe-structure-item .si-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 10px;
+    background: var(--pe-accent);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    flex: 0 0 auto;
+}
+#pe-structure .pe-structure-item .si-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#pe-structure .pe-structure-item .si-actions { display: flex; gap: 2px; }
+#pe-structure .pe-structure-item .si-actions button {
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #667;
+    padding: 2px 5px;
+    border-radius: 5px;
+}
+#pe-structure .pe-structure-item .si-actions button:hover { background: #d7e5ff; color: var(--pe-accent-dark); }
+#pe-structure .pe-structure-add {
+    margin: 0.5rem;
+    border: 1px dashed var(--pe-accent);
+    background: #f6faff;
+    color: var(--pe-accent-dark);
+    border-radius: 9px;
+    padding: 0.55rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+#pe-structure .pe-structure-add:hover { background: #e8f1ff; }
+
+/* ---------------- Правая панель настроек блока ---------------- */
 #pe-drawer {
     position: fixed;
-    top: 46px;
+    top: var(--pe-topbar-h);
     right: 0;
     bottom: 0;
     width: 360px;
     z-index: 99999;
     background: #fff;
-    box-shadow: -4px 0 18px rgba(0,0,0,0.18);
+    box-shadow: -4px 0 18px rgba(0, 0, 0, 0.18);
     transform: translateX(105%);
     transition: transform 0.22s ease;
     display: flex;
@@ -135,8 +336,8 @@ body.pe-active { padding-top: 46px; }
     align-items: center;
     justify-content: space-between;
     padding: 0.7rem 1rem;
-    background: #f7f3ee;
-    border-bottom: 1px solid #e5ddd2;
+    background: #f2f6ff;
+    border-bottom: 1px solid #dde6f5;
     font-weight: 700;
     font-size: 0.92rem;
 }
@@ -163,16 +364,33 @@ body.pe-active { padding-top: 46px; }
 #pe-drawer .help { color: #888; font-size: 0.8rem; margin-top: 0.25rem; }
 #pe-drawer .preview-img img { max-width: 100%; border: 1px solid #ddd; border-radius: 6px; }
 
-/* Поповер параметров страницы */
+/* Визуальный редактор списка пунктов (галерея, преимущества, таблица…) */
+.pe-items { display: flex; flex-direction: column; gap: 0.6rem; }
+.pe-item { border: 1px solid #dde6f5; border-radius: 9px; padding: 0.6rem; position: relative; background: #f6faff; }
+.pe-item-field { margin-bottom: 0.45rem; }
+.pe-item-field:last-child { margin-bottom: 0; }
+.pe-item-field label { font-size: 0.76rem !important; color: #667; }
+.pe-item-del {
+    position: absolute; top: 6px; right: 6px;
+    border: 0; background: transparent; cursor: pointer; font-size: 0.85rem; opacity: 0.55;
+}
+.pe-item-del:hover { opacity: 1; }
+.pe-item-add {
+    border: 1px dashed var(--pe-accent); background: #fff; color: var(--pe-accent-dark);
+    border-radius: 9px; padding: 0.5rem; cursor: pointer; font-size: 0.85rem; font-weight: 600;
+}
+.pe-item-add:hover { background: #e8f1ff; }
+
+/* ---------------- Поповер параметров страницы ---------------- */
 #pe-pageprops {
     position: fixed;
-    top: 52px;
+    top: 56px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 99999;
     background: #fff;
     border-radius: 10px;
-    box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
     padding: 1rem;
     width: 480px;
     max-width: 92vw;
@@ -193,11 +411,11 @@ body.pe-active { padding-top: 46px; }
     font-family: inherit;
 }
 
-/* Галерея блоков (попап на странице) */
+/* ---------------- Галерея блоков ---------------- */
 #pe-gallery-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(30, 25, 20, 0.55);
+    background: rgba(20, 28, 45, 0.6);
     z-index: 100001;
     display: none;
     overflow-y: auto;
@@ -206,7 +424,7 @@ body.pe-active { padding-top: 46px; }
 }
 #pe-gallery-overlay.open { display: block; }
 #pe-gallery {
-    max-width: 880px;
+    max-width: 900px;
     margin: 0 auto;
     background: #fff;
     border-radius: 14px;
@@ -219,7 +437,7 @@ body.pe-active { padding-top: 46px; }
 #pe-gallery .pe-gallery-close:hover { background: #c00; color: #fff; }
 #pe-gallery .pe-gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.9rem; }
 #pe-gallery .gcard { border: 2px solid #e2e2e2; border-radius: 10px; padding: 0.6rem; cursor: pointer; background: #fff; }
-#pe-gallery .gcard:hover { border-color: #b49d84; background: #fbf8f4; }
+#pe-gallery .gcard:hover { border-color: var(--pe-accent); background: #f6faff; }
 #pe-gallery .gmock {
     height: 84px; border-radius: 7px; background: #f4f4f8;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -229,7 +447,7 @@ body.pe-active { padding-top: 46px; }
 #pe-gallery .gdesc { color: #999; font-size: 0.74rem; margin-top: 0.12rem; text-align: center; }
 #pe-gallery .gm-bar { background: #cfcfcf; border-radius: 3px; }
 #pe-gallery .gm-img { width: 100%; height: 100%; background: #e2e2e8; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 1.3rem; }
-#pe-gallery .gm-btn { background: #b49d84; color: #fff; border-radius: 20px; padding: 4px 18px; font-size: 0.7rem; font-weight: 700; }
+#pe-gallery .gm-btn { background: var(--pe-accent); color: #fff; border-radius: 20px; padding: 4px 18px; font-size: 0.7rem; font-weight: 700; }
 #pe-gallery .gm-video { width: 100%; height: 100%; background: #3a3a3a; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.25rem; }
 #pe-gallery .gm-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; width: 100%; }
 #pe-gallery .gm-card-mini { background: #fff; border: 1px solid #ddd; border-radius: 4px; height: 32px; padding: 3px; }
@@ -237,20 +455,3 @@ body.pe-active { padding-top: 46px; }
 #pe-gallery .gm-card-mini .tx { background: #ddd; height: 5px; border-radius: 2px; margin-top: 4px; }
 #pe-gallery .gm-line { width: 80%; height: 2px; background: #cfcfcf; }
 #pe-gallery .gm-code { color: #999; font-family: monospace; font-size: 1rem; }
-
-/* Визуальный редактор списка пунктов (галерея, преимущества, таблица…) */
-.pe-items { display: flex; flex-direction: column; gap: 0.6rem; }
-.pe-item { border: 1px solid #e5ddd2; border-radius: 9px; padding: 0.6rem; position: relative; background: #fbf8f4; }
-.pe-item-field { margin-bottom: 0.45rem; }
-.pe-item-field:last-child { margin-bottom: 0; }
-.pe-item-field label { font-size: 0.76rem !important; color: #7a7166; }
-.pe-item-del {
-    position: absolute; top: 6px; right: 6px;
-    border: 0; background: transparent; cursor: pointer; font-size: 0.85rem; opacity: 0.55;
-}
-.pe-item-del:hover { opacity: 1; }
-.pe-item-add {
-    border: 1px dashed #b49d84; background: #fff; color: #9a8269;
-    border-radius: 9px; padding: 0.5rem; cursor: pointer; font-size: 0.85rem; font-weight: 600;
-}
-.pe-item-add:hover { background: #f7f3ee; }
