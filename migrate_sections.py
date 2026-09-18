@@ -161,6 +161,18 @@ def split_page(html):
         classes = ' '.join(c.get('class') or []) if getattr(c, 'name', None) else ''
         blocks.append({'name': name_for(classes, i), 'html': serialize(c)})
     blocks = [b for b in blocks if has_content(b['html'])]
+    if len(blocks) >= 2:
+        return blocks
+
+    # 3) Запасной вариант: режем по осмысленным элементам верхнего уровня
+    # (заголовок страницы + контейнер контента и т.п.).
+    top = [c for c in soup.contents if getattr(c, 'name', None) and meaningful(c)]
+    if 2 <= len(top) <= 12:
+        blocks = [{'name': name_for(' '.join(c.get('class') or []), i), 'html': serialize(c)}
+                  for i, c in enumerate(top, 1)]
+        blocks = [b for b in blocks if has_content(b['html'])]
+        if len(blocks) >= 2:
+            return blocks
     return blocks or None
 
 

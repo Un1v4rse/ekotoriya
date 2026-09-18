@@ -91,6 +91,16 @@
             cursor: pointer;
         }
         button:hover { background: var(--accent-dark); }
+        /* Глазик — прозрачная кнопка, без заливки при наведении */
+        button.toggle-pass,
+        button.toggle-pass:hover,
+        button.toggle-pass:focus {
+            background: transparent;
+            color: #888;
+            border: 0;
+            box-shadow: none;
+        }
+        button.toggle-pass:hover { color: var(--accent-dark); }
         .error {
             background: #fdecea;
             color: var(--danger);
