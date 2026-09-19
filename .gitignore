@@ -15,3 +15,6 @@ screenshots/
 *.log
 .DS_Store
 Thumbs.db
+
+# Бэкапы (крупные, локальные)
+backups/
