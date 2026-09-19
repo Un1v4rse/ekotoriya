@@ -13,6 +13,7 @@ site.wb_api_token в data/content.json.
 """
 import json
 import os
+from contextlib import nullcontext
 from pathlib import Path
 
 import requests
@@ -21,6 +22,15 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_FILE = BASE_DIR / 'data' / 'content.json'
 PRODUCTS_FILE = BASE_DIR / 'data' / 'wb_products.json'
 SYNC_LOG_FILE = BASE_DIR / 'data' / 'sync_log.json'
+
+
+def app_context():
+    """Контекст БД: внутри Flask-запроса — ничего не делать, иначе — standalone."""
+    from flask import has_app_context
+    if has_app_context():
+        return nullcontext()
+    from db import standalone_app
+    return standalone_app().app_context()
 
 API_BASE = 'https://api-seller.wildberries.ru'
 
@@ -62,29 +72,62 @@ def save_json(path, data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def log_sync(status, message, count=None):
-    """Дописывает запись в журнал синхронизации (data/sync_log.json, последние 200)."""
-    entries = load_json(SYNC_LOG_FILE).get('entries', [])
+def log_sync(status, message, count=None, source='wb'):
+    """Журнал синхронизации: таблица sync_logs (AR-1) + JSON-фолбэк."""
     from datetime import datetime
+    from db import db
+    from models import SyncLog
+    with app_context():
+        try:
+            db.session.add(SyncLog(
+                source=source, status=status, message=message, count=count,
+                created_at=datetime.now(),
+            ))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+    entries = load_json(SYNC_LOG_FILE).get('entries', [])
     entries.append({
         'time': datetime.now().isoformat(timespec='seconds'),
         'status': status,
         'message': message,
         'count': count,
+        'source': source,
     })
     save_json(SYNC_LOG_FILE, {'entries': entries[-200:]})
 
 
-def get_sync_log(limit=50):
-    """Последние записи журнала синхронизации."""
-    entries = load_json(SYNC_LOG_FILE).get('entries', [])
-    return entries[-limit:][::-1]
+def get_sync_log(limit=50, source=None):
+    """Последние записи журнала: из БД, при сбое — из JSON-фолбэка."""
+    from db import db
+    from models import SyncLog
+    with app_context():
+        try:
+            q = db.session.query(SyncLog).order_by(SyncLog.id.desc())
+            if source:
+                q = q.filter_by(source=source)
+            return [e.to_dict() for e in q.limit(limit).all()]
+        except Exception:
+            db.session.rollback()
+    entries = load_json(SYNC_LOG_FILE).get('entries', [])[::-1]
+    if source:
+        entries = [e for e in entries if e.get('source', 'wb') == source]
+    return entries[:limit]
 
 
 def get_wb_token():
     token = os.environ.get('WB_API_TOKEN')
     if token:
         return token
+    try:
+        import storage
+        with app_context():
+            site = storage.get_setting('site') or {}
+        token = site.get('wb_api_token', '')
+        if token:
+            return token
+    except Exception:
+        pass
     content = load_json(DATA_FILE)
     return content.get('site', {}).get('wb_api_token', '')
 
@@ -251,13 +294,58 @@ def push_discount(token, nm_id, percent):
         return False, str(e)
 
 
+def _db_products_by_nm():
+    """Существующие товары WB из БД: {nm_id: Product}."""
+    from db import db
+    from models import Product
+    rows = db.session.query(Product).filter_by(source='wb').all()
+    return {p.nm_id: p for p in rows}
+
+
+def _persist_products(items, demo):
+    """Сохранить товары WB: в БД (основное хранилище, AR-1) и в JSON-фолбэк."""
+    from db import db
+    from models import Product
+    with app_context():
+        existing = _db_products_by_nm()
+        for item in items:
+            nm = int(item.get('nm_id') or 0)
+            prod = existing.get(nm)
+            if prod is None:
+                prod = Product(source='wb', nm_id=nm)
+                db.session.add(prod)
+            prod.name = item.get('name', '')
+            prod.brand = item.get('brand', '')
+            prod.vendor_code = item.get('vendor_code', '')
+            prod.price = item.get('price', 0) or 0
+            prod.discount_price = item.get('discount_price', 0) or 0
+            prod.mp_discount_percent = item.get('wb_discount_percent', 0) or 0
+            prod.photo = item.get('photo', '')
+            prod.url = item.get('url', '')
+            prod.stock = item.get('stock', 0) or 0
+        db.session.commit()
+    save_json(PRODUCTS_FILE, {'products': items, 'demo': demo})
+
+
 def merge_with_existing(existing, new_items):
-    existing_by_nm = {p['nm_id']: p for p in existing}
+    """Сохранить скидки админа из существующих товаров (по nm_id).
+
+    existing — list of dicts (старый JSON-формат) или {nm_id: Product} из БД.
+    """
+    def _get(old, key):
+        if isinstance(old, dict):
+            return old.get(key, 0)
+        return getattr(old, key, 0) or 0
+
+    existing_by_nm = {(_get(p, 'nm_id') or _get(p, 'nm_id')): p for p in
+                      (existing.values() if isinstance(existing, dict) else existing)}
     merged = []
     for item in new_items:
         nm = item['nm_id']
         old = existing_by_nm.get(nm, {})
-        item['admin_discount_percent'] = old.get('admin_discount_percent', 0)
+        item['admin_discount_percent'] = _get(old, 'admin_discount_percent')
+        item['admin_discount_type'] = _get(old, 'admin_discount_type') or 'percent'
+        item['admin_discount_amount'] = _get(old, 'admin_discount_amount')
         merged.append(item)
     return merged
 
@@ -276,12 +364,14 @@ def sync(token=None, demo=False):
                 'discount_price': p['discount_price'],
                 'wb_discount_percent': 10,
                 'admin_discount_percent': 0,
+                'admin_discount_type': 'percent',
+                'admin_discount_amount': 0,
                 'photo': p['photo'],
                 'url': f'https://www.wildberries.ru/catalog/{p["nm_id"]}/detail.aspx',
                 'updated_at': '',
                 'stock': 10,
             })
-        save_json(PRODUCTS_FILE, {'products': items, 'demo': True})
+        _persist_products(items, demo=True)
         log_sync('ok', 'Демо-синхронизация завершена', count=len(items))
         return {'success': True, 'count': len(items), 'demo': True}
 
@@ -297,15 +387,15 @@ def sync(token=None, demo=False):
 
         new_items = [build_product(c, prices_by_nm.get(c['nmID'], {})) for c in cards]
 
-        existing = load_json(PRODUCTS_FILE).get('products', [])
-        merged = merge_with_existing(existing, new_items)
+        with app_context():
+            merged = merge_with_existing(_db_products_by_nm(), new_items)
 
         # Остатки — best-effort: без прав на «Маркетплейс» просто останутся 0
         stocks = fetch_stocks(token, nm_ids)
         for p in merged:
             p['stock'] = stocks.get(p['nm_id'], 0)
 
-        save_json(PRODUCTS_FILE, {'products': merged, 'demo': False})
+        _persist_products(merged, demo=False)
         log_sync('ok', f'Синхронизация с WB API завершена', count=len(merged))
         return {'success': True, 'count': len(merged), 'demo': False}
     except requests.exceptions.RequestException as e:
@@ -323,8 +413,11 @@ def sync_light(token):
     """
     if not token:
         return {'success': False, 'error': 'WB_API_TOKEN не задан'}
-    data = load_json(PRODUCTS_FILE)
-    products = data.get('products', [])
+    from db import db
+    from models import Product
+    with app_context():
+        products = [p.to_product_dict() for p in
+                    db.session.query(Product).filter_by(source='wb').all()]
     if not products:
         return {'success': False, 'error': 'Каталог пуст — сначала запустите полную синхронизацию'}
     nm_ids = [p['nm_id'] for p in products]
@@ -343,7 +436,7 @@ def sync_light(token):
                 p['wb_discount_percent'] = info['discount']
             if p['nm_id'] in stocks:
                 p['stock'] = stocks[p['nm_id']]
-        save_json(PRODUCTS_FILE, {'products': products, 'demo': data.get('demo', False)})
+        _persist_products(products, demo=False)
         log_sync('ok', 'Обновление цен и остатков завершено', count=len(products))
         return {'success': True, 'count': len(products), 'light': True}
     except Exception as e:
@@ -352,6 +445,18 @@ def sync_light(token):
 
 
 def load_products():
+    """Товары WB: из БД (AR-1); пока БД пуста — фолбэк из JSON-файла."""
+    from db import db
+    from models import Product
+    with app_context():
+        try:
+            rows = (db.session.query(Product)
+                    .filter_by(source='wb')
+                    .order_by(Product.id).all())
+            if rows:
+                return [p.to_product_dict() for p in rows]
+        except Exception:
+            db.session.rollback()
     products = load_json(PRODUCTS_FILE).get('products', [])
     for p in products:
         if 'id' not in p:
@@ -360,9 +465,18 @@ def load_products():
 
 
 def set_admin_discount(nm_id, percent):
+    """Индивидуальная скидка админа: в БД (основное) и JSON-фолбэк."""
+    from db import db
+    from models import Product
+    with app_context():
+        prod = db.session.query(Product).filter_by(source='wb', nm_id=int(nm_id)).first()
+        if prod is not None:
+            prod.admin_discount_percent = int(percent)
+            prod.admin_discount_type = 'percent'
+            db.session.commit()
     data = load_json(PRODUCTS_FILE)
     for p in data.get('products', []):
-        if p['nm_id'] == nm_id:
+        if p.get('nm_id') == nm_id or p.get('nm_id') == int(nm_id):
             p['admin_discount_percent'] = percent
             break
     save_json(PRODUCTS_FILE, data)

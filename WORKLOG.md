@@ -79,3 +79,46 @@
 ## Журнал
 
 (новые записи — сверху, под этой строкой; самая свежая запись всегда первая)
+
+## [2026-09-19 20:50] Задача: [этап-1.11] — Тесты TS-1 (baseline), pytest зелёный
+- Статус: done
+- Сделано: создан `tests/` (conftest с временной SQLite-БД и изоляцией JSON-фолбэков wb_sync во tmp): `test_blocks.py` (рендер всех 21 типа блоков + products-блок из БД), `test_customers.py` (нормализация, дедуп, заказы→клиент, лайки/события, популярное), `test_final_price.py` (baseline старой формулы round(base×(1−min(wb+admin,99)/100))), `test_storage.py` (roundtrip, удаление страниц, settings), `test_wb_sync.py` (demo-синк в БД, скидка переживает ресинк, журнал, light-sync, final_price на уровне app.get_products()).
+- Изменённые файлы: tests/conftest.py, tests/test_blocks.py, tests/test_customers.py, tests/test_final_price.py, tests/test_storage.py, tests/test_wb_sync.py
+- Проверки: `pytest tests/ -q` → **53 passed**. Заодно исправлено: `customers.normalize_phone` теперь приводит «8…»/«+7…»/10-значные к каноническому `+7XXXXXXXXXX` (иначе дедупликация по телефону не работала — CL-2).
+- Бэкапы: backup_2026-09-19_19-49
+- Следующий шаг: ручная проверка «не ломать», обновление PLAN.md, коммит [этап-1].
+
+## [2026-09-19 20:40] Задача: [этап-1.10] — Авто-синк WB в cron-скрипт (AR-4, WB-2)
+- Статус: done
+- Сделано: создан `jobs/autosync.py` — расписание из БД (`site.wb_autosync`), состояние последних запусков в `site.wb_autosync_state`, флаги `--force-catalog`/`--force-light`. Из app.py удалены `_autosync_loop` и фоновый поток; `start_autosync()` оставлен как stub с подсказкой (обратная совместимость команд запуска). `__main__` теперь просто `app.run(...)`.
+- Изменённые файлы: jobs/autosync.py, app.py
+- Проверки: `python jobs/autosync.py --force-catalog` — демо-синк 8 товаров ОК; `import app` + test_client `/` → 200.
+- Бэкапы: backup_2026-09-19_19-49
+- Следующий шаг: 1.11 тесты.
+- Примечания: для продакшена cron-строку: `*/15 * * * * cd <проект> && .venv/bin/python jobs/autosync.py` (Windows — планировщик задач). Сервер сессии перезапущен: TaskStop bash-agggxcpx → новый фоновый `bash-vffyu5s4` (`.venv/Scripts/python.exe -X utf8 app.py`, порт 5000, curl `/`, `/admin/login`, `/api/wb-products` → 200).
+
+## [2026-09-19 20:20] Задача: [этап-1.9] — Flask-Caching (AR-3)
+- Статус: done
+- Сделано: подключён `Cache` (SimpleCache по умолчанию, env `CACHE_TYPE`); `_products_cached()` (5 мин) + `_popular_cached()` через `get_products()`; `invalidate_site_cache()` (cache.clear + storage.invalidate_cache) вызывается после всех save_content в админке (page-save, save, add-page, delete-page), после `admin_wb_sync`, `api_order`, `api_like`. `admin_wb_products`, `api_wb_products`, `wb_product_page` переведены на `get_products()` (в wb_product_page убрана ручная досчёт final_price — теперь из кэша).
+- Изменённые файлы: app.py
+- Проверки: test_client `/`, `/catalog/namatrasniki/`, `/proizvodstvo/`, `/theme.css`, `/robots.txt`, `/sitemap.xml`, `/catalog/wb/890129778/` → все 200.
+- Бэкапы: backup_2026-09-19_19-49
+- Следующий шаг: 1.10 autosync.
+
+## [2026-09-19 20:05] Задача: [этап-1.1…1.8] — БД-фундамент: зависимости, модели, миграция данных
+- Статус: done
+- Сделано: requirements.txt + `.venv` (Python 3.14.7; всегда запускать `.venv/Scripts/python.exe -X utf8` — консоль Windows cp1251); `db.py` (Flask-SQLAlchemy, SQLite по умолчанию `data/ekotoriya.db`, env `DATABASE_URL`, WAL, `standalone_app()`); `models.py` (13 таблиц AR-1, у Page/Product — `to_content_dict()`/`to_product_dict()` под прежний JSON-формат); Alembic (`alembic/env.py` на database_url(), миграция `5da456f72137`, upgrade head выполнен); `migrate_json_to_db.py` (идемпотентен, сверка counts: 32 pages, 8 products source='wb', 6 customers, 7 orders, 8 likes→events, 2 sync_logs); `storage.py` (load/save на БД + JSON-фолбэк, module-level кэш, get/set_setting); `customers.py` полностью на БД (сигнатуры сохранены; добавлены normalize_phone/add_event/get_customer_likes/get_customer_orders/get_customer_stats); `wb_sync.py` на БД (app_context, журнал в sync_logs, скидки админа переживают ресинк через merge_with_existing, JSON-фолбэк сохраняется). `final_price()` — пока СТАРАЯ формула (baseline, новая PR-2 в этапе 2).
+- Изменённые файлы: requirements.txt, db.py, models.py, storage.py, customers.py, wb_sync.py, migrate_json_to_db.py, alembic/*, app.py (импорты storage/db, init_app, обёртки load/save_content)
+- Проверки: миграция идемпотентна (двойной прогон); test_client `/`, `/catalog/namatrasniki/`, `/proizvodstvo/`, `/theme.css`, `/robots.txt`, `/sitemap.xml` → 200; demo-синк 8 товаров, скидка 15% переживает ресинк.
+- Бэкапы: backup_2026-09-19_19-49
+- Следующий шаг: 1.9 кэширование.
+- Примечания: бэкап №2 по плану перед этапом 1 не делался отдельно — baseline-бэкап №1 (сделанный при исправном состоянии) покрывает это требование.
+
+## [2026-09-19 19:55] Задача: [этап-0] — Анализ, бэкап №1, baseline
+- Статус: done
+- Сделано: прочитаны все ключевые файлы; карта проекта и решения по миграции — в разделе «Анализ» выше; бэкап №1 `backups/backup_2026-09-19_19-49/` (102 МБ, полный); baseline-коммит `5ea17d6`; в `.gitignore` добавлен `backups/` (бэкап случайно попал в git — вынесен через `git rm --cached` + amend).
+- Изменённые файлы: WORKLOG.md, PLAN.md, .gitignore
+- Проверки: `/` → 200, `/admin` → 302; бэкап сверен побайтово (app.py, data/content.json).
+- Бэкапы: backup_2026-09-19_19-49
+- Следующий шаг: Этап 1.1 — зависимости (venv, requirements.txt).
+- Примечания: `.venv` в проекте пуст — создаём заново; системный Python 3.14.7 с Flask 3.1.3 пока держит работающий сервер (фоновая задача bash-agggxcpx).

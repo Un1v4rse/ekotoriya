@@ -34,6 +34,8 @@ mimetypes.add_type('text/css', '.less')
 import customers
 import wb_sync
 import blocks as blocks_module
+import storage
+import db as db_module
 from werkzeug.security import check_password_hash, generate_password_hash
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -51,6 +53,44 @@ else:
     print('[admin] SECRET_KEY не задан в окружении: сгенерирован случайный ключ, '
           'сессии будут сбрасываться при перезапуске сервера.')
 app.json.ensure_ascii = False
+
+# База данных (AR-1): SQLite по умолчанию, DATABASE_URL для PostgreSQL.
+db_module.init_app(app)
+
+# Кэширование (AR-3): SimpleCache по умолчанию, тип — через env CACHE_TYPE.
+from flask_caching import Cache
+cache = Cache(app, config={
+    'CACHE_TYPE': os.environ.get('CACHE_TYPE', 'SimpleCache'),
+    'CACHE_DEFAULT_TIMEOUT': 300,
+})
+
+
+def invalidate_site_cache():
+    """Инвалидация кэша сайта после изменений в админке / синка (AR-3)."""
+    try:
+        cache.clear()
+    except Exception:
+        pass
+    storage.invalidate_cache()
+
+
+@cache.memoize(timeout=300)
+def _products_cached():
+    """Каталог WB с итоговыми ценами (кэш AR-3)."""
+    products = wb_sync.load_products()
+    for p in products:
+        p['final_price'] = wb_sync.final_price(p)
+    return products
+
+
+def get_products():
+    return _products_cached()
+
+
+@cache.memoize(timeout=300)
+def _popular_cached():
+    """Рекомендации «популярное» из базы клиентов (кэш AR-3, RS-5)."""
+    return customers.get_popular_products(_products_cached(), limit=8)
 
 
 def load_admin_credentials():
@@ -128,16 +168,6 @@ def add_cache_headers(response):
     else:
         response.headers['Cache-Control'] = 'no-store, must-revalidate'
     return response
-
-
-def load_content():
-    with open(DATA_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
-
-
-def save_content(data):
-    with open(DATA_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def check_auth(username, password):
@@ -300,8 +330,17 @@ def ensure_site_defaults(content):
 
 
 def load_content():
-    with open(DATA_FILE, 'r', encoding='utf-8') as f:
-        return ensure_site_defaults(json.load(f))
+    """Контент сайта из БД (AR-1). Формат dict — как у старого content.json.
+
+    Пока таблица pages пуста (миграция не прогнана), storage читает
+    data/content.json как фолбэк — сайт работает на любом этапе перехода.
+    """
+    return ensure_site_defaults(storage.load_content())
+
+
+def save_content(data):
+    """Сохранить контент в БД (транзакционно, upsert по slug)."""
+    storage.save_content(data)
 
 
 def _absolute_url(url, host_url):
@@ -334,11 +373,8 @@ def _seo_org(content, host_url):
 
 
 def make_context(content, page):
-    wb_products = wb_sync.load_products()
-    for p in wb_products:
-        p['final_price'] = wb_sync.final_price(p)
-    all_products = wb_products
-    popular = customers.get_popular_products(all_products, limit=8)
+    all_products = get_products()
+    popular = _popular_cached()
     host_url = request.host_url
     site = content.get('site', {})
     ctx = {
@@ -346,7 +382,7 @@ def make_context(content, page):
         'page': page,
         'menu': content.get('menu', []),
         'socials': content.get('socials', []),
-        'wb_products': wb_products,
+        'wb_products': all_products,
         'wb_demo': wb_sync.load_json(wb_sync.PRODUCTS_FILE).get('demo', False),
         'recommended_products': popular,
         'seo_org': _seo_org(content, host_url),
@@ -754,6 +790,7 @@ def admin_page_save():
     page['blocks'] = blocks
     page['content_html'] = blocks_module.render_blocks(blocks)
     save_content(content)
+    invalidate_site_cache()
     return jsonify({'success': True})
 
 
@@ -814,6 +851,7 @@ def admin_save():
         elif page.get('slug') in stored_pages:
             page['content_html'] = stored_pages[page['slug']].get('content_html', '')
     save_content(data)
+    invalidate_site_cache()
     return jsonify({'success': True})
 
 
@@ -877,6 +915,7 @@ def admin_add_page():
     })
     content['pages'][-1]['content_html'] = blocks_module.render_blocks(content['pages'][-1]['blocks'])
     save_content(content)
+    invalidate_site_cache()
     return jsonify({'success': True, 'page': content['pages'][-1]})
 
 
@@ -894,6 +933,7 @@ def admin_delete_page():
         return jsonify({'success': False, 'error': 'Страница не найдена'}), 404
     content['pages'] = [p for p in content['pages'] if p['slug'] != slug]
     save_content(content)
+    invalidate_site_cache()
     template_path = BASE_DIR / 'templates' / page.get('template', '')
     try:
         if template_path.exists() and template_path != BASE_DIR / 'templates' / BASE_PAGE_TEMPLATE:
@@ -919,10 +959,7 @@ def admin_rebuild():
 @admin_required
 def admin_wb_products():
     """Return current Wildberries products with final prices."""
-    products = wb_sync.load_products()
-    for p in products:
-        p['final_price'] = wb_sync.final_price(p)
-    return jsonify({'success': True, 'products': products, 'demo': wb_sync.load_json(wb_sync.PRODUCTS_FILE).get('demo', False)})
+    return jsonify({'success': True, 'products': get_products(), 'demo': wb_sync.load_json(wb_sync.PRODUCTS_FILE).get('demo', False)})
 
 
 @app.route('/admin/api/wb-sync', methods=['POST'])
@@ -931,6 +968,7 @@ def admin_wb_sync():
     """Sync products from Wildberries Seller API."""
     token = wb_sync.get_wb_token()
     result = wb_sync.sync(token=token, demo=not token)
+    invalidate_site_cache()
     return jsonify(result)
 
 
@@ -1006,19 +1044,15 @@ def admin_wb_sync_log():
 @app.route('/api/wb-products')
 def api_wb_products():
     """Public endpoint for WB products (used by catalog pages)."""
-    products = wb_sync.load_products()
-    for p in products:
-        p['final_price'] = wb_sync.final_price(p)
-    return jsonify({'success': True, 'products': products})
+    return jsonify({'success': True, 'products': get_products()})
 
 
 @app.route('/catalog/wb/<int:nm_id>/')
 def wb_product_page(nm_id):
     """Dedicated page for a WB product."""
-    product = next((p for p in wb_sync.load_products() if p['nm_id'] == nm_id), None)
+    product = next((p for p in get_products() if p['nm_id'] == nm_id), None)
     if not product:
         return 'Товар не найден', 404
-    product['final_price'] = wb_sync.final_price(product)
     content = load_content()
 
     # SEO title/description из шаблонов с переменными {name} {brand} {price}
@@ -1112,6 +1146,7 @@ def api_order():
     except (TypeError, ValueError):
         price = 0
     order = customers.add_order(name, phone, email, product_id, product_name, price)
+    invalidate_site_cache()
     if request.form.get('redirect'):
         # Обычная (не AJAX) отправка формы из блока конструктора: вернуть на страницу
         return redirect(request.referrer or '/')
@@ -1132,6 +1167,7 @@ def api_like():
     if not product_id:
         return jsonify({'success': False, 'error': 'product_id обязателен'}), 400
     customers.add_like(product_id, product_name)
+    invalidate_site_cache()
     return jsonify({'success': True, 'likes': customers.get_like_counts().get(product_id, 0)})
 
 
@@ -1255,36 +1291,14 @@ def get_autosync_settings():
     return settings
 
 
-def _autosync_loop():
-    """Фоновый цикл авто-синхронизации WB. Проверяет настройки раз в минуту."""
-    last_catalog = 0.0
-    last_light = 0.0
-    while True:
-        try:
-            s = get_autosync_settings()
-            if s.get('enabled'):
-                token = wb_sync.get_wb_token()
-                now = time.time()
-                catalog_every = max(1, int(s.get('catalog_hours', 6))) * 3600
-                light_every = max(5, int(s.get('light_minutes', 30))) * 60
-                if now - last_catalog >= catalog_every:
-                    wb_sync.sync(token=token, demo=not token)
-                    last_catalog = now
-                    last_light = now
-                elif now - last_light >= light_every:
-                    wb_sync.sync_light(token=token)
-                    last_light = now
-        except Exception:
-            pass
-        time.sleep(60)
-
-
 def start_autosync():
-    """Запускает поток авто-синхронизации (демон — не мешает остановке сервера)."""
-    t = threading.Thread(target=_autosync_loop, daemon=True, name='wb-autosync')
-    t.start()
+    """Авто-синхронизация перенесена в cron-скрипт jobs/autosync.py (AR-4).
+
+    Оставлено для обратной совместимости команд запуска — синхронизация
+    больше не выполняется в процессе веб-сервера.
+    """
+    print('[autosync] фоновый поток отключён: запускайте `python jobs/autosync.py` по расписанию (cron/планировщик задач)')
 
 
 if __name__ == '__main__':
-    start_autosync()
     app.run(host='0.0.0.0', port=5000, debug=False)
