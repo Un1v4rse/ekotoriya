@@ -75,12 +75,23 @@ def invalidate_site_cache():
 
 
 @cache.memoize(timeout=300)
-def _products_cached():
-    """Каталог WB с итоговыми ценами (кэш AR-3)."""
-    products = wb_sync.load_products()
-    for p in products:
-        p['final_price'] = wb_sync.final_price(p)
-    return products
+def _products_cached(include_hidden=False):
+    """Единый каталог WB+Ozon (CT-1) с итоговыми ценами (кэш AR-3).
+
+    По умолчанию — только visible-товары (WB-5/OZ-4) и с учётом настройки
+    «скрывать нулевые остатки» (CT-4). include_hidden=True — для админки.
+    """
+    import pricing
+    from db import db as _db
+    from models import Product
+    rows = _db.session.query(Product).order_by(Product.id).all()
+    products = [p.to_product_dict() for p in rows]
+    if not include_hidden:
+        site = load_content().get('site', {}) or {}
+        hide_zero = bool(site.get('hide_zero_stock'))
+        products = [p for p in products
+                    if p.get('visible') and not (hide_zero and not p.get('stock'))]
+    return pricing.enrich_products(products)
 
 
 def get_products():
@@ -958,8 +969,12 @@ def admin_rebuild():
 @app.route('/admin/api/wb-products')
 @admin_required
 def admin_wb_products():
-    """Return current Wildberries products with final prices."""
-    return jsonify({'success': True, 'products': get_products(), 'demo': wb_sync.load_json(wb_sync.PRODUCTS_FILE).get('demo', False)})
+    """Каталог для админки: ВСЕ товары всех источников, включая скрытые."""
+    return jsonify({
+        'success': True,
+        'products': _products_cached(include_hidden=True),
+        'demo': wb_sync.load_json(wb_sync.PRODUCTS_FILE).get('demo', False),
+    })
 
 
 @app.route('/admin/api/wb-sync', methods=['POST'])
@@ -975,70 +990,249 @@ def admin_wb_sync():
 @app.route('/admin/api/wb-discount', methods=['POST'])
 @admin_required
 def admin_wb_discount():
-    """Set additional discount percent for a WB product."""
+    """Совместимость: индивидуальная скидка на товар WB (PR-3).
+
+    Делегирует общей логике /admin/api/product-discount. Push в WB
+    не выполняется — скидки живут только на сайте (PR-5).
+    """
     data = request.get_json() or {}
+    data.setdefault('source', 'wb')
+    return _product_discount_response(data)
+
+
+@app.route('/admin/api/product-discount', methods=['POST'])
+@admin_required
+def admin_product_discount():
+    """Индивидуальная скидка на товар любого источника (PR-3, PR-4, PR-7)."""
+    return _product_discount_response(request.get_json() or {})
+
+
+def _product_discount_response(data):
+    source = data.get('source', 'wb')
     product_id = data.get('product_id') or data.get('nm_id')
-    percent = data.get('percent', 0)
+    discount_type = data.get('discount_type', 'percent')
+    value = data.get('value', data.get('percent', 0))
+    if discount_type not in ('percent', 'amount'):
+        return jsonify({'success': False, 'error': 'discount_type must be percent|amount'}), 400
     try:
-        percent = int(percent)
+        value = int(value)
     except (TypeError, ValueError):
-        return jsonify({'success': False, 'error': 'percent must be integer'}), 400
+        return jsonify({'success': False, 'error': 'value must be integer'}), 400
     if not product_id:
         return jsonify({'success': False, 'error': 'product_id required'}), 400
-    wb_sync.set_admin_discount(int(product_id), max(0, min(99, percent)))
-    pushed, push_message = _maybe_push_discount(int(product_id), percent)
-    return jsonify({'success': True, 'pushed': pushed, 'push_message': push_message})
+    ok = _set_product_discount(source, product_id, discount_type, value)
+    if not ok:
+        return jsonify({'success': False, 'error': 'Товар не найден'}), 404
+    _audit_log('discount.set', 'product', f'{source}:{product_id}', {
+        'discount_type': discount_type, 'value': value,
+    })
+    invalidate_site_cache()
+    return jsonify({'success': True})
+
+
+def _set_product_discount(source, product_id, discount_type, value):
+    """Проставить скидку админа товару в БД (PR-3, PR-4)."""
+    from db import db
+    from models import Product
+    prod = db.session.query(Product).filter_by(
+        source=source, nm_id=int(product_id)).first()
+    if prod is None:
+        return False
+    if discount_type == 'amount':
+        prod.admin_discount_type = 'amount'
+        prod.admin_discount_amount = max(0, int(value))
+        prod.admin_discount_percent = 0
+    else:
+        prod.admin_discount_type = 'percent'
+        prod.admin_discount_percent = max(0, min(99, int(value)))
+        prod.admin_discount_amount = 0
+    db.session.commit()
+    return True
 
 
 @app.route('/admin/api/wb-discount-bulk', methods=['POST'])
 @admin_required
 def admin_wb_discount_bulk():
-    """Ставит доп. скидку выбранным товарам локально и (опционально) в WB."""
+    """Совместимость: массовая скидка выбранным товарам WB (PR-3)."""
     data = request.get_json() or {}
     nm_ids = data.get('nm_ids') or []
-    percent = data.get('percent', 0)
+    data['scope'] = 'selected'
+    data['items'] = [{'source': 'wb', 'product_id': nm} for nm in nm_ids]
+    return _discount_bulk_response(data)
+
+
+@app.route('/admin/api/discount-bulk', methods=['POST'])
+@admin_required
+def admin_discount_bulk():
+    """Массовая скидка (PR-3): selected / category / source / all."""
+    return _discount_bulk_response(request.get_json() or {})
+
+
+def _discount_bulk_response(data):
+    scope = data.get('scope', 'selected')
+    discount_type = data.get('discount_type', 'percent')
+    value = data.get('value', data.get('percent', 0))
+    if discount_type not in ('percent', 'amount'):
+        return jsonify({'success': False, 'error': 'discount_type must be percent|amount'}), 400
     try:
-        percent = int(percent)
+        value = int(value)
     except (TypeError, ValueError):
-        return jsonify({'success': False, 'error': 'percent must be integer'}), 400
-    if not nm_ids:
-        return jsonify({'success': False, 'error': 'nm_ids required'}), 400
-    percent = max(0, min(99, percent))
-    pushed_count, push_errors = 0, 0
-    for nm_id in nm_ids:
-        wb_sync.set_admin_discount(int(nm_id), percent)
-        pushed, _msg = _maybe_push_discount(int(nm_id), percent)
-        if pushed:
-            pushed_count += 1
-        elif _msg:
-            push_errors += 1
-    return jsonify({
-        'success': True,
-        'count': len(nm_ids),
-        'pushed': pushed_count,
-        'push_errors': push_errors,
+        return jsonify({'success': False, 'error': 'value must be integer'}), 400
+
+    if scope == 'selected':
+        items = data.get('items') or []
+        if not items:
+            return jsonify({'success': False, 'error': 'items required'}), 400
+        count = 0
+        for it in items:
+            if _set_product_discount(it.get('source', 'wb'), it.get('product_id'),
+                                     discount_type, value):
+                count += 1
+        _audit_log('discount.bulk', 'products', f'{scope}:{count}', {
+            'discount_type': discount_type, 'value': value,
+            'items': [f"{it.get('source','wb')}:{it.get('product_id')}" for it in items],
+        })
+        invalidate_site_cache()
+        return jsonify({'success': True, 'count': count})
+
+    # scope = category | source | all — правило в таблице discounts
+    scope_value = {
+        'category': data.get('category', ''),
+        'source': data.get('source', ''),
+        'all': '',
+    }.get(scope)
+    if scope_value is None:
+        return jsonify({'success': False, 'error': 'scope must be selected|category|source|all'}), 400
+    if scope in ('category', 'source') and not scope_value:
+        return jsonify({'success': False, 'error': f'{scope} required'}), 400
+
+    from db import db
+    from models import Discount
+    (db.session.query(Discount)
+     .filter_by(scope=scope, scope_value=scope_value, active=True)
+     .update({'active': False}))
+    rule = Discount(scope=scope, scope_value=scope_value,
+                    discount_type=discount_type, value=max(0, value), active=True,
+                    created_by=session.get('admin_user') or 'admin')
+    db.session.add(rule)
+    db.session.commit()
+    _audit_log('discount.rule', scope, scope_value, {
+        'discount_type': discount_type, 'value': value, 'rule_id': rule.id,
     })
+    invalidate_site_cache()
+    return jsonify({'success': True, 'rule_id': rule.id})
 
 
-def _maybe_push_discount(nm_id, percent):
-    """Отправляет скидку в WB, если включён режим site.wb_push_discounts.
+@app.route('/admin/api/discount-rules')
+@admin_required
+def admin_discount_rules():
+    """Активные правила скидок category/source/all (PR-3)."""
+    from db import db
+    from models import Discount
+    rules = (db.session.query(Discount)
+             .filter_by(active=True)
+             .order_by(Discount.id.desc()).all())
+    return jsonify({'success': True, 'rules': [{
+        'id': r.id, 'scope': r.scope, 'scope_value': r.scope_value,
+        'discount_type': r.discount_type, 'value': r.value,
+        'created_by': r.created_by or '',
+        'created_at': r.created_at.isoformat(timespec='seconds') if r.created_at else '',
+    } for r in rules]})
 
-    Возвращает (pushed, message); (False, None), если отправка не требуется.
-    """
+
+@app.route('/admin/api/discount-rule/delete', methods=['POST'])
+@admin_required
+def admin_discount_rule_delete():
+    data = request.get_json() or {}
+    rule_id = data.get('id')
+    if not rule_id:
+        return jsonify({'success': False, 'error': 'id required'}), 400
+    from db import db
+    from models import Discount
+    rule = db.session.get(Discount, int(rule_id))
+    if rule is None:
+        return jsonify({'success': False, 'error': 'Правило не найдено'}), 404
+    rule.active = False
+    db.session.commit()
+    _audit_log('discount.rule_delete', rule.scope, rule.scope_value, {'rule_id': rule.id})
+    invalidate_site_cache()
+    return jsonify({'success': True})
+
+
+@app.route('/admin/api/export-settings', methods=['GET', 'POST'])
+@admin_required
+def admin_export_settings():
+    """Режим выгрузки товаров на сайт (WB-5, OZ-4): all/selected/category."""
+    import export_filter
+    if request.method == 'GET':
+        source = request.args.get('source', 'wb')
+        return jsonify({'success': True, 'settings': export_filter.get_export_settings(source)})
+
+    data = request.get_json() or {}
+    source = data.get('source', 'wb')
+    if source not in ('wb', 'ozon'):
+        return jsonify({'success': False, 'error': 'source must be wb|ozon'}), 400
+    mode = data.get('mode', 'all')
+    if mode not in ('all', 'selected', 'category'):
+        return jsonify({'success': False, 'error': 'mode must be all|selected|category'}), 400
+    selected_ids = [int(x) for x in (data.get('selected_ids') or []) if str(x).isdigit()]
+    category = str(data.get('category') or '')
+
     content = load_content()
-    if not content.get('site', {}).get('wb_push_discounts'):
-        return False, None
-    token = wb_sync.get_wb_token()
-    if not token:
-        return False, 'WB-токен не задан, отправка пропущена'
-    return wb_sync.push_discount(token, nm_id, percent)
+    site = content.setdefault('site', {})
+    site[f'{source}_export'] = {
+        'mode': mode, 'selected_ids': selected_ids, 'category': category,
+    }
+    save_content(content)
+    affected = export_filter.reapply_visibility(source)
+    _audit_log('export.settings', source, mode, {
+        'selected_ids': selected_ids, 'category': category, 'affected': affected,
+    })
+    invalidate_site_cache()
+    return jsonify({'success': True, 'affected': affected})
+
+
+@app.route('/admin/api/ozon-sync', methods=['POST'])
+@admin_required
+def admin_ozon_sync():
+    """Полная синхронизация каталога Ozon (OZ-2, OZ-5)."""
+    import ozon_sync
+    result = ozon_sync.sync()
+    invalidate_site_cache()
+    return jsonify(result)
+
+
+@app.route('/admin/api/ozon-sync-light', methods=['POST'])
+@admin_required
+def admin_ozon_sync_light():
+    """Лёгкая синхронизация Ozon: цены и остатки (OZ-5)."""
+    import ozon_sync
+    result = ozon_sync.sync_light()
+    invalidate_site_cache()
+    return jsonify(result)
+
+
+def _audit_log(action, object_type='', object_id='', detail=None):
+    """Аудит действий админа (AD-4, PR-7): кто/когда/что."""
+    from db import db
+    from models import AuditLog
+    try:
+        db.session.add(AuditLog(
+            admin_user=session.get('admin_user') or 'admin',
+            action=action, object_type=object_type,
+            object_id=str(object_id or ''), detail=detail or {},
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 @app.route('/admin/api/wb-sync-log')
 @admin_required
 def admin_wb_sync_log():
-    """Последние записи журнала синхронизации с WB."""
-    return jsonify({'success': True, 'entries': wb_sync.get_sync_log(limit=50)})
+    """Журнал синхронизации: ?source=wb|ozon (OZ-6)."""
+    source = request.args.get('source') or None
+    return jsonify({'success': True, 'entries': wb_sync.get_sync_log(limit=50, source=source)})
 
 
 @app.route('/api/wb-products')
@@ -1047,10 +1241,105 @@ def api_wb_products():
     return jsonify({'success': True, 'products': get_products()})
 
 
+@app.route('/catalog/')
+def catalog_page():
+    """Единый каталог WB+Ozon (CT-1): фильтры, сортировка, пагинация, поиск (CT-5)."""
+    content = load_content()
+    page = get_page_by_url(content, '/catalog/')
+    if not page:
+        return 'Страница не найдена', 404
+    ctx = make_context(content, page)
+    ctx['catalog_view'] = _filtered_catalog(request.args)
+    return render_template(page['template'], **ctx)
+
+
+def _filtered_catalog(args):
+    """Фильтрация/сортировка/пагинация каталога (CT-1, CT-5)."""
+    import math as _math
+    products = list(get_products())
+
+    q = (args.get('q') or '').strip().lower()
+    if q:
+        products = [p for p in products if q in (p.get('name') or '').lower()
+                    or q in (p.get('brand') or '').lower()
+                    or q in str(p.get('vendor_code') or '').lower()
+                    or q in str(p.get('nm_id') or '')]
+    source = args.get('source') or ''
+    if source in ('wb', 'ozon'):
+        products = [p for p in products if p.get('source') == source]
+    category = args.get('category') or ''
+    if category:
+        products = [p for p in products if p.get('category') == category]
+    if args.get('in_stock'):
+        products = [p for p in products if (p.get('stock') or 0) > 0]
+    try:
+        price_from = int(args.get('price_from') or 0)
+        price_to = int(args.get('price_to') or 0)
+    except ValueError:
+        price_from = price_to = 0
+    if price_from:
+        products = [p for p in products if (p.get('final_price') or 0) >= price_from]
+    if price_to:
+        products = [p for p in products if (p.get('final_price') or 0) <= price_to]
+
+    sort = args.get('sort') or 'popular'
+    if sort == 'price_asc':
+        products.sort(key=lambda p: p.get('final_price') or 0)
+    elif sort == 'price_desc':
+        products.sort(key=lambda p: p.get('final_price') or 0, reverse=True)
+    elif sort == 'new':
+        products.sort(key=lambda p: p.get('updated_at') or '', reverse=True)
+    else:  # popular — по заказам и лайкам из базы клиентов (RS-2)
+        popular = customers.get_popular_products(products, limit=len(products) or 1)
+        score_by_key = {(_product_key(e['product'])): e['score'] for e in popular}
+        products.sort(key=lambda p: score_by_key.get(_product_key(p), 0), reverse=True)
+
+    per_page = 24
+    try:
+        page_num = max(1, int(args.get('page') or 1))
+    except ValueError:
+        page_num = 1
+    total = len(products)
+    pages = max(1, _math.ceil(total / per_page))
+    page_num = min(page_num, pages)
+    items = products[(page_num - 1) * per_page: page_num * per_page]
+
+    categories = sorted({p.get('category') for p in get_products() if p.get('category')})
+    return {
+        'products': items,
+        'total': total,
+        'page': page_num,
+        'pages': pages,
+        'categories': categories,
+        'applied': {
+            'q': args.get('q') or '', 'source': source, 'category': category,
+            'in_stock': bool(args.get('in_stock')),
+            'price_from': args.get('price_from') or '', 'price_to': args.get('price_to') or '',
+            'sort': sort,
+        },
+    }
+
+
+def _product_key(p):
+    return f"{p.get('source', 'wb')}:{p.get('nm_id') or p.get('id')}"
+
+
 @app.route('/catalog/wb/<int:nm_id>/')
 def wb_product_page(nm_id):
-    """Dedicated page for a WB product."""
-    product = next((p for p in get_products() if p['nm_id'] == nm_id), None)
+    """Карточка товара WB (CT-2)."""
+    return _product_page('wb', nm_id)
+
+
+@app.route('/catalog/ozon/<int:product_id>/')
+def ozon_product_page(product_id):
+    """Карточка товара Ozon (CT-2)."""
+    return _product_page('ozon', product_id)
+
+
+def _product_page(source, nm_id):
+    """Единая карточка товара для обоих источников (CT-2…CT-4, OZ-3)."""
+    product = next((p for p in get_products()
+                    if p.get('source') == source and int(p.get('nm_id') or 0) == nm_id), None)
     if not product:
         return 'Товар не найден', 404
     content = load_content()

@@ -306,6 +306,8 @@ def _persist_products(items, demo):
     """Сохранить товары WB: в БД (основное хранилище, AR-1) и в JSON-фолбэк."""
     from db import db
     from models import Product
+    import export_filter
+    items = export_filter.apply_visibility(items, 'wb')
     with app_context():
         existing = _db_products_by_nm()
         for item in items:
@@ -323,6 +325,7 @@ def _persist_products(items, demo):
             prod.photo = item.get('photo', '')
             prod.url = item.get('url', '')
             prod.stock = item.get('stock', 0) or 0
+            prod.visible = bool(item.get('visible', True))
         db.session.commit()
     save_json(PRODUCTS_FILE, {'products': items, 'demo': demo})
 
@@ -483,14 +486,13 @@ def set_admin_discount(nm_id, percent):
 
 
 def final_price(product):
-    """Цена с учётом скидки WB и дополнительной скидки из админки."""
-    base = product.get('price', 0)
-    if not base:
-        return 0
-    wb_discount = product.get('wb_discount_percent', 0)
-    admin_discount = product.get('admin_discount_percent', 0)
-    total_discount = min(wb_discount + admin_discount, 99)
-    return round(base * (1 - total_discount / 100))
+    """Итоговая цена сайта (PR-2). Обёртка над pricing.final_price —
+    формула: база (discount_price или price) × (1 − admin/100), floor.
+
+    Суммирование wb+admin убрано — скидка МП уже учтена в discount_price.
+    """
+    import pricing
+    return pricing.final_price(product)
 
 
 if __name__ == '__main__':

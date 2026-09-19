@@ -80,6 +80,23 @@
 
 (новые записи — сверху, под этой строкой; самая свежая запись всегда первая)
 
+## [2026-09-19 21:30] Задача: [этап-2.1…2.8 частично] — Ozon, фильтр выгрузки, скидки PR-2
+- Статус: in_progress (осталось: админка «Интеграции» — субагент, финальный прогон/коммит)
+- Сделано:
+  - `pricing.py` (PR-2/4/5/6): база=discount_price или price; итог=база×(1−admin/100) или база−сумма; floor в пользу клиента; минимум 1 руб.; скидка МП в итог не входит; resolve по приоритету индивидуальная→category→source→all из таблицы discounts; enrich_product(s) добавляет final_price/site_discount_badge.
+  - `wb_sync.final_price` — обёртка над pricing (старая формула удалена); `_persist_products` проставляет visible через export_filter.
+  - `export_filter.py` (WB-5/OZ-4): режим all/selected/category из site.<source>_export; `reapply_visibility(source)` пересчитывает visible в БД без синка.
+  - app.py: `_products_cached(include_hidden=False)` — единый каталог WB+Ozon (видимые; настройка site.hide_zero_stock CT-4); `invalidate_site_cache` везде; роуты: `/catalog/` (фильтры цена/категория/наличие/источник, сортировка popular/price/new, пагинация 24, поиск q — CT-1/CT-5), `/catalog/ozon/<id>/`, `_product_page(source, nm_id)` — единая карточка (CT-2…4); скидки: `/admin/api/product-discount` (percent|amount), `/admin/api/discount-bulk` (selected/category/source/all → Discount-правило), `/admin/api/discount-rules`, `/admin/api/discount-rule/delete`, `/admin/api/export-settings` GET/POST, `/admin/api/ozon-sync(-light)`; `_audit_log()` (PR-7); push-скидок в WB УДАЛЁН целиком (PR-5: `_maybe_push_discount`, pushed/push_message); `/admin/api/wb-discount(-bulk)` — обёртки совместимости; `/admin/api/wb-products` теперь отдаёт ВСЕ товары включая скрытые; журнал `/admin/api/wb-sync-log?source=wb|ozon` (OZ-6).
+  - `templates/wb_catalog_block.html` переписан: три цены (база зачёркнута → цена МП → итог сайта), бейдж «скидка X% на сайте», бейдж источника WB/Ozon (OZ-7), внутренние ссылки на карточки, панель фильтров + пагинация при catalog_view, кнопки лайк/1-клик сохранены.
+  - `ozon_sync.py` (OZ-1…6, субагент): креденшелы env/site, эндпоинты v3 product/list+info/list, v5 prices, v4 stocks, цены в сотых→рубли, маппинг в единую схему, merge admin-скидок, журнал source='ozon', без креденшелов → ошибка (демо НЕ нужен).
+  - `jobs/autosync.py`: оба источника (wb+ozon), флаг --source, состояние site.mp_autosync_state.
+  - Тесты: test_final_price.py переписан под PR-2 (floor, границы 0/99, фикс. сумма, приоритет правил, бейдж); test_export_filter.py (режимы, reapply, hide_zero_stock, цикл синк→каталог→заявка→клиент, фильтры/поиск); test_ozon_sync.py (маппинг, persist, merge скидок, журнал, sync_light) — субагент.
+- Изменённые файлы: pricing.py, export_filter.py, ozon_sync.py, wb_sync.py, app.py, jobs/autosync.py, templates/wb_catalog_block.html, tests/{conftest,test_final_price,test_export_filter,test_ozon_sync}.py
+- Проверки: `pytest tests/ -q` → **77 passed**; smoke test_client: `/`, `/catalog/` (+фильтры/поиск/пагинация), `/catalog/wb/<id>/`, `/theme.css` → 200; `jobs/autosync.py` — оба источника корректно пропускаются (выключены).
+- Бэкапы: backup_2026-09-19_19-49, backup_2026-09-19_20-55
+- Следующий шаг: админка «Интеграции» (субагент-3, фон) → финальная проверка «не ломать» → бэкап №3 → коммит [этап-2] → Этап 3.
+- Примечания: карточка `/catalog/wb/<nm_id>/` сохранена (роутинг не сломан), добавлен `/catalog/ozon/<id>/`. Категория у WB-товаров пустая (WB API отдаёт предметы только через отдельный справочник) — фильтр по категории для WB сработает когда category появится.
+
 ## [2026-09-19 20:50] Задача: [этап-1.11] — Тесты TS-1 (baseline), pytest зелёный
 - Статус: done
 - Сделано: создан `tests/` (conftest с временной SQLite-БД и изоляцией JSON-фолбэков wb_sync во tmp): `test_blocks.py` (рендер всех 21 типа блоков + products-блок из БД), `test_customers.py` (нормализация, дедуп, заказы→клиент, лайки/события, популярное), `test_final_price.py` (baseline старой формулы round(base×(1−min(wb+admin,99)/100))), `test_storage.py` (roundtrip, удаление страниц, settings), `test_wb_sync.py` (demo-синк в БД, скидка переживает ресинк, журнал, light-sync, final_price на уровне app.get_products()).
