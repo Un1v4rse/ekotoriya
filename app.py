@@ -987,6 +987,15 @@ def admin_wb_sync():
     return jsonify(result)
 
 
+@app.route('/admin/api/wb-sync-light', methods=['POST'])
+@admin_required
+def admin_wb_sync_light():
+    """Лёгкая синхронизация WB: только цены и остатки."""
+    result = wb_sync.sync_light(token=wb_sync.get_wb_token())
+    invalidate_site_cache()
+    return jsonify(result)
+
+
 @app.route('/admin/api/wb-discount', methods=['POST'])
 @admin_required
 def admin_wb_discount():

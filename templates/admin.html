@@ -64,6 +64,10 @@
         }
         nav button:hover, nav button.active { background: var(--bg); color: var(--accent-dark); font-weight: 600; }
         nav button small { display: block; color: #aaa; font-weight: normal; font-size: 0.72rem; }
+        .subnav { display: flex; gap: 0.3rem; margin-bottom: 1.2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.6rem; flex-wrap: wrap; }
+        .subnav button { padding: 0.45rem 0.9rem; border: 1px solid var(--border); background: transparent; border-radius: 7px; cursor: pointer; color: var(--text); font-size: 0.88rem; }
+        .subnav button:hover, .subnav button.active { background: var(--bg); color: var(--accent-dark); font-weight: 600; }
+        .exp-picker { max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.7rem; }
         main { min-width: 0; }
         section { display: none; background: var(--card); border-radius: 10px; padding: 1.4rem 1.6rem; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
         section.active { display: block; }
@@ -320,7 +324,7 @@
                 <button data-tab="theme">🎨 Дизайн: цвета и шрифты</button>
                 <button data-tab="menu">☰ Меню сайта</button>
                 <button data-tab="socials">👍 Соцсети</button>
-                <button data-tab="wildberries">🛍 Wildberries</button>
+                <button data-tab="wildberries">🛒 Интеграции (WB / Ozon)</button>
                 <button data-tab="customers">👥 Клиенты и заявки</button>
                 <button data-tab="seo">📈 Продвижение (SEO)</button>
                 <button data-tab="backup">💾 Резервная копия</button>
@@ -491,48 +495,188 @@
                 </section>
 
                 <section id="tab-wildberries">
-                    <h2>Wildberries — товары и скидки</h2>
-                    <div class="field">
-                        <label for="wb-token">API-токен WB (категория «Контент» или «Цены и скидки»)</label>
-                        <input type="text" id="wb-token" data-path="site.wb_api_token" placeholder="Оставьте пустым — будет демо-каталог">
-                        <div class="help">Товары загружаются официальным API продавца WB (api-seller.wildberries.ru): карточки и фото — через «Контент», цены и скидки — через «Цены и скидки». Токен создаётся в кабинете WB: Настройки → Доступ к API. <a href="https://dev.wildberries.ru" target="_blank">Документация WB API ↗</a></div>
+                    <h2>Интеграции с маркетплейсами</h2>
+                    <div class="subnav" id="int-subnav">
+                        <button type="button" data-subtab="wb" class="active">Wildberries</button>
+                        <button type="button" data-subtab="ozon">Ozon</button>
+                        <button type="button" data-subtab="discounts">Скидки и каталог</button>
                     </div>
-                    <div class="field">
-                        <label style="font-weight:400;display:flex;align-items:center;gap:0.4rem;">
-                            <input type="checkbox" id="wb-push-discounts" data-path="site.wb_push_discounts">
-                            Отправлять скидки в WB API (требуется токен с правами «Цены и скидки»)
-                        </label>
-                    </div>
-                    <div class="field">
-                        <label style="font-weight:400;display:flex;align-items:center;gap:0.4rem;">
-                            <input type="checkbox" id="wb-autosync-enabled" data-path="site.wb_autosync.enabled">
-                            Автосинхронизация по расписанию (сервер обновляет каталог сам)
-                        </label>
-                        <div style="display:flex;gap:1rem;margin-top:0.4rem;">
-                            <label style="font-weight:400;">Полная (карточки), раз в
-                                <input type="number" min="1" max="168" style="width:5rem;" data-path="site.wb_autosync.catalog_hours"> час.
+
+                    <div id="int-sub-wb">
+                        <div class="field">
+                            <label for="wb-token">API-токен WB (категория «Контент» или «Цены и скидки»)</label>
+                            <input type="text" id="wb-token" data-path="site.wb_api_token" placeholder="Оставьте пустым — будет демо-каталог">
+                            <div class="help">Товары загружаются официальным API продавца WB (api-seller.wildberries.ru): карточки и фото — через «Контент», цены и скидки — через «Цены и скидки». Токен создаётся в кабинете WB: Настройки → Доступ к API. <a href="https://dev.wildberries.ru" target="_blank">Документация WB API ↗</a></div>
+                        </div>
+                        <div class="field">
+                            <label style="font-weight:400;display:flex;align-items:center;gap:0.4rem;">
+                                <input type="checkbox" id="wb-autosync-enabled" data-path="site.wb_autosync.enabled">
+                                Автосинхронизация по расписанию (сервер обновляет каталог сам)
                             </label>
-                            <label style="font-weight:400;">Цены и остатки, каждые
-                                <input type="number" min="5" max="720" style="width:5rem;" data-path="site.wb_autosync.light_minutes"> мин.
+                            <div style="display:flex;gap:1rem;margin-top:0.4rem;">
+                                <label style="font-weight:400;">Полная (карточки), раз в
+                                    <input type="number" min="1" max="168" style="width:5rem;" data-path="site.wb_autosync.catalog_hours"> час.
+                                </label>
+                                <label style="font-weight:400;">Цены и остатки, каждые
+                                    <input type="number" min="5" max="720" style="width:5rem;" data-path="site.wb_autosync.light_minutes"> мин.
+                                </label>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <button type="button" class="secondary" onclick="marketSync('wb', false)">🔄 Полная синхронизация</button>
+                            <button type="button" class="secondary" onclick="marketSync('wb', true)" style="margin-left:0.5rem;">⚡ Только цены и остатки</button>
+                            <span id="wb-sync-result" class="help" style="display:inline;margin-left:0.5rem;"></span>
+                            <button type="button" class="secondary" onclick="toggleSyncLog('wb')" style="margin-left:0.5rem;">📋 Журнал</button>
+                        </div>
+                        <div id="wb-sync-log" style="display:none;" class="table-wrap">
+                            <p class="help">Нажмите «Журнал», чтобы загрузить записи.</p>
+                        </div>
+                        <hr style="border:0;border-top:1px solid var(--border);margin:0.9rem 0;">
+                        <h3>Фильтр выгрузки на сайт</h3>
+                        <div class="help" style="margin-bottom:0.6rem;">Какие товары WB показывать на сайте.</div>
+                        <div class="field">
+                            <label style="font-weight:400;display:flex;align-items:center;gap:0.4rem;">
+                                <input type="radio" name="wb-exp-mode" value="all" onchange="exportModeChanged('wb')"> Все товары кабинета
+                            </label>
+                            <label style="font-weight:400;display:flex;align-items:center;gap:0.4rem;">
+                                <input type="radio" name="wb-exp-mode" value="selected" onchange="exportModeChanged('wb')"> Выбранные товары
+                            </label>
+                            <label style="font-weight:400;display:flex;align-items:center;gap:0.4rem;">
+                                <input type="radio" name="wb-exp-mode" value="category" onchange="exportModeChanged('wb')"> По категории
                             </label>
                         </div>
+                        <div id="wb-exp-selected" style="display:none;">
+                            <input type="text" id="wb-exp-search" placeholder="Поиск по имени или артикулу" oninput="renderExportPicker('wb')" style="margin-bottom:0.4rem;">
+                            <div id="wb-exp-list" class="exp-picker"></div>
+                        </div>
+                        <div id="wb-exp-category" style="display:none;">
+                            <select id="wb-exp-cat" style="min-width:16rem;"></select>
+                        </div>
+                        <div class="field" style="margin-top:0.5rem;">
+                            <button type="button" class="secondary" onclick="saveExportSettings('wb')">Сохранить фильтр</button>
+                            <span id="wb-exp-result" class="help" style="display:inline;margin-left:0.5rem;"></span>
+                        </div>
+                        <hr style="border:0;border-top:1px solid var(--border);margin:0.9rem 0;">
+                        <h3>Товары Wildberries</h3>
+                        <div class="field">
+                            <input type="text" id="wb-search" placeholder="Поиск по имени или артикулу" oninput="renderProductList('wb')">
+                        </div>
+                        <div id="wb-products"></div>
                     </div>
-                    <div class="field">
-                        <button type="button" class="secondary" onclick="wbSync()">🔄 Загрузить / обновить товары с WB</button>
-                        <span id="wb-sync-result" class="help" style="display:inline;margin-left:0.5rem;"></span>
-                        <button type="button" class="secondary" onclick="toggleSyncLog()" style="margin-left:0.5rem;">📋 Журнал</button>
+
+                    <div id="int-sub-ozon" style="display:none;">
+                        <div class="row">
+                            <div class="field">
+                                <label for="ozon-client-id">Client-Id</label>
+                                <input type="text" id="ozon-client-id" data-path="site.ozon_client_id" placeholder="Например, 123456">
+                            </div>
+                            <div class="field">
+                                <label for="ozon-api-key">Api-Key</label>
+                                <input type="text" id="ozon-api-key" data-path="site.ozon_api_key" placeholder="Ключ из кабинета Ozon">
+                            </div>
+                        </div>
+                        <div class="help" style="margin-bottom:0.9rem;">Ключи создаются в кабинете Ozon: Настройки → API-ключи. Товары загружаются официальным API продавца Ozon (api-seller.ozon.ru).</div>
+                        <div class="field">
+                            <label style="font-weight:400;display:flex;align-items:center;gap:0.4rem;">
+                                <input type="checkbox" id="ozon-autosync-enabled" data-path="site.ozon_autosync.enabled">
+                                Автосинхронизация по расписанию (сервер обновляет каталог сам)
+                            </label>
+                            <div style="display:flex;gap:1rem;margin-top:0.4rem;">
+                                <label style="font-weight:400;">Полная (карточки), раз в
+                                    <input type="number" id="ozon-autosync-catalog-hours" min="1" max="168" style="width:5rem;" data-path="site.ozon_autosync.catalog_hours"> час.
+                                </label>
+                                <label style="font-weight:400;">Цены и остатки, каждые
+                                    <input type="number" id="ozon-autosync-light-minutes" min="5" max="720" style="width:5rem;" data-path="site.ozon_autosync.light_minutes"> мин.
+                                </label>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <button type="button" class="secondary" onclick="marketSync('ozon', false)">🔄 Полная синхронизация</button>
+                            <button type="button" class="secondary" onclick="marketSync('ozon', true)" style="margin-left:0.5rem;">⚡ Только цены и остатки</button>
+                            <span id="ozon-sync-result" class="help" style="display:inline;margin-left:0.5rem;"></span>
+                            <button type="button" class="secondary" onclick="toggleSyncLog('ozon')" style="margin-left:0.5rem;">📋 Журнал</button>
+                        </div>
+                        <div id="ozon-sync-log" style="display:none;" class="table-wrap">
+                            <p class="help">Нажмите «Журнал», чтобы загрузить записи.</p>
+                        </div>
+                        <hr style="border:0;border-top:1px solid var(--border);margin:0.9rem 0;">
+                        <h3>Фильтр выгрузки на сайт</h3>
+                        <div class="help" style="margin-bottom:0.6rem;">Какие товары Ozon показывать на сайте.</div>
+                        <div class="field">
+                            <label style="font-weight:400;display:flex;align-items:center;gap:0.4rem;">
+                                <input type="radio" name="ozon-exp-mode" value="all" onchange="exportModeChanged('ozon')"> Все товары кабинета
+                            </label>
+                            <label style="font-weight:400;display:flex;align-items:center;gap:0.4rem;">
+                                <input type="radio" name="ozon-exp-mode" value="selected" onchange="exportModeChanged('ozon')"> Выбранные товары
+                            </label>
+                            <label style="font-weight:400;display:flex;align-items:center;gap:0.4rem;">
+                                <input type="radio" name="ozon-exp-mode" value="category" onchange="exportModeChanged('ozon')"> По категории
+                            </label>
+                        </div>
+                        <div id="ozon-exp-selected" style="display:none;">
+                            <input type="text" id="ozon-exp-search" placeholder="Поиск по имени или артикулу" oninput="renderExportPicker('ozon')" style="margin-bottom:0.4rem;">
+                            <div id="ozon-exp-list" class="exp-picker"></div>
+                        </div>
+                        <div id="ozon-exp-category" style="display:none;">
+                            <select id="ozon-exp-cat" style="min-width:16rem;"></select>
+                        </div>
+                        <div class="field" style="margin-top:0.5rem;">
+                            <button type="button" class="secondary" onclick="saveExportSettings('ozon')">Сохранить фильтр</button>
+                            <span id="ozon-exp-result" class="help" style="display:inline;margin-left:0.5rem;"></span>
+                        </div>
+                        <hr style="border:0;border-top:1px solid var(--border);margin:0.9rem 0;">
+                        <h3>Товары Ozon</h3>
+                        <div class="field">
+                            <input type="text" id="ozon-search" placeholder="Поиск по имени или артикулу" oninput="renderProductList('ozon')">
+                        </div>
+                        <div id="ozon-products"></div>
                     </div>
-                    <div id="wb-sync-log" style="display:none;" class="table-wrap">
-                        <p class="help">Нажмите «Журнал», чтобы загрузить записи.</p>
+
+                    <div id="int-sub-discounts" style="display:none;">
+                        <div class="field">
+                            <label style="font-weight:400;display:flex;align-items:center;gap:0.4rem;">
+                                <input type="checkbox" id="hide-zero-stock" data-path="site.hide_zero_stock">
+                                Скрывать товары с нулевым остатком
+                            </label>
+                            <div class="help">Товары, которых нет в наличии, не показываются на сайте.</div>
+                        </div>
+                        <hr style="border:0;border-top:1px solid var(--border);margin:0.9rem 0;">
+                        <h3>Правила скидок</h3>
+                        <div id="disc-rules" class="table-wrap">
+                            <p class="help">Нажмите «Скидки и каталог», чтобы загрузить правила.</p>
+                        </div>
+                        <h3 style="margin-top:1.2rem;">Добавить правило</h3>
+                        <div class="field" style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
+                            <select id="rule-scope" onchange="ruleScopeChanged()">
+                                <option value="all">Весь каталог</option>
+                                <option value="category">По категории</option>
+                                <option value="source">По источнику</option>
+                            </select>
+                            <input type="text" id="rule-category" placeholder="Категория" style="display:none;width:12rem;">
+                            <select id="rule-source" style="display:none;">
+                                <option value="wb">Wildberries</option>
+                                <option value="ozon">Ozon</option>
+                            </select>
+                            <select id="rule-type">
+                                <option value="percent">%</option>
+                                <option value="amount">руб</option>
+                            </select>
+                            <input type="number" id="rule-value" min="0" style="width:6rem;" placeholder="0">
+                            <button type="button" class="secondary" onclick="addDiscountRule()">Добавить правило</button>
+                        </div>
+                        <hr style="border:0;border-top:1px solid var(--border);margin:0.9rem 0;">
+                        <h3>Массовая скидка выбранным</h3>
+                        <div class="field" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                            <input type="number" id="sel-bulk-value" min="0" style="width:6rem;" value="10">
+                            <select id="sel-bulk-type">
+                                <option value="percent">%</option>
+                                <option value="amount">руб</option>
+                            </select>
+                            <button type="button" class="secondary" onclick="applySelectedDiscount()">Применить выбранным</button>
+                            <span id="sel-bulk-result" class="help" style="display:inline;"></span>
+                        </div>
+                        <p class="help">Отметьте товары галочками на вкладках Wildberries или Ozon — скидка применится ко всем отмеченным.</p>
                     </div>
-                    <div class="field" style="margin-top:0.5rem;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-                        <span class="help">Выбранным:</span>
-                        <input type="number" id="wb-bulk-percent" min="0" max="99" value="10" style="width:5rem;padding:0.35rem 0.5rem;" title="Процент скидки">
-                        <span class="help">%</span>
-                        <button type="button" class="secondary" onclick="applyBulkDiscount()">Применить скидку</button>
-                        <span id="wb-bulk-result" class="help" style="display:inline;"></span>
-                    </div>
-                    <div id="wb-products"></div>
                 </section>
 
                 <section id="tab-customers">
@@ -1560,119 +1704,327 @@
             }
         }
 
-        /* ================= WB ================= */
-        async function wbSync() {
-            $('wb-sync-result').textContent = 'Синхронизация…';
-            try {
-                const resp = await fetch(`${location.origin}/admin/api/wb-sync`, {method: 'POST', headers: {'X-CSRF-Token': window.CSRF_TOKEN}});
-                const result = await resp.json();
-                $('wb-sync-result').textContent = result.success
-                    ? `Загружено ${result.count} товаров${result.demo ? ' (демо-режим)' : ' через WB API'}`
-                    : 'Ошибка: ' + (result.error || '');
-                if (result.success) loadWbProducts();
-            } catch (e) { $('wb-sync-result').textContent = 'Ошибка: ' + e.message; }
+        /* ================= Интеграции (WB / Ozon) ================= */
+        let allProducts = [];
+        let productsLoaded = false;
+        const exportSelected = {wb: new Set(), ozon: new Set()};
+
+        function productsOf(source) {
+            return allProducts.filter(p => p.source === source);
         }
 
-        function productCard(p, market, setDiscount) {
-            const card = document.createElement('div');
-            card.className = 'prod-card';
-            card.innerHTML = `
-                <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.8rem;margin-bottom:0.3rem;">
-                    <input type="checkbox" class="wb-select" data-id="${p.id}"> выбрать
-                </label>
-                <img src="${p.photo}" alt="" loading="lazy">
-                <div class="pname">${escapeHtml(p.name)}</div>
-                <div><span class="old">${p.price} ₽</span><span class="new">${p.final_price} ₽</span></div>
-                <div class="help">Скидка ${market}: ${p.wb_discount_percent}%</div>
-                <div class="disc-row">
-                    <input type="number" min="0" max="99" value="${p.admin_discount_percent || 0}" class="disc-input" title="Доп. скидка, %">
-                    <button type="button" class="secondary" style="padding:0.3rem 0.7rem;font-size:0.82rem;">OK</button>
-                </div>
-                <div class="wb-push-result help" style="display:none;"></div>`;
-            card.querySelector('button').addEventListener('click', () => {
-                setDiscount(p.id, parseInt(card.querySelector('.disc-input').value || 0, 10));
-            });
-            return card;
+        function productMatches(p, q) {
+            return (p.name || '').toLowerCase().includes(q)
+                || String(p.nm_id || '').includes(q)
+                || (p.vendor_code || '').toLowerCase().includes(q);
         }
 
-        async function loadWbProducts() {
+        async function loadAllProducts() {
+            if (productsLoaded) return;
             try {
                 const resp = await fetch(`${location.origin}/admin/api/wb-products`);
                 const result = await resp.json();
                 if (!result.success) return;
-                const container = $('wb-products');
-                container.innerHTML = result.demo
-                    ? '<p class="help">Демо-режим: для реальных товаров вашего магазина введите API-токен выше и нажмите «Загрузить / обновить товары с WB».</p>'
-                    : '<p class="help">Товары загружены через официальный WB API.</p>';
-                const grid = document.createElement('div');
-                grid.className = 'prod-grid';
-                result.products.forEach(p => grid.appendChild(productCard(p, 'WB', setWbDiscount)));
-                container.appendChild(grid);
+                allProducts = result.products || [];
+                productsLoaded = true;
+                renderProductList('wb');
+                renderProductList('ozon');
+                fillExportCategories('wb');
+                fillExportCategories('ozon');
+                renderExportPicker('wb');
+                renderExportPicker('ozon');
             } catch (e) { console.error(e); }
         }
 
-        async function setWbDiscount(id, percent) {
+        async function reloadProducts() {
+            productsLoaded = false;
+            await loadAllProducts();
+        }
+
+        function productCard(p) {
+            const discType = p.admin_discount_type === 'amount' ? 'amount' : 'percent';
+            const discVal = discType === 'amount' ? (p.admin_discount_amount || 0) : (p.admin_discount_percent || 0);
+            const hidden = p.visible === false;
+            const card = document.createElement('div');
+            card.className = 'prod-card';
+            if (hidden) card.style.opacity = '0.55';
+            card.innerHTML = `
+                <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.8rem;margin-bottom:0.3rem;">
+                    <input type="checkbox" class="wb-select" data-source="${p.source}" data-id="${p.nm_id}"> выбрать
+                </label>
+                <img src="${p.photo}" alt="" loading="lazy">
+                <div class="pname">${escapeHtml(p.name)}</div>
+                <div><span class="old">${p.price} ₽</span><span class="new">${p.final_price} ₽</span></div>
+                ${hidden ? '<div class="help" style="color:var(--danger);">скрыт с сайта</div>' : ''}
+                <div class="disc-row">
+                    <input type="number" min="0" max="99" value="${discVal}" class="disc-input" title="Скидка админа">
+                    <select class="disc-type" title="Тип скидки">
+                        <option value="percent" ${discType === 'percent' ? 'selected' : ''}>%</option>
+                        <option value="amount" ${discType === 'amount' ? 'selected' : ''}>руб</option>
+                    </select>
+                    <button type="button" class="secondary" style="padding:0.3rem 0.7rem;font-size:0.82rem;">OK</button>
+                </div>`;
+            card.querySelector('button').addEventListener('click', () => {
+                setProductDiscount(p.source, p.nm_id,
+                    parseInt(card.querySelector('.disc-input').value || 0, 10),
+                    card.querySelector('.disc-type').value);
+            });
+            return card;
+        }
+
+        function renderProductList(source) {
+            const container = $(`${source}-products`);
+            if (!container) return;
+            if (!productsLoaded) {
+                container.innerHTML = '<p class="help">Загрузка товаров…</p>';
+                return;
+            }
+            const q = (($(`${source}-search`) && $(`${source}-search`).value) || '').trim().toLowerCase();
+            const items = q ? productsOf(source).filter(p => productMatches(p, q)) : productsOf(source);
+            container.innerHTML = '';
+            if (!items.length) {
+                container.innerHTML = '<p class="help">Товары не найдены.</p>';
+                return;
+            }
+            const grid = document.createElement('div');
+            grid.className = 'prod-grid';
+            items.forEach(p => grid.appendChild(productCard(p)));
+            container.appendChild(grid);
+        }
+
+        async function setProductDiscount(source, productId, value, discountType) {
             try {
-                const resp = await fetch(`${location.origin}/admin/api/wb-discount`, {
+                const resp = await fetch(`${location.origin}/admin/api/product-discount`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
-                    body: JSON.stringify({product_id: id, nm_id: id, percent})
+                    body: JSON.stringify({source, product_id: productId, discount_type: discountType, value})
                 });
                 const result = await resp.json();
                 showMsg(result.success ? 'Скидка сохранена' : 'Ошибка: ' + (result.error || ''), result.success);
-                if (result.success) {
-                    if (result.pushed) showMsg('Скидка сохранена и отправлена в WB', true);
-                    else if (result.push_message) showMsg('Скидка сохранена. WB: ' + result.push_message, false);
-                    loadWbProducts();
-                }
+                if (result.success) await reloadProducts();
             } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
         }
 
-        async function applyBulkDiscount() {
-            const ids = Array.from(document.querySelectorAll('.wb-select:checked')).map(cb => parseInt(cb.dataset.id, 10));
-            const percent = parseInt($('wb-bulk-percent').value || 0, 10);
-            const resultEl = $('wb-bulk-result');
-            if (!ids.length) { resultEl.textContent = 'Отметьте галочками хотя бы один товар'; return; }
-            resultEl.textContent = 'Применение…';
+        async function marketSync(source, light) {
+            const resultEl = $(`${source}-sync-result`);
+            resultEl.textContent = 'Синхронизация…';
+            const url = source === 'wb'
+                ? (light ? '/admin/api/wb-sync-light' : '/admin/api/wb-sync')
+                : (light ? '/admin/api/ozon-sync-light' : '/admin/api/ozon-sync');
             try {
-                const resp = await fetch(`${location.origin}/admin/api/wb-discount-bulk`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
-                    body: JSON.stringify({percent, nm_ids: ids})
-                });
+                const resp = await fetch(`${location.origin}${url}`, {method: 'POST', headers: {'X-CSRF-Token': window.CSRF_TOKEN}});
                 const result = await resp.json();
                 resultEl.textContent = result.success
-                    ? `Скидка ${percent}% применена к ${result.count} товарам` + (result.pushed ? `, отправлено в WB: ${result.pushed}` : '') + (result.push_errors ? `, ошибок отправки: ${result.push_errors}` : '')
+                    ? `Готово${result.count !== undefined ? `: обработано ${result.count} товаров` : ''}${result.demo ? ' (демо-режим)' : ''}`
                     : 'Ошибка: ' + (result.error || '');
-                if (result.success) loadWbProducts();
-            } catch (e) { resultEl.textContent = 'Ошибка сети: ' + e.message; }
+                if (result.success) await reloadProducts();
+            } catch (e) { resultEl.textContent = 'Ошибка: ' + e.message; }
         }
 
-        /* ================= Журнал синхронизации WB ================= */
-        async function toggleSyncLog() {
-            const box = $('wb-sync-log');
+        /* ================= Журнал синхронизации ================= */
+        async function toggleSyncLog(source) {
+            const box = $(`${source}-sync-log`);
             if (box.style.display === 'none') {
                 box.style.display = 'block';
-                await loadSyncLog();
+                await loadSyncLog(source);
             } else {
                 box.style.display = 'none';
             }
         }
 
-        async function loadSyncLog() {
-            const box = $('wb-sync-log');
+        async function loadSyncLog(source) {
+            const box = $(`${source}-sync-log`);
             box.innerHTML = '<p class="help">Загрузка…</p>';
             try {
-                const resp = await fetch(`${location.origin}/admin/api/wb-sync-log`);
+                const resp = await fetch(`${location.origin}/admin/api/wb-sync-log?source=${source}`);
                 const result = await resp.json();
                 if (!result.success) { box.innerHTML = '<p class="help">Ошибка загрузки журнала.</p>'; return; }
                 if (!result.entries.length) { box.innerHTML = '<p class="help">Журнал пуст — синхронизация ещё не запускалась.</p>'; return; }
-                let html = '<table class="adm"><thead><tr><th>Время</th><th>Статус</th><th>Сообщение</th><th>Товаров</th></tr></thead><tbody>';
+                const titles = {wb: 'WB', ozon: 'Ozon'};
+                let html = '<table class="adm"><thead><tr><th>Время</th><th>Источник</th><th>Статус</th><th>Сообщение</th><th>Товаров</th></tr></thead><tbody>';
                 result.entries.forEach(e => {
-                    html += `<tr><td>${escapeHtml(e.time || '')}</td><td>${e.status === 'ok' ? '✅ ok' : '❌ error'}</td><td>${escapeHtml(e.message || '')}</td><td>${e.count !== null && e.count !== undefined ? e.count : ''}</td></tr>`;
+                    html += `<tr><td>${escapeHtml(e.time || '')}</td><td>${titles[e.source] || escapeHtml(e.source || '')}</td><td>${e.status === 'ok' ? '✅ ok' : '❌ error'}</td><td>${escapeHtml(e.message || '')}</td><td>${e.count !== null && e.count !== undefined ? e.count : ''}</td></tr>`;
                 });
                 box.innerHTML = html + '</tbody></table>';
             } catch (e) { box.innerHTML = '<p class="help">Ошибка сети: ' + e.message + '</p>'; }
+        }
+
+        /* ================= Фильтр выгрузки ================= */
+        async function loadExportSettings(source) {
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/export-settings?source=${source}`);
+                const result = await resp.json();
+                if (!result.success) return;
+                const settings = result.settings || {mode: 'all', selected_ids: [], category: ''};
+                const radio = document.querySelector(`input[name="${source}-exp-mode"][value="${settings.mode}"]`);
+                if (radio) radio.checked = true;
+                exportSelected[source] = new Set(settings.selected_ids || []);
+                fillExportCategories(source);
+                const catSel = $(`${source}-exp-cat`);
+                if (catSel && settings.category) catSel.value = settings.category;
+                exportModeChanged(source);
+                renderExportPicker(source);
+            } catch (e) { console.error(e); }
+        }
+
+        function fillExportCategories(source) {
+            const sel = $(`${source}-exp-cat`);
+            if (!sel) return;
+            const cats = [...new Set(productsOf(source).map(p => p.category).filter(Boolean))].sort();
+            sel.innerHTML = cats.length
+                ? cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')
+                : '<option value="">— нет категорий —</option>';
+        }
+
+        function exportModeChanged(source) {
+            const checked = document.querySelector(`input[name="${source}-exp-mode"]:checked`);
+            const mode = checked ? checked.value : 'all';
+            $(`${source}-exp-selected`).style.display = mode === 'selected' ? 'block' : 'none';
+            $(`${source}-exp-category`).style.display = mode === 'category' ? 'block' : 'none';
+        }
+
+        function renderExportPicker(source) {
+            const list = $(`${source}-exp-list`);
+            if (!list) return;
+            if (!productsLoaded) {
+                list.innerHTML = '<p class="help">Загрузка товаров…</p>';
+                return;
+            }
+            const q = (($(`${source}-exp-search`) && $(`${source}-exp-search`).value) || '').trim().toLowerCase();
+            const items = q ? productsOf(source).filter(p => productMatches(p, q)) : productsOf(source);
+            list.innerHTML = '';
+            if (!items.length) {
+                list.innerHTML = '<p class="help">Товары не найдены.</p>';
+                return;
+            }
+            items.forEach(p => {
+                const label = document.createElement('label');
+                label.style.cssText = 'display:flex;align-items:center;gap:0.4rem;font-weight:400;font-size:0.85rem;padding:0.15rem 0;';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.checked = exportSelected[source].has(p.nm_id);
+                cb.addEventListener('change', () => {
+                    if (cb.checked) exportSelected[source].add(p.nm_id);
+                    else exportSelected[source].delete(p.nm_id);
+                });
+                label.appendChild(cb);
+                label.appendChild(document.createTextNode(` ${escapeHtml(p.name)} (арт. ${p.nm_id})`));
+                list.appendChild(label);
+            });
+        }
+
+        async function saveExportSettings(source) {
+            const checked = document.querySelector(`input[name="${source}-exp-mode"]:checked`);
+            const mode = checked ? checked.value : 'all';
+            const body = {source, mode, selected_ids: [...exportSelected[source]], category: ''};
+            if (mode === 'category') body.category = ($(`${source}-exp-cat`).value || '');
+            const resultEl = $(`${source}-exp-result`);
+            resultEl.textContent = 'Сохранение…';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/export-settings`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify(body)
+                });
+                const result = await resp.json();
+                resultEl.textContent = result.success
+                    ? `Сохранено. Пересчитано товаров: ${result.affected !== undefined ? result.affected : '—'}`
+                    : 'Ошибка: ' + (result.error || '');
+                if (result.success) await reloadProducts();
+            } catch (e) { resultEl.textContent = 'Ошибка сети: ' + e.message; }
+        }
+
+        /* ================= Правила скидок ================= */
+        async function loadDiscountRules() {
+            const box = $('disc-rules');
+            box.innerHTML = '<p class="help">Загрузка…</p>';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/discount-rules`);
+                const result = await resp.json();
+                if (!result.success) { box.innerHTML = '<p class="help">Ошибка загрузки.</p>'; return; }
+                if (!result.rules.length) { box.innerHTML = '<p class="help">Правил пока нет.</p>'; return; }
+                const scopeNames = {all: 'Весь каталог', category: 'Категория', source: 'Источник'};
+                let html = '<table class="adm"><thead><tr><th>Область</th><th>Значение</th><th>Скидка</th><th>Создал</th><th>Дата</th><th></th></tr></thead><tbody>';
+                result.rules.forEach(r => {
+                    const val = r.scope === 'all' ? '—' : escapeHtml(r.scope_value || '');
+                    const sourceName = r.scope === 'source' ? (r.scope_value === 'ozon' ? 'Ozon' : 'Wildberries') : val;
+                    html += `<tr><td>${scopeNames[r.scope] || escapeHtml(r.scope)}</td><td>${r.scope === 'source' ? sourceName : val}</td><td>${r.value}${r.discount_type === 'percent' ? '%' : ' руб'}</td><td>${escapeHtml(r.created_by || '')}</td><td>${escapeHtml((r.created_at || '').replace('T', ' '))}</td><td><button type="button" class="secondary" style="padding:0.25rem 0.6rem;font-size:0.8rem;" onclick="deleteDiscountRule(${r.id})">Удалить</button></td></tr>`;
+                });
+                box.innerHTML = html + '</tbody></table>';
+            } catch (e) { box.innerHTML = '<p class="help">Ошибка сети: ' + e.message + '</p>'; }
+        }
+
+        async function deleteDiscountRule(id) {
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/discount-rule/delete`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({id})
+                });
+                const result = await resp.json();
+                showMsg(result.success ? 'Правило удалено' : 'Ошибка: ' + (result.error || ''), result.success);
+                if (result.success) loadDiscountRules();
+            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
+        }
+
+        function ruleScopeChanged() {
+            const scope = $('rule-scope').value;
+            $('rule-category').style.display = scope === 'category' ? 'inline-block' : 'none';
+            $('rule-source').style.display = scope === 'source' ? 'inline-block' : 'none';
+        }
+
+        async function addDiscountRule() {
+            const scope = $('rule-scope').value;
+            const body = {scope, discount_type: $('rule-type').value, value: parseInt($('rule-value').value || 0, 10)};
+            if (scope === 'category') body.category = $('rule-category').value.trim();
+            if (scope === 'source') body.source = $('rule-source').value;
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/discount-bulk`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify(body)
+                });
+                const result = await resp.json();
+                showMsg(result.success ? 'Правило добавлено' : 'Ошибка: ' + (result.error || ''), result.success);
+                if (result.success) loadDiscountRules();
+            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
+        }
+
+        async function applySelectedDiscount() {
+            const items = Array.from(document.querySelectorAll('.wb-select:checked'))
+                .map(cb => ({source: cb.dataset.source, product_id: parseInt(cb.dataset.id, 10)}));
+            const value = parseInt($('sel-bulk-value').value || 0, 10);
+            const discountType = $('sel-bulk-type').value;
+            const resultEl = $('sel-bulk-result');
+            if (!items.length) { resultEl.textContent = 'Отметьте галочками хотя бы один товар на вкладке Wildberries или Ozon'; return; }
+            resultEl.textContent = 'Применение…';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/discount-bulk`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({scope: 'selected', items, discount_type: discountType, value})
+                });
+                const result = await resp.json();
+                resultEl.textContent = result.success
+                    ? `Скидка применена к ${result.count} товарам`
+                    : 'Ошибка: ' + (result.error || '');
+                if (result.success) await reloadProducts();
+            } catch (e) { resultEl.textContent = 'Ошибка сети: ' + e.message; }
+        }
+
+        /* ================= Саб-вкладки интеграций ================= */
+        function switchIntSubtab(name) {
+            document.querySelectorAll('#int-subnav button[data-subtab]').forEach(b =>
+                b.classList.toggle('active', b.dataset.subtab === name));
+            ['wb', 'ozon', 'discounts'].forEach(n => {
+                $(`int-sub-${n}`).style.display = n === name ? 'block' : 'none';
+            });
+            if (name === 'discounts') {
+                loadDiscountRules();
+            } else {
+                loadAllProducts();
+                loadExportSettings(name);
+            }
         }
 
         /* ================= Клиенты и заявки ================= */
@@ -1743,7 +2095,20 @@
         renderMenuEditor();
         renderSocialsEditor();
         selectPage(0);
-        loadWbProducts();
+        loadAllProducts();
+        loadExportSettings('wb');
+        document.querySelectorAll('#int-subnav button[data-subtab]').forEach(btn => {
+            btn.addEventListener('click', () => switchIntSubtab(btn.dataset.subtab));
+        });
+        // Значения по умолчанию для автосинхронизации Ozon
+        if (!getDeep(data, 'site.ozon_autosync.catalog_hours')) {
+            setDeep(data, 'site.ozon_autosync.catalog_hours', 6);
+            $('ozon-autosync-catalog-hours').value = 6;
+        }
+        if (!getDeep(data, 'site.ozon_autosync.light_minutes')) {
+            setDeep(data, 'site.ozon_autosync.light_minutes', 30);
+            $('ozon-autosync-light-minutes').value = 30;
+        }
     </script>
 </body>
 </html>
