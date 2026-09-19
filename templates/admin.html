@@ -641,6 +641,29 @@
                             <div class="help">Товары, которых нет в наличии, не показываются на сайте.</div>
                         </div>
                         <hr style="border:0;border-top:1px solid var(--border);margin:0.9rem 0;">
+                        <h3>Рекомендации (RS-7)</h3>
+                        <div class="field">
+                            <div class="help" style="margin-bottom:0.4rem;">Веса событий при подборе «популярного» и персональных рекомендаций. Заказ &gt; лайк &gt; просмотр.</div>
+                            <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;">
+                                <label style="font-weight:400;">Заказ
+                                    <input type="number" min="0" max="100" step="0.5" style="width:5rem;" data-path="site.recommendations.w_order">
+                                </label>
+                                <label style="font-weight:400;">Лайк
+                                    <input type="number" min="0" max="100" step="0.5" style="width:5rem;" data-path="site.recommendations.w_like">
+                                </label>
+                                <label style="font-weight:400;">Просмотр
+                                    <input type="number" min="0" max="100" step="0.5" style="width:5rem;" data-path="site.recommendations.w_view">
+                                </label>
+                                <label style="font-weight:400;">Затухание, дней
+                                    <input type="number" min="1" max="365" style="width:5rem;" data-path="site.recommendations.decay_days">
+                                </label>
+                                <label style="font-weight:400;">Товаров в блоке
+                                    <input type="number" min="1" max="48" style="width:5rem;" data-path="site.recommendations.limit">
+                                </label>
+                            </div>
+                            <div class="help">Свежие события влияют сильнее старых: линейное затухание за указанный период.</div>
+                        </div>
+                        <hr style="border:0;border-top:1px solid var(--border);margin:0.9rem 0;">
                         <h3>Правила скидок</h3>
                         <div id="disc-rules" class="table-wrap">
                             <p class="help">Нажмите «Скидки и каталог», чтобы загрузить правила.</p>
@@ -681,8 +704,24 @@
 
                 <section id="tab-customers">
                     <h2>Клиенты и заявки</h2>
-                    <div class="field">
+                    <div class="field row">
                         <button type="button" class="secondary" onclick="loadCustomers()">🔄 Обновить список</button>
+                        <a class="btn secondary" href="/admin/api/customers/export" download style="display:inline-block;text-decoration:none;">⬇ Экспорт CSV</a>
+                        <button type="button" class="secondary" onclick="loadSegments()">🎯 Сегменты</button>
+                    </div>
+                    <div id="segments-box" style="display:none;">
+                        <h3>Сегменты клиентов</h3>
+                        <div class="row">
+                            <div class="field">
+                                <label for="seg-days">Период, дней</label>
+                                <input type="number" id="seg-days" value="30" min="1" max="3650">
+                            </div>
+                            <div class="field">
+                                <label for="seg-min-orders">Порог заявок</label>
+                                <input type="number" id="seg-min-orders" value="2" min="1" max="1000">
+                            </div>
+                        </div>
+                        <div id="segments-list" class="table-wrap"></div>
                     </div>
                     <h3>Заявки на покупку</h3>
                     <div id="orders-list" class="table-wrap">
@@ -2048,11 +2087,45 @@
         function renderCustomers(customers) {
             const container = $('customers-list');
             if (!customers.length) { container.innerHTML = '<p class="help">Пока нет клиентов. Клиенты добавляются автоматически при заказе или регистрации.</p>'; return; }
-            let html = '<table class="adm"><thead><tr><th>ID</th><th>Имя</th><th>Телефон</th><th>Email</th><th>Добавлен</th></tr></thead><tbody>';
+            let html = '<table class="adm"><thead><tr><th>ID</th><th>Имя</th><th>Телефон</th><th>Email</th><th>Согласие ПДн</th><th>Добавлен</th><th></th></tr></thead><tbody>';
             customers.forEach(c => {
-                html += `<tr><td>${c.id}</td><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone)}</td><td>${escapeHtml(c.email || '')}</td><td>${formatDate(c.created_at)}</td></tr>`;
+                html += `<tr><td>${c.id}</td><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone)}</td><td>${escapeHtml(c.email || '')}</td><td>${c.consent_pd ? '✅' : '—'}</td><td>${formatDate(c.created_at)}</td><td><button type="button" class="secondary" onclick="deleteCustomer(${c.id})" title="Удалить клиента и все его данные (152-ФЗ)">🗑</button></td></tr>`;
             });
             container.innerHTML = html + '</tbody></table>';
+        }
+
+        async function deleteCustomer(id) {
+            if (!confirm('Удалить клиента и все его заявки, события и рекомендации? Это действие необратимо (152-ФЗ).')) return;
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/customer/delete`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({id})
+                });
+                const result = await resp.json();
+                showMsg(result.success ? 'Клиент удалён' : 'Ошибка: ' + (result.error || ''), result.success);
+                if (result.success) loadCustomers();
+            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
+        }
+
+        async function loadSegments() {
+            $('segments-box').style.display = 'block';
+            const days = parseInt($('seg-days').value, 10) || 30;
+            const minOrders = parseInt($('seg-min-orders').value, 10) || 2;
+            $('segments-list').innerHTML = '<p class="help">Расчёт сегментов…</p>';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/segments?days=${days}&min_orders=${minOrders}`);
+                const data = await resp.json();
+                if (!data.success) { $('segments-list').innerHTML = '<p class="help">Ошибка: ' + (data.error || '') + '</p>'; return; }
+                let html = '<table class="adm"><thead><tr><th>Сегмент</th><th>Клиентов</th><th>Кто</th></tr></thead><tbody>';
+                data.segments.forEach(s => {
+                    const who = s.customers.map(c => escapeHtml(c.name || c.phone || ('#' + c.id))).join(', ');
+                    html += `<tr><td>${escapeHtml(s.title)}</td><td>${s.count}</td><td>${who || '—'}</td></tr>`;
+                });
+                $('segments-list').innerHTML = html + '</tbody></table>';
+            } catch (e) {
+                $('segments-list').innerHTML = '<p class="help">Ошибка: ' + e.message + '</p>';
+            }
         }
 
         function renderOrders(orders) {

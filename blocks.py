@@ -88,6 +88,58 @@ def _style_attr(block):
     return f' style="{";".join(styles)}"' if styles else ''
 
 
+def _load_products():
+    """Видимые товары всех источников с итоговыми ценами (для блока «Товары»)."""
+    from db import db
+    from models import Product
+    rows = db.session.query(Product).filter_by(visible=True).order_by(Product.id).all()
+    products = [p.to_product_dict() for p in rows]
+    import pricing
+    return pricing.enrich_products(products)
+
+
+def _product_cards_html(products):
+    """Компактные карточки товаров для блока «Товары» (классы как в каталоге —
+    кнопки лайк/1-клик подхватываются существующим wb-actions.js)."""
+    out = []
+    for p in products:
+        pid = p.get('id') or p.get('nm_id')
+        photo = p.get('photo') or ''
+        img = photo if photo.startswith('/') else f'/proxy/image?url={quote(photo)}'
+        stock = p.get('stock', 0)
+        final = p.get('final_price') or p.get('price') or 0
+        badge = (f'<span style="background:#137333;color:#fff;font-size:0.72rem;'
+                 f'padding:0.15rem 0.5rem;border-radius:4px;">скидка '
+                 f'{p.get("site_discount_badge", 0)}% на сайте</span>'
+                 if p.get('site_discount_badge') else '')
+        stock_html = ('<div style="margin-top:0.5rem;font-size:0.82rem;font-weight:600;color:#c00;">Нет в наличии</div>'
+                      if stock <= 0 else '')
+        out.append(
+            f'<a href="/catalog/{p.get("source", "wb")}/{pid}/" class="wb-product-card" '
+            f'style="display:block;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;'
+            f'background:#fff;text-decoration:none;color:inherit;">'
+            f'<div style="padding:1rem;background:#f9f9f9;">'
+            f'<img src="{img}" alt="{esc(p.get("name", ""))}" loading="lazy" '
+            f'style="width:100%;height:220px;object-fit:contain;display:block;"></div>'
+            f'<div style="padding:1rem;">'
+            f'<div style="font-weight:600;font-size:0.95rem;line-height:1.35;min-height:3.9em;'
+            f'overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">'
+            f'{esc(p.get("name", ""))}</div>'
+            f'<div style="margin-top:0.75rem;display:flex;align-items:baseline;gap:0.5rem;flex-wrap:wrap;">'
+            f'<span style="color:#c00;font-weight:700;font-size:1.15rem;">{final} ₽</span>{badge}</div>'
+            f'{stock_html}'
+            f'<button type="button" class="wb-like-btn" data-id="{pid}" data-name="{esc(p.get("name", ""))}" '
+            f'style="margin-top:0.75rem;width:100%;background:#fff;color:#c00;border:1px solid #c00;'
+            f'padding:0.5rem;border-radius:6px;cursor:pointer;font-weight:600;">❤ В избранное</button>'
+            f'<button type="button" class="wb-buy-btn" data-id="{pid}" data-name="{esc(p.get("name", ""))}" '
+            f'data-price="{final}" data-stock="{stock}" '
+            f'style="margin-top:0.5rem;width:100%;background:#b49d84;color:#fff;border:0;padding:0.6rem;'
+            f'border-radius:6px;cursor:pointer;font-weight:600;"'
+            f'{" disabled" if stock <= 0 else ""}>Купить в 1 клик</button>'
+            f'</div></a>')
+    return ''.join(out)
+
+
 def render_block(block):
     btype = block.get('type', 'text')
     if btype == 'heading':
@@ -153,9 +205,11 @@ def render_block(block):
                 f' allowfullscreen loading="lazy"></iframe></div></div>')
 
     if btype == 'products':
-        source = block.get('source', 'all')
-        if source not in ('wb', 'all'):
-            source = 'all'
+        # Блок «Товары» (CN-2): режимы all/wb/ozon по источнику, фильтр по
+        # категории, подборка «Рекомендации» (популярное). Рендер серверный.
+        mode = block.get('mode', 'source')          # source | category | recommendations
+        source = block.get('source', 'all')         # wb | ozon | all
+        category = (block.get('category') or '').strip()
         limit = block.get('limit', 8)
         try:
             limit = max(1, min(48, int(limit)))
@@ -163,11 +217,29 @@ def render_block(block):
             limit = 8
         title = (block.get('title') or '').strip()
         title_html = f'<h2 style="font-size:1.6rem;margin-bottom:1.5rem;">{esc(title)}</h2>' if title else ''
+
+        products = []
+        try:
+            if mode == 'recommendations':
+                import recommendations
+                products = recommendations.popular_products(
+                    _load_products(), limit=limit)
+            else:
+                products = _load_products()
+                if source in ('wb', 'ozon'):
+                    products = [p for p in products if p.get('source') == source]
+                if mode == 'category' and category:
+                    products = [p for p in products if p.get('category') == category]
+                products = products[:limit]
+        except Exception:
+            products = []
+
+        cards = _product_cards_html(products)
         return (f'<div class="cb cb-products" style="padding:2rem 0;">'
                 f'<div class="maxwidth-theme">{title_html}'
-                f'<div class="wb-products-dynamic" data-source="{source}" data-limit="{limit}"'
-                f' style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1.5rem;"></div>'
-                f'</div></div>')
+                f'<div class="wb-products-grid" style="display:grid;'
+                f'grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1.5rem;">'
+                f'{cards}</div></div></div>')
 
     if btype == 'divider':
         return '<div class="cb cb-divider"><hr style="border:0;border-top:1px solid #e0e0e0;margin:2rem 0;"></div>'
@@ -206,6 +278,9 @@ def render_block(block):
                 '<input type="text" name="name" placeholder="Ваше имя" required>'
                 '<input type="tel" name="phone" placeholder="Телефон" required>'
                 '<input type="email" name="email" placeholder="Email (необязательно)">'
+                '<label style="display:flex;align-items:flex-start;gap:.4rem;font-size:.8rem;color:#666;cursor:pointer;">'
+                '<input type="checkbox" name="consent_pd" value="1" required style="margin-top:.15rem;">'
+                '<span>Соглашаюсь с обработкой персональных данных</span></label>'
                 f'<button type="submit">{esc(button)}</button>'
                 '</form></div></div>')
 

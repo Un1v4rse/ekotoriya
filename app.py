@@ -100,8 +100,40 @@ def get_products():
 
 @cache.memoize(timeout=300)
 def _popular_cached():
-    """Рекомендации «популярное» из базы клиентов (кэш AR-3, RS-5)."""
-    return customers.get_popular_products(_products_cached(), limit=8)
+    """Рекомендации «популярное» (RS-2/RS-5): движок recommendations.py —
+    веса заказ/лайк/просмотр + затухание по времени (RS-3/RS-4)."""
+    import recommendations
+    return recommendations.popular_products(_products_cached(), limit=8)
+
+
+def _session_id():
+    """Анонимный id сессии для событий и персональных рекомендаций."""
+    sid = session.get('sid')
+    if not sid:
+        sid = secrets.token_hex(8)
+        session['sid'] = sid
+    return sid
+
+
+def _rec_block_items(products):
+    """Адаптер для recommendations_block.html: [{product, orders, likes, score}]."""
+    from collections import Counter
+    from db import db
+    from models import Order
+    order_counts = Counter(str(o.product_id or '') for o in
+                           db.session.query(Order).all())
+    like_counts = customers.get_like_counts()
+    items = []
+    for p in products:
+        pid = str(p.get('nm_id') or p.get('id') or '')
+        like_key = int(pid) if pid.isdigit() else pid
+        items.append({
+            'product': p,
+            'orders': order_counts.get(pid, 0),
+            'likes': like_counts.get(like_key, 0),
+            'score': p.get('rec_score', 0),
+        })
+    return items
 
 
 def load_admin_credentials():
@@ -395,11 +427,22 @@ def make_context(content, page):
         'socials': content.get('socials', []),
         'wb_products': all_products,
         'wb_demo': wb_sync.load_json(wb_sync.PRODUCTS_FILE).get('demo', False),
-        'recommended_products': popular,
+        'recommended_products': _rec_block_items(popular),
         'seo_org': _seo_org(content, host_url),
         'seo_og_image': _absolute_url(site.get('logo'), host_url) or (host_url.rstrip('/') + '/static/noimage.png'),
         'seo_product': None,
     }
+    # Главная: персональные рекомендации по истории сессии/клиента (RS-2, 3.3).
+    # Аноним с пустой историей получит fallback на популярное (RS-5).
+    if page.get('slug') == 'index':
+        try:
+            import recommendations
+            personal = recommendations.personal_products(
+                all_products, customer_id=session.get('customer_id'),
+                session_id=_session_id())
+            ctx['personal_products'] = _rec_block_items(personal)
+        except Exception:
+            ctx['personal_products'] = []
     return ctx
 
 
@@ -1257,6 +1300,15 @@ def catalog_page():
     page = get_page_by_url(content, '/catalog/')
     if not page:
         return 'Страница не найдена', 404
+    # Событие «поисковый запрос» (RS-1)
+    q = (request.args.get('q') or '').strip()
+    if q:
+        try:
+            customers.add_event('search', query=q[:500],
+                                customer_id=session.get('customer_id'),
+                                session_id=_session_id())
+        except Exception:
+            pass
     ctx = make_context(content, page)
     ctx['catalog_view'] = _filtered_catalog(request.args)
     return render_template(page['template'], **ctx)
@@ -1353,6 +1405,15 @@ def _product_page(source, nm_id):
         return 'Товар не найден', 404
     content = load_content()
 
+    # Событие «просмотр карточки» (RS-1) — для рекомендаций.
+    try:
+        customers.add_event('view', product_id=product.get('nm_id'),
+                            product_name=product.get('name', ''),
+                            customer_id=session.get('customer_id'),
+                            session_id=_session_id())
+    except Exception:
+        pass
+
     # SEO title/description из шаблонов с переменными {name} {brand} {price}
     seo = content.get('site', {}).get('seo', {})
     values = {
@@ -1418,7 +1479,8 @@ def api_register():
     email = data.get('email', '').strip()
     if not name or not phone:
         return jsonify({'success': False, 'error': 'Имя и телефон обязательны'}), 400
-    customer = customers.add_customer(name, phone, email)
+    consent_pd = bool(data.get('consent_pd'))
+    customer = customers.add_customer(name, phone, email, consent_pd=consent_pd)
     return jsonify({'success': True, 'customer': customer})
 
 
@@ -1443,7 +1505,8 @@ def api_order():
         price = int(price)
     except (TypeError, ValueError):
         price = 0
-    order = customers.add_order(name, phone, email, product_id, product_name, price)
+    order = customers.add_order(name, phone, email, product_id, product_name, price,
+                                consent_pd=bool(data.get('consent_pd')))
     invalidate_site_cache()
     if request.form.get('redirect'):
         # Обычная (не AJAX) отправка формы из блока конструктора: вернуть на страницу
@@ -1464,9 +1527,42 @@ def api_like():
         product_id = 0
     if not product_id:
         return jsonify({'success': False, 'error': 'product_id обязателен'}), 400
-    customers.add_like(product_id, product_name)
+    customers.add_like(product_id, product_name,
+                       customer_id=session.get('customer_id'),
+                       session_id=_session_id())
     invalidate_site_cache()
     return jsonify({'success': True, 'likes': customers.get_like_counts().get(product_id, 0)})
+
+
+@app.route('/api/recommendations')
+def api_recommendations():
+    """Публичный API рекомендаций (RS-2): popular | personal | similar | also_bought."""
+    import recommendations
+    kind = request.args.get('kind', 'popular')
+    products = get_products()
+    limit = request.args.get('limit', type=int) or 8
+    limit = max(1, min(48, limit))
+    try:
+        if kind == 'personal':
+            items = recommendations.personal_products(
+                products, customer_id=session.get('customer_id'),
+                session_id=_session_id(), limit=limit)
+        elif kind in ('similar', 'also_bought'):
+            source = request.args.get('source', 'wb')
+            pid = request.args.get('product_id', type=int) or 0
+            product = next((p for p in products
+                            if p.get('source') == source
+                            and int(p.get('nm_id') or 0) == pid), None)
+            if not product:
+                return jsonify({'success': False, 'error': 'Товар не найден'}), 404
+            fn = (recommendations.similar_products if kind == 'similar'
+                  else recommendations.also_bought)
+            items = fn(products, product, limit=limit)
+        else:
+            items = recommendations.popular_products(products, limit=limit)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    return jsonify({'success': True, 'kind': kind, 'products': items})
 
 
 @app.route('/admin/api/customers')
@@ -1474,6 +1570,62 @@ def api_like():
 def admin_api_customers():
     """Return all customers for admin panel."""
     return jsonify({'success': True, 'customers': customers.get_customers()})
+
+
+@app.route('/admin/api/customers/export')
+@admin_required
+def admin_api_customers_export():
+    """Экспорт базы клиентов в CSV (CL-4)."""
+    import csv
+    import io
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=';')
+    writer.writerow(['id', 'name', 'phone', 'email', 'consent_pd',
+                     'orders_count', 'total_spent', 'last_activity_at', 'created_at'])
+    for c in customers.get_customers():
+        stats = customers.get_customer_stats(c['id'])
+        writer.writerow([
+            c['id'], c['name'], c['phone'], c['email'],
+            'да' if c.get('consent_pd') else '',
+            stats['orders_count'], stats['total_spent'],
+            c.get('last_activity_at', ''), c.get('created_at', ''),
+        ])
+    resp = app.response_class(
+        buf.getvalue().encode('utf-8-sig'),
+        mimetype='text/csv; charset=utf-8',
+    )
+    resp.headers['Content-Disposition'] = 'attachment; filename="customers.csv"'
+    _audit_log('customers.export', 'customers', '', {'count': len(customers.get_customers())})
+    return resp
+
+
+@app.route('/admin/api/customer/delete', methods=['POST'])
+@admin_required
+def admin_api_customer_delete():
+    """Удаление клиента по запросу (152-ФЗ, CL-6) — каскадно, с аудитом."""
+    data = request.get_json() or {}
+    customer_id = data.get('id')
+    if not customer_id:
+        return jsonify({'success': False, 'error': 'id обязателен'}), 400
+    ok = customers.delete_customer(int(customer_id))
+    if not ok:
+        return jsonify({'success': False, 'error': 'Клиент не найден'}), 404
+    _audit_log('customer.delete', 'customer', customer_id)
+    return jsonify({'success': True})
+
+
+@app.route('/admin/api/segments')
+@admin_required
+def admin_api_segments():
+    """Сегменты клиентов (CL-5), расчёт на лету.
+    Параметры: days (период, по умолчанию 30), min_orders (порог, по умолчанию 2)."""
+    days = request.args.get('days', type=int) or 30
+    min_orders = request.args.get('min_orders', type=int) or 2
+    days = max(1, min(3650, days))
+    min_orders = max(1, min(1000, min_orders))
+    segments = customers.compute_segments(get_products(), days=days, min_orders=min_orders)
+    return jsonify({'success': True, 'days': days, 'min_orders': min_orders,
+                    'segments': segments})
 
 
 @app.route('/admin/api/orders')

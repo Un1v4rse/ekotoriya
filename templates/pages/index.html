@@ -779,6 +779,16 @@
 </div> 					</div>
 		{% include 'wb_catalog_block.html' %}
 {% include 'recommendations_block.html' %}
+	{% if personal_products %}
+	<div class="wb-catalog-wrapper" style="padding: 2rem 0;">
+	    <div class="maxwidth-theme">
+	        <h2 class="wb-catalog-title" style="font-size: 1.6rem; margin-bottom: 0.5rem;">Вам может понравиться</h2>
+	        <p class="wb-demo-note" style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">Подборка по вашим просмотрам и лайкам.</p>
+	    </div>
+	    {% set recommended_products = personal_products %}
+	    {% include 'recommendations_block_inner.html' %}
+	</div>
+	{% endif %}
 <footer id="footer">
 				<!--'start_frame_cache_viewed-block'-->	<!--'end_frame_cache_viewed-block'-->                                                <div itemscope itemtype="http://schema.org/Organization">
 

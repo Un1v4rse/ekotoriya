@@ -17,10 +17,10 @@
 
 Все функции требуют активного Flask app-контекста (запросы — всегда есть).
 """
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from db import db
-from models import Customer, Event, Order
+from models import Customer, CustomerAuth, Event, Order, Recommendation
 
 
 def utcnow():
@@ -92,16 +92,19 @@ def get_customer_by_phone(phone):
 
 
 def add_order(name, phone, email, product_id, product_name, price, qty=1,
-              source='oneclick', status='new', customer_id=None):
+              source='oneclick', status='new', customer_id=None, consent_pd=False):
     """Новая заявка + гарантированное создание клиента (CL-1)."""
     if customer_id is None:
-        customer = add_customer(name, phone, email)
+        customer = add_customer(name, phone, email, consent_pd=consent_pd)
         customer_id = customer['id']
     else:
         existing = db.session.get(Customer, customer_id)
         if existing is None:
-            customer = add_customer(name, phone, email)
+            customer = add_customer(name, phone, email, consent_pd=consent_pd)
             customer_id = customer['id']
+        elif consent_pd and not existing.consent_pd:
+            existing.consent_pd = True
+            existing.consent_at = utcnow()
     order = Order(
         customer_id=customer_id,
         name=name or '',
@@ -250,3 +253,102 @@ def get_customer_stats(customer_id):
         'total_spent': total,
         'last_activity_at': customer.last_activity_at.isoformat() if customer and customer.last_activity_at else '',
     }
+
+
+def delete_customer(customer_id):
+    """Полное удаление клиента по запросу (152-ФЗ, CL-6): каскадно заявки,
+    события, сессии и рекомендации. Возвращает True, если клиент был найден."""
+    customer = db.session.get(Customer, int(customer_id))
+    if customer is None:
+        return False
+    cid = customer.id
+    db.session.query(Order).filter_by(customer_id=cid).delete()
+    db.session.query(Event).filter_by(customer_id=cid).delete()
+    db.session.query(CustomerAuth).filter_by(customer_id=cid).delete()
+    db.session.query(Recommendation).filter_by(customer_id=cid).delete()
+    db.session.delete(customer)
+    db.session.commit()
+    return True
+
+
+def _naive(dt):
+    """SQLite возвращает наивные datetime — приводим к наивному UTC для сравнений."""
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        return dt.replace(tzinfo=None)
+    return dt
+
+
+def _customers_by_ids(ids):
+    if not ids:
+        return []
+    rows = (db.session.query(Customer)
+            .filter(Customer.id.in_(list(ids)))
+            .order_by(Customer.id).all())
+    return [c.to_dict() for c in rows]
+
+
+def compute_segments(products, days=30, min_orders=2):
+    """Сегменты клиентов (CL-5). Правила:
+    - «покупал категорию X» — клиенты с заявками на товары категории X;
+    - «N заявок за период» — min_orders+ заявок за последние days дней;
+    - «не активен 30 дней» — нет заявок и событий за последние days дней.
+    Возвращает list of dict: key, title, count, customers (полные dict клиентов).
+    """
+    cat_by_pid = {}
+    for p in products or []:
+        pid = str(p.get('nm_id') or p.get('offer_id') or '')
+        cat = (p.get('category') or '').strip()
+        if pid and cat:
+            cat_by_pid[pid] = cat
+
+    now = _naive(datetime.now(timezone.utc))
+    window_start = now - timedelta(days=days)
+
+    orders = db.session.query(Order).all()
+    events = db.session.query(Event).all()
+
+    by_category = {}
+    counts_window = {}
+    active_ids = set()
+    for o in orders:
+        created = _naive(o.created_at)
+        if created and created >= window_start:
+            counts_window[o.customer_id] = counts_window.get(o.customer_id, 0) + 1
+            active_ids.add(o.customer_id)
+        cat = cat_by_pid.get(str(o.product_id))
+        if cat:
+            by_category.setdefault(cat, set()).add(o.customer_id)
+    for e in events:
+        created = _naive(e.created_at)
+        if created and created >= window_start:
+            active_ids.add(e.customer_id)
+
+    segments = []
+    for cat in sorted(by_category):
+        ids = by_category[cat]
+        segments.append({
+            'key': f'category:{cat}',
+            'title': f'Покупали категорию «{cat}»',
+            'count': len(ids),
+            'customers': _customers_by_ids(ids),
+        })
+
+    freq_ids = {cid for cid, n in counts_window.items() if n >= min_orders}
+    segments.append({
+        'key': f'orders>={min_orders}:{days}d',
+        'title': f'{min_orders}+ заявок за {days} дней',
+        'count': len(freq_ids),
+        'customers': _customers_by_ids(freq_ids),
+    })
+
+    all_ids = {row[0] for row in db.session.query(Customer.id).all()}
+    inactive_ids = all_ids - active_ids
+    segments.append({
+        'key': f'inactive:{days}d',
+        'title': f'Не активны {days} дней',
+        'count': len(inactive_ids),
+        'customers': _customers_by_ids(inactive_ids),
+    })
+    return segments
