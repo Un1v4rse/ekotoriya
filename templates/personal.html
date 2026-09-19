@@ -1,5 +1,6 @@
 {% extends 'lk_base.html' %}
 {% block title %}Личный кабинет — {{ site.name or 'Экотория' }}{% endblock %}
+{% block extra %}{{ blocks_html | safe }}{% endblock %}
 {% block content %}
 <h1>Личный кабинет</h1>
 

@@ -308,6 +308,7 @@
                 <div id="pages-list"></div>
                 <div style="margin-top:0.5rem;display:flex;gap:0.4rem;flex-wrap:wrap;">
                     <button type="button" class="secondary" onclick="showAddPage()" style="font-size:0.82rem;padding:0.35rem 0.6rem;">+ Новая страница</button>
+                    <button type="button" class="secondary" onclick="duplicateCurrentPage()" style="font-size:0.82rem;padding:0.35rem 0.6rem;" title="Создать копию выбранной страницы">⧉ Дублировать</button>
                     <button type="button" class="danger" onclick="deleteCurrentPage()" style="font-size:0.82rem;">Удалить</button>
                 </div>
                 <div id="add-page-form" style="display:none;margin-top:0.7rem;padding:0.7rem;border:1px solid var(--border);border-radius:8px;background:#f9f9f9;">
@@ -330,7 +331,7 @@
                 <button data-tab="dashboard" data-section="dashboard">📊 Дашборд</button>
                 <button data-tab="site" data-section="site">🏠 Настройки сайта</button>
                 <button data-tab="theme" data-section="theme">🎨 Дизайн: цвета и шрифты</button>
-                <button data-tab="menu" data-section="menu">☰ Меню сайта</button>
+                <button data-tab="menu" data-section="menu">☰ Меню сайта (шапка)</button>
                 <button data-tab="socials" data-section="socials">👍 Соцсети</button>
                 <button data-tab="wildberries" data-section="integrations">🛒 Интеграции (WB / Ozon)</button>
                 <button data-tab="customers" data-section="customers">👥 Клиенты и заявки</button>
@@ -435,25 +436,30 @@
                         <div class="field">
                             <label for="site-phone">Телефон</label>
                             <input type="tel" id="site-phone" data-path="site.phone">
+                            <div class="help">Показывается в шапке сайта (и в подвале).</div>
                         </div>
                     </div>
                     <div class="row">
                         <div class="field">
                             <label for="site-email">Email</label>
                             <input type="email" id="site-email" data-path="site.email">
+                            <div class="help">Показывается в подвале сайта.</div>
                         </div>
                         <div class="field">
                             <label for="site-address">Адрес</label>
                             <input type="text" id="site-address" data-path="site.address">
+                            <div class="help">Показывается в подвале сайта.</div>
                         </div>
                     </div>
                     <div class="field">
                         <label>Логотип</label>
                         <input type="file" id="logo-file" accept="image/*">
                         <button type="button" class="secondary" style="margin-top:0.4rem;" onclick="uploadLogo()">Загрузить логотип</button>
+                        <div class="help">Логотип показывается в шапке сайта.</div>
                         <div id="logo-upload-result" class="help"></div>
                         <div class="preview-img"><img id="logo-preview" src="" alt="logo"></div>
                     </div>
+                    <div class="help" style="margin-bottom:1rem;">Шапка сайта — это раздел «☰ Меню сайта» (меню, телефон, логотип). Подвал — email, адрес и раздел «Соцсети».</div>
                 </section>
 
                 <section id="tab-theme">
@@ -528,6 +534,20 @@
                             <select id="theme-heading-font" data-path="site.theme.heading_font_family"></select>
                         </div>
                     </div>
+                    <hr style="border:0;border-top:1px solid var(--border);margin:1.2rem 0;">
+                    <h3 style="margin:0 0 0.6rem;">Пресеты темы</h3>
+                    <div class="help" style="margin-bottom:0.6rem;">Сохраните текущие цвета и шрифты как пресет, чтобы быстро переключаться между оформлениями. Применённый пресет сразу становится темой сайта.</div>
+                    <div class="row" style="align-items:flex-end;">
+                        <div class="field" style="flex:1;min-width:180px;">
+                            <label for="theme-preset-select">Сохранённые пресеты</label>
+                            <select id="theme-preset-select"></select>
+                        </div>
+                        <button type="button" class="secondary" onclick="applyThemePreset()">Применить</button>
+                        <button type="button" class="secondary" onclick="deleteThemePreset()">Удалить пресет</button>
+                        <button type="button" class="secondary" onclick="saveThemePreset()">💾 Сохранить как пресет</button>
+                        <button type="button" class="secondary" onclick="resetTheme()">Сброс к стандартной теме</button>
+                    </div>
+                    <div id="theme-preset-msg" class="help" style="margin-top:0.5rem;"></div>
                 </section>
 
                 <section id="tab-menu">
@@ -961,6 +981,12 @@
                 mock: '<div class="gm-code">&lt;/&gt;</div>',
                 make: () => ({type: 'html', html: ''}),
             },
+            timer: {
+                icon: '⏳', label: 'Таймер акции',
+                desc: 'Обратный отсчёт до конца акции с кнопкой',
+                mock: '<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;"><div class="gm-bar" style="width:60%;height:8px;background:#9a8269;"></div><div class="gm-bar" style="width:80%;height:10px;background:#c00;"></div><div class="gm-btn" style="font-size:0.6rem;padding:2px 8px;">КНОПКА</div></div>',
+                make: () => ({type: 'timer', title: 'До конца акции', date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), button_text: 'Успеть купить', button_link: '/catalog/'}),
+            },
         };
 
         const FONTS = [
@@ -994,14 +1020,25 @@
             return iso ? new Date(iso).toLocaleString('ru-RU') : '';
         }
 
-        /* ================= Список страниц ================= */
+        /* ================= Список страниц (дерево по вложенности URL, CN-1) ================= */
+        const SYSTEM_PAGE_SLUGS = ['basket', 'personal', 'auth', '404'];
+
         function renderPagesList() {
             const container = $('pages-list');
             container.innerHTML = '';
-            data.pages.forEach((p, i) => {
+            // Порядок — по URL; индексы в data.pages сохраняем для выбора.
+            const order = data.pages.map((p, i) => i)
+                .sort((a, b) => String(data.pages[a].url).localeCompare(String(data.pages[b].url)));
+            order.forEach(i => {
+                const p = data.pages[i];
                 const btn = document.createElement('button');
                 btn.className = i === currentPageIndex ? 'active' : '';
-                btn.innerHTML = `<span>${escapeHtml(p.h1 || p.title)}</span><small>${p.url}</small>`;
+                // Отступ по глубине вложенности URL (корень — без отступа, максимум 3 уровня)
+                const depth = String(p.url || '/').split('/').filter(Boolean).length;
+                const indent = Math.min(Math.max(depth - 1, 0), 2);
+                const sysBadge = SYSTEM_PAGE_SLUGS.includes(p.slug)
+                    ? ' <small style="color:#999;">· системная</small>' : '';
+                btn.innerHTML = `<span style="display:block;padding-left:${indent * 14}px;">${indent ? '└ ' : ''}${escapeHtml(p.h1 || p.title)}${sysBadge}</span><small style="display:block;padding-left:${indent * 14}px;">${p.url}</small>`;
                 btn.addEventListener('click', () => selectPage(i));
                 const edit = document.createElement('span');
                 edit.textContent = '✎';
@@ -1712,6 +1749,112 @@
             setTimeout(() => { el.style.display = 'none'; }, 4000);
         }
 
+        /* ================= Пресеты темы (CN-3) ================= */
+        function themePresetMsg(text) { $('theme-preset-msg').textContent = text; }
+
+        async function loadThemePresets() {
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/theme-presets`);
+                const result = await resp.json();
+                const sel = $('theme-preset-select');
+                sel.innerHTML = '';
+                Object.keys(result.presets || {}).forEach(name => {
+                    const o = document.createElement('option');
+                    o.value = name;
+                    o.textContent = name;
+                    sel.appendChild(o);
+                });
+            } catch (e) { themePresetMsg('Ошибка загрузки пресетов: ' + e.message); }
+        }
+
+        function refreshThemeInputs() {
+            // После apply/reset подставить новую тему в поля вкладки (data.site.theme уже обновлён)
+            document.querySelectorAll('[data-path^="site.theme."]').forEach(el => {
+                const val = getDeep(data, el.dataset.path);
+                if (el.type === 'checkbox') el.checked = val === true || val === 'true';
+                else el.value = val || '';
+            });
+        }
+
+        async function saveThemePreset() {
+            const name = prompt('Имя пресета:', getDeep(data, 'site.theme.primary_color') ? 'Моя тема' : '');
+            if (!name || !name.trim()) return;
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/theme-presets`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({action: 'save', name: name.trim(), theme: getDeep(data, 'site.theme')})
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    await loadThemePresets();
+                    $('theme-preset-select').value = name.trim();
+                    themePresetMsg('Пресет «' + name.trim() + '» сохранён.');
+                } else {
+                    themePresetMsg('Ошибка: ' + (result.error || ''));
+                }
+            } catch (e) { themePresetMsg('Ошибка сети: ' + e.message); }
+        }
+
+        async function applyThemePreset() {
+            const name = $('theme-preset-select').value;
+            if (!name) { themePresetMsg('Сначала сохраните пресет.'); return; }
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/theme-presets`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({action: 'apply', name})
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    setDeep(data, 'site.theme', result.theme);
+                    refreshThemeInputs();
+                    themePresetMsg('Пресет «' + name + '» применён. Обновите сайт (F5), чтобы увидеть изменения.');
+                } else {
+                    themePresetMsg('Ошибка: ' + (result.error || ''));
+                }
+            } catch (e) { themePresetMsg('Ошибка сети: ' + e.message); }
+        }
+
+        async function deleteThemePreset() {
+            const name = $('theme-preset-select').value;
+            if (!name) return;
+            if (!confirm('Удалить пресет «' + name + '»?')) return;
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/theme-presets`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({action: 'delete', name})
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    await loadThemePresets();
+                    themePresetMsg('Пресет «' + name + '» удалён.');
+                } else {
+                    themePresetMsg('Ошибка: ' + (result.error || ''));
+                }
+            } catch (e) { themePresetMsg('Ошибка сети: ' + e.message); }
+        }
+
+        async function resetTheme() {
+            if (!confirm('Сбросить цвета и шрифты к стандартной теме?')) return;
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/theme-presets`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({action: 'reset'})
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    setDeep(data, 'site.theme', result.theme);
+                    refreshThemeInputs();
+                    themePresetMsg('Тема сброшена к стандартной. Обновите сайт (F5), чтобы увидеть изменения.');
+                } else {
+                    themePresetMsg('Ошибка: ' + (result.error || ''));
+                }
+            } catch (e) { themePresetMsg('Ошибка сети: ' + e.message); }
+        }
+
         /* ================= Страницы: создание/удаление ================= */
         function showAddPage() { $('add-page-form').style.display = 'block'; }
         function hideAddPage() { $('add-page-form').style.display = 'none'; }
@@ -1767,6 +1910,32 @@
                     renderPagesList();
                     selectPage(currentPageIndex);
                     showMsg('Страница удалена', true);
+                } else {
+                    showMsg('Ошибка: ' + (result.error || ''), false);
+                }
+            } catch (e) {
+                showMsg('Ошибка сети: ' + e.message, false);
+            }
+        }
+
+        async function duplicateCurrentPage() {
+            const page = currentPage();
+            if (!page) return;
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/duplicate-page`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({slug: page.slug})
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    const fresh = await fetch(`${location.origin}/admin/api/full-content`);
+                    const full = await fresh.json();
+                    data.pages = full.pages || data.pages;
+                    renderPagesList();
+                    const idx = data.pages.findIndex(p => p.slug === result.slug);
+                    if (idx >= 0) selectPage(idx);
+                    showMsg('Страница продублирована', true);
                 } else {
                     showMsg('Ошибка: ' + (result.error || ''), false);
                 }
@@ -2371,6 +2540,7 @@
             if (name === 'dashboard') loadDashboard();
             if (name === 'audit') loadAudit();
             if (name === 'users') loadAdminUsers();
+            if (name === 'theme') loadThemePresets();
         }
         document.querySelectorAll('nav button[data-tab]').forEach(btn => {
             btn.addEventListener('click', () => switchTab(btn.dataset.tab));
@@ -2384,6 +2554,7 @@
         selectPage(0);
         loadAllProducts();
         loadExportSettings('wb');
+        loadThemePresets();
         document.querySelectorAll('#int-subnav button[data-subtab]').forEach(btn => {
             btn.addEventListener('click', () => switchIntSubtab(btn.dataset.subtab));
         });

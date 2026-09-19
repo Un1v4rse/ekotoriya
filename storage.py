@@ -104,6 +104,14 @@ def save_content(data):
                     page.blocks = copy.deepcopy(pdata['blocks'])
                 if pdata.get('content_html') is not None:
                     page.content_html = pdata.get('content_html', '')
+                if pdata.get('updated_at'):
+                    # CN-5: явный updated_at (контроль версий страницы при page-save)
+                    try:
+                        from datetime import datetime
+                        dt = datetime.fromisoformat(str(pdata['updated_at']))
+                        page.updated_at = dt.replace(tzinfo=None) if dt.tzinfo else dt
+                    except ValueError:
+                        pass
 
             # Страницы, которых нет в новом наборе, — удалённые.
             for slug, page in existing.items():

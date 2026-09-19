@@ -49,6 +49,7 @@ class Page(db.Model):
             'template': self.template or '',
             'blocks': self.blocks if isinstance(self.blocks, list) else None,
             'content_html': self.content_html or '',
+            'updated_at': self.updated_at.isoformat() if self.updated_at else '',
         }
 
 

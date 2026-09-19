@@ -1,5 +1,6 @@
 {% extends 'lk_base.html' %}
 {% block title %}Вход и регистрация — {{ site.name or 'Экотория' }}{% endblock %}
+{% block extra %}{{ blocks_html | safe }}{% endblock %}
 {% block content %}
 <div style="max-width:520px;margin:0 auto;">
     <h1>Вход и регистрация</h1>

@@ -30,6 +30,17 @@ def esc(value):
     return html.escape(str(value or ''), quote=True)
 
 
+def _is_superadmin():
+    """True, если текущий запрос от суперадмина (для блока «HTML-код», CN-2)."""
+    try:
+        from flask import has_request_context, session
+        if not has_request_context():
+            return False
+        return session.get('admin_role') == 'superadmin'
+    except Exception:
+        return False
+
+
 def _youtube_id(url):
     """Извлечь id ролика YouTube из разных форматов ссылок."""
     if not url:
@@ -341,7 +352,34 @@ def render_block(block):
                 '</div></div></div>')
 
     if btype == 'html':
-        return block.get('html', '') or ''
+        # Блок «HTML-код» (CN-2): рендерится без эскейпинга ТОЛЬКО для
+        # суперадмина; остальным — комментарий-заглушка (сохранение таких
+        # блоков не-суперадмином отсекает ещё и сервер, app.py page-save).
+        if _is_superadmin():
+            return block.get('html', '') or ''
+        return '<!-- html block: restricted -->'
+
+    if btype == 'timer':
+        # Блок «Таймер акции» (CN-2): обратный отсчёт до даты окончания.
+        # Отсчёт работает на инлайн-JS-виджете TIMER_HYDRATOR (см. ниже).
+        title = (block.get('title') or '').strip()
+        date = (block.get('date') or '').strip()
+        try:
+            from datetime import datetime
+            deadline = datetime.fromisoformat(date)
+            valid = True
+        except (ValueError, TypeError):
+            valid = False
+        button_text = (block.get('button_text') or '').strip()
+        button_link = (block.get('button_link') or '').strip()
+        heading = f'<h2>{esc(title)}</h2>' if title else ''
+        btn_html = (f'<a class="cb-timer-btn" href="{esc(button_link or "#")}">{esc(button_text)}</a>'
+                    if button_text else '')
+        date_attr = esc(date) if valid else ''
+        return (f'<div class="cb cb-timer" data-cb-timer-date="{date_attr}"{_style_attr(block)}>'
+                f'<div class="maxwidth-theme">{heading}'
+                f'<div class="cb-timer-widget"><span class="cb-timer-countdown">…</span></div>'
+                f'{btn_html}</div></div>')
 
     if btype == 'section':
         # Секция перенесённого дизайна: готовый HTML целиком (миграция со
@@ -486,6 +524,34 @@ def render_block(block):
 
 # JS-гидратор для блоков «Товары»: подгружает карточки с публичных API
 # и инициализирует кнопки лайка/покупки через window.initWbActions.
+# JS-виджет блока «Таймер акции» (CN-2): обратный отсчёт «ДД чч мм сс»
+# до дедлайна; если дата прошла — «Акция завершена». Без внешних библиотек.
+TIMER_HYDRATOR = """<script>
+(function(){
+    function pad(n){return (n<10?'0':'')+n;}
+    function tick(el){
+        var raw = el.getAttribute('data-cb-timer-date') || '';
+        var target = null;
+        try { target = new Date(raw); } catch (e) {}
+        var out = el.querySelector('.cb-timer-countdown');
+        if (!out) return;
+        if (!target || isNaN(target.getTime())) { out.textContent = 'Укажите дату окончания акции'; return; }
+        var diff = target.getTime() - Date.now();
+        if (diff <= 0) { out.textContent = 'Акция завершена'; return; }
+        var s = Math.floor(diff / 1000);
+        var d = Math.floor(s / 86400); s -= d * 86400;
+        var h = Math.floor(s / 3600); s -= h * 3600;
+        var m = Math.floor(s / 60); s -= m * 60;
+        out.textContent = pad(d) + ' дн ' + pad(h) + ' ч ' + pad(m) + ' мин ' + pad(s) + ' сек';
+    }
+    document.querySelectorAll('.cb-timer[data-cb-timer-date]').forEach(function(el){
+        tick(el);
+        setInterval(function(){ tick(el); }, 1000);
+    });
+})();
+</script>"""
+
+
 PRODUCTS_HYDRATOR = """<script>
 (function(){
     function money(n){return (n||0).toLocaleString('ru-RU')+' ₽';}
@@ -561,6 +627,8 @@ def render_blocks(blocks):
     html_out = '\n'.join(p for p in parts if p)
     if any(isinstance(b, dict) and b.get('type') == 'products' for b in blocks):
         html_out += '\n' + PRODUCTS_HYDRATOR
+    if any(isinstance(b, dict) and b.get('type') == 'timer' for b in blocks):
+        html_out += '\n' + TIMER_HYDRATOR
     return html_out
 
 
@@ -582,4 +650,6 @@ def render_blocks_marked(blocks):
     out = '\n'.join(parts)
     if any(isinstance(b, dict) and b.get('type') == 'products' for b in blocks):
         out += '\n' + PRODUCTS_HYDRATOR
+    if any(isinstance(b, dict) and b.get('type') == 'timer' for b in blocks):
+        out += '\n' + TIMER_HYDRATOR
     return out

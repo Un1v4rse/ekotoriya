@@ -1,5 +1,6 @@
 {% extends 'lk_base.html' %}
 {% block title %}Корзина — {{ site.name or 'Экотория' }}{% endblock %}
+{% block extra %}{{ blocks_html | safe }}{% endblock %}
 {% block content %}
 <h1>Корзина</h1>
 

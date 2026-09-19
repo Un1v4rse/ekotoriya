@@ -288,6 +288,7 @@ ADMIN_PATH_SECTIONS = [
     ('/admin/api/upload', 'pages'),
     ('/admin/api/add-page', 'pages'),
     ('/admin/api/delete-page', 'pages'),
+    ('/admin/api/duplicate-page', 'pages'),
     ('/admin/api/render-blocks', 'pages'),
     ('/admin/api/rebuild', 'pages'),
     ('/admin/api/theme', 'theme'),
@@ -637,6 +638,56 @@ def _cart_items():
     return items, total
 
 
+# Системные страницы (CN-6): их контентные блоки живут в content['pages']
+# и редактируются тем же редактором «на странице», что и обычные страницы.
+SYSTEM_PAGE_SLUGS = {
+    'basket': '/basket/',
+    'personal': '/personal/',
+    'auth': '/auth/',
+    '404': '/404/',
+}
+
+
+def _system_page(slug):
+    """Найти системную страницу; при первом обращении — создать запись."""
+    content = load_content()
+    page = get_page_by_slug(content, slug)
+    if page:
+        return content, page
+    page = {
+        'slug': slug,
+        'url': SYSTEM_PAGE_SLUGS[slug],
+        'title': slug,
+        'h1': '',
+        'meta_description': '',
+        'template': '',
+        'blocks': [],
+    }
+    content['pages'].append(page)
+    save_content(content)
+    return content, page
+
+
+def _system_page_blocks_html(slug, marked=False):
+    """Отрендеренные блоки системной страницы (сверху её шаблона)."""
+    _content, page = _system_page(slug)
+    blocks = page.get('blocks')
+    if not isinstance(blocks, list):
+        blocks = []
+    if marked:
+        return blocks_module.render_blocks_marked(blocks)
+    return blocks_module.render_blocks(blocks)
+
+
+def _system_edit_mode(slug):
+    """Режим ?edit для системной страницы: только админ с разделом 'pages'."""
+    if 'edit' not in request.args:
+        return False
+    if not session.get('admin_user'):
+        return False
+    return _role_allows(_admin_role(), 'pages')
+
+
 @app.route('/basket/')
 def basket_page():
     """Корзина (LC-4): список товаров, количество, оформление заявкой без оплаты."""
@@ -648,9 +699,14 @@ def basket_page():
         row = db.session.get(Customer, cid)
         if row is not None:
             customer = row.to_dict()
-    return render_template('basket.html', site=content.get('site', {}),
+    edit_mode = _system_edit_mode('basket')
+    html = render_template('basket.html', site=content.get('site', {}),
                            menu=content.get('menu', []), items=items,
-                           total=total, customer=customer)
+                           total=total, customer=customer,
+                           blocks_html=_system_page_blocks_html('basket', marked=edit_mode))
+    if edit_mode:
+        html = _inject_editor(html, 'basket')
+    return Response(html)
 
 
 @app.route('/api/cart/add', methods=['POST'])
@@ -759,11 +815,16 @@ def personal_page():
             products, customer_id=customer['id'], limit=8)
     except Exception:
         personal = []
-    return render_template('personal.html', site=content.get('site', {}),
+    edit_mode = _system_edit_mode('personal')
+    html = render_template('personal.html', site=content.get('site', {}),
                            menu=content.get('menu', []), customer=customer,
                            orders=orders, likes=likes, stats=stats,
                            favorite_products=favorite_products,
-                           personal_products=_rec_block_items(personal))
+                           personal_products=_rec_block_items(personal),
+                           blocks_html=_system_page_blocks_html('personal', marked=edit_mode))
+    if edit_mode:
+        html = _inject_editor(html, 'personal')
+    return Response(html)
 
 
 @app.route('/api/client/profile', methods=['POST'])
@@ -784,8 +845,13 @@ def auth_page():
     if session.get('customer_id'):
         return redirect(url_for('personal_page'))
     content = load_content()
-    return render_template('auth.html', site=content.get('site', {}),
-                           menu=content.get('menu', []), error=None)
+    edit_mode = _system_edit_mode('auth')
+    html = render_template('auth.html', site=content.get('site', {}),
+                           menu=content.get('menu', []), error=None,
+                           blocks_html=_system_page_blocks_html('auth', marked=edit_mode))
+    if edit_mode:
+        html = _inject_editor(html, 'auth')
+    return Response(html)
 
 
 @app.route('/api/client/register', methods=['POST'])
@@ -836,6 +902,41 @@ def _css_size(value, default):
     """Безопасный CSS-размер: число + px/rem/em/%/vw/vh (без скобок и точек с запятой)."""
     value = str(value or '').strip()
     return value if re.fullmatch(r'\d+(\.\d+)?(px|rem|em|%|vw|vh)', value) else default
+
+
+# Ключи темы, валидируемые по типу (CN-3: пресеты принимаем только с валидными значениями).
+_THEME_COLOR_KEYS = ('primary_color', 'secondary_color', 'accent_color', 'text_color',
+                     'bg_color', 'card_bg', 'button_text_color', 'link_color')
+_THEME_SIZE_KEYS = ('font_size', 'border_radius', 'container_width')
+
+
+def _validated_theme(raw):
+    """Оставить только известные ключи темы с безопасными значениями.
+
+    Правила те же, что в /theme.css: цвета — HEX, размеры — число+единица,
+    шрифты — без скобок/точек с запятой. None, если не получилось собрать тему.
+    """
+    if not isinstance(raw, dict):
+        return None
+    theme = {}
+    for k in THEME_DEFAULTS:
+        if k not in raw:
+            continue
+        v = raw[k]
+        if k in _THEME_COLOR_KEYS:
+            theme[k] = _css_color(v, THEME_DEFAULTS[k])
+        elif k in _THEME_SIZE_KEYS:
+            theme[k] = _css_size(v, THEME_DEFAULTS[k])
+        elif k == 'version':
+            try:
+                theme[k] = int(v)
+            except (TypeError, ValueError):
+                pass
+        else:  # font_family, heading_font_family
+            v = str(v or '').strip()
+            if re.fullmatch(r'[^{}<>;]+', v):
+                theme[k] = v
+    return theme or None
 
 
 @app.route('/theme.css')
@@ -981,6 +1082,13 @@ span.cb-feature-icon { display: block; height: auto; width: 100%; }
 .cb-contact-row:last-child { border-bottom: 0; }
 .cb-contact-row > span:first-child { width: 130px; color: #888; flex-shrink: 0; }
 .cb-contact-row a { color: #b49d84; }
+/* Таймер акции (CN-2) */
+.cb-timer { padding: 2rem 0; text-align: center; }
+.cb-timer h2 { font-size: 1.6rem; margin-bottom: 1rem; }
+.cb-timer-widget { margin: 0.5rem 0 1.2rem; }
+.cb-timer-countdown { display: inline-block; font-size: 2rem; font-weight: 700; letter-spacing: 1px; color: #c00; font-variant-numeric: tabular-nums; }
+.cb-timer-btn { display: inline-block; background: #b49d84; color: #fff; padding: 0.7rem 1.8rem; border-radius: 6px; text-decoration: none; font-weight: 600; }
+.cb-timer-btn:hover { opacity: 0.9; }
 """
 
 
@@ -997,6 +1105,8 @@ def sitemap_xml():
     site_url = request.host_url.rstrip('/')
     xml = ['<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n']
     for page in content.get('pages', []):
+        if page.get('slug') in SYSTEM_PAGE_SLUGS:
+            continue   # системные страницы — свои роуты, в sitemap не нужны
         xml.append(f'<url><loc>{site_url}{page["url"]}</loc><priority>0.8</priority></url>\n')
     xml.append('</urlset>')
     return Response(''.join(xml), mimetype='application/xml')
@@ -1020,15 +1130,15 @@ def page_route(path):
         target = redirects.get('/' + path + '/') or redirects.get('/' + path)
         if target:
             return redirect(target, code=301)
-    # Try direct URL match first
+    # Try direct URL match first (системные страницы обслуживаются своими роутами)
     url = '/' + path + '/'
     page = get_page_by_url(content, url)
-    if page:
+    if page and page.get('slug') not in SYSTEM_PAGE_SLUGS:
         return render_template(page['template'], **make_context(content, page))
     # Try slug match (double underscores represent slashes)
     slug = path.replace('/', '__').replace('-', '_')
     page = get_page_by_slug(content, slug)
-    if page:
+    if page and page.get('slug') not in SYSTEM_PAGE_SLUGS:
         return render_template(page['template'], **make_context(content, page))
     # Fallback: if a parent path exists (e.g. product detail link under /catalog/namatrasniki/),
     # redirect to the nearest parent page to avoid 404s from original product cards.
@@ -1038,7 +1148,20 @@ def page_route(path):
         parent_page = get_page_by_url(content, parent_url)
         if parent_page:
             return redirect(parent_url, code=302)
-    return 'Страница не найдена', 404
+    return page_not_found(None), 404
+
+
+@app.errorhandler(404)
+def page_not_found(e):
+    """404 (CN-6): шаблон с редактируемыми блоками системной страницы '404'."""
+    content = load_content()
+    edit_mode = _system_edit_mode('404')
+    html = render_template('pages/404.html', site=content.get('site', {}),
+                           menu=content.get('menu', []),
+                           blocks_html=_system_page_blocks_html('404', marked=edit_mode))
+    if edit_mode:
+        html = _inject_editor(html, '404')
+    return html
 
 
 @app.route('/admin')
@@ -1077,6 +1200,20 @@ def admin_full_content():
     return jsonify(load_content())
 
 
+def _inject_editor(html, slug):
+    """Инжект CSS/JS редактора «на странице» в готовый HTML (CN-6 — общий для
+    /admin/page/<slug> и системных страниц ?edit)."""
+    editor_ver = int(os.path.getmtime(os.path.join(BASE_DIR, 'static', 'js', 'page-editor.js')))
+    inject = (
+        f'<link rel="stylesheet" href="/static/css/page-editor.css?v={editor_ver}">\n'
+        f'<script>window.CSRF_TOKEN = "{get_csrf_token()}";</script>\n'
+        f'<script src="/static/js/page-editor.js?v={editor_ver}" data-slug="{slug}" defer></script>\n'
+    )
+    if '</body>' in html:
+        return html.replace('</body>', inject + '</body>', 1)
+    return html + inject
+
+
 @app.route('/admin/page/<slug>')
 @admin_required
 def admin_edit_page(slug):
@@ -1095,17 +1232,64 @@ def admin_edit_page(slug):
     edit_page = dict(page)
     edit_page['content_html'] = blocks_module.render_blocks_marked(blocks)
     html = render_template(page['template'], **make_context(content, edit_page))
-    editor_ver = int(os.path.getmtime(os.path.join(BASE_DIR, 'static', 'js', 'page-editor.js')))
-    inject = (
-        f'<link rel="stylesheet" href="/static/css/page-editor.css?v={editor_ver}">\n'
-        f'<script>window.CSRF_TOKEN = "{get_csrf_token()}";</script>\n'
-        f'<script src="/static/js/page-editor.js?v={editor_ver}" data-slug="{slug}" defer></script>\n'
-    )
-    if '</body>' in html:
-        html = html.replace('</body>', inject + '</body>', 1)
-    else:
-        html += inject
-    return Response(html)
+    return Response(_inject_editor(html, slug))
+
+
+@app.route('/admin/api/theme-presets', methods=['GET', 'POST'])
+@admin_required
+def admin_theme_presets():
+    """Пресеты темы оформления (CN-3): список/сохранить/применить/удалить/сброс."""
+    if request.method == 'GET':
+        presets = load_content().get('site', {}).get('theme_presets') or {}
+        return jsonify({'success': True, 'presets': presets})
+
+    payload = request.get_json() or {}
+    action = payload.get('action', '').strip()
+    name = str(payload.get('name') or '').strip()[:80]
+    content = load_content()
+    site = content.setdefault('site', {})
+    presets = site.get('theme_presets')
+    if not isinstance(presets, dict):
+        presets = {}
+        site['theme_presets'] = presets
+
+    if action == 'save':
+        if not name:
+            return jsonify({'success': False, 'error': 'Укажите имя пресета'}), 400
+        theme = _validated_theme(payload.get('theme'))
+        if theme is None:
+            return jsonify({'success': False, 'error': 'Некорректная тема'}), 400
+        presets[name] = theme
+        save_content(content)
+        return jsonify({'success': True})
+
+    if action == 'delete':
+        if name not in presets:
+            return jsonify({'success': False, 'error': 'Пресет не найден'}), 404
+        del presets[name]
+        save_content(content)
+        return jsonify({'success': True})
+
+    if action == 'apply':
+        theme = _validated_theme(presets.get(name))
+        if theme is None:
+            return jsonify({'success': False, 'error': 'Пресет не найден'}), 404
+        # Инвалидируем кэш /theme.css у браузеров, как при обычном сохранении темы
+        theme['version'] = int((site.get('theme') or {}).get('version') or 1) + 1
+        site['theme'] = theme
+        save_content(content)
+        invalidate_site_cache()
+        return jsonify({'success': True, 'theme': theme})
+
+    if action == 'reset':
+        theme = dict(THEME_DEFAULTS)
+        theme['version'] = int((site.get('theme') or {}).get('version') or 1) + 1
+        site['theme'] = theme
+        save_content(content)
+        invalidate_site_cache()
+        return jsonify({'success': True, 'theme': theme})
+
+    return jsonify({'success': False, 'error': 'action must be save|apply|delete|reset'}), 400
 
 
 @app.route('/admin/api/page-blocks')
@@ -1125,7 +1309,36 @@ def admin_page_blocks():
         'page': {k: page.get(k, '') for k in ('slug', 'url', 'title', 'h1', 'meta_description')},
         'blocks': blocks,
         'legacy': any(isinstance(b, dict) and b.get('legacy') for b in blocks),
+        'updated_at': page.get('updated_at', ''),
     })
+
+
+@app.route('/admin/api/page-draft', methods=['GET', 'POST'])
+@admin_required
+def admin_page_draft():
+    """Черновики страниц (CN-5/CN-7): {slug: {blocks, saved_at}} в site_settings.
+
+    POST {slug, blocks} — сохранить черновик; GET ?slug= — получить черновик.
+    """
+    if request.method == 'GET':
+        slug = request.args.get('slug', '').strip()
+        drafts = storage.get_setting('page_drafts') or {}
+        draft = (drafts or {}).get(slug)
+        if not isinstance(draft, dict):
+            return jsonify({'success': False, 'error': 'Черновик не найден'}), 404
+        return jsonify({'success': True, 'draft': draft})
+    payload = request.get_json() or {}
+    slug = payload.get('slug', '').strip()
+    blocks = payload.get('blocks')
+    if not slug or not isinstance(blocks, list):
+        return jsonify({'success': False, 'error': 'slug и blocks обязательны'}), 400
+    drafts = storage.get_setting('page_drafts') or {}
+    if not isinstance(drafts, dict):
+        drafts = {}
+    drafts[slug] = {'blocks': blocks,
+                    'saved_at': datetime.now(timezone.utc).isoformat(timespec='seconds')}
+    storage.set_setting('page_drafts', drafts)
+    return jsonify({'success': True, 'saved_at': drafts[slug]['saved_at']})
 
 
 @app.route('/admin/api/preview-marked', methods=['POST'])
@@ -1140,25 +1353,43 @@ def admin_preview_marked():
 @app.route('/admin/api/page-save', methods=['POST'])
 @admin_required
 def admin_page_save():
-    """Сохранить одну страницу (мета + блоки) из редактора на странице."""
+    """Сохранить одну страницу (мета + блоки) из редактора на странице.
+
+    CN-5 (конфликт админов): если передан expected_updated_at и он не совпадает
+    с текущим updated_at страницы — отказ 409, чтобы второй админ не затирал
+    изменения первого. Повторный save без expected_updated_at перезаписывает.
+    CN-2: блоки «HTML-код» сохраняет только суперадмин.
+    """
     payload = request.get_json() or {}
     slug = payload.get('slug', '').strip()
     content = load_content()
     page = get_page_by_slug(content, slug)
     if not page:
         return jsonify({'success': False, 'error': 'Страница не найдена'}), 404
+    expected = payload.get('expected_updated_at')
+    current_updated = page.get('updated_at', '')
+    if expected and current_updated and expected != current_updated:
+        return jsonify({'success': False,
+                        'error': 'Страница изменена другим админом',
+                        'updated_at': current_updated}), 409
     blocks = payload.get('blocks')
     if not isinstance(blocks, list):
         return jsonify({'success': False, 'error': 'blocks обязателен'}), 400
+    blocks = [b for b in blocks if isinstance(b, dict)]
+    if _admin_role() != 'superadmin':
+        blocks = [b for b in blocks if b.get('type') != 'html']
     meta = payload.get('page') or {}
     for k in ('title', 'h1', 'meta_description'):
         if k in meta:
             page[k] = meta[k]
     page['blocks'] = blocks
     page['content_html'] = blocks_module.render_blocks(blocks)
+    page['updated_at'] = datetime.now(timezone.utc).isoformat(timespec='seconds')
     save_content(content)
     invalidate_site_cache()
-    return jsonify({'success': True})
+    # Вернуть значение из хранилища: формат после сохранения — канонический
+    saved = get_page_by_slug(load_content(), slug) or page
+    return jsonify({'success': True, 'updated_at': saved.get('updated_at', '')})
 
 
 @app.route('/admin/api/preview', methods=['POST'])
@@ -1308,6 +1539,39 @@ def admin_delete_page():
     except Exception as e:
         return jsonify({'success': True, 'warning': str(e)})
     return jsonify({'success': True})
+
+
+@app.route('/admin/api/duplicate-page', methods=['POST'])
+@admin_required
+def admin_duplicate_page():
+    """Дублирование страницы (CN-1): копия с slug `<slug>-copy`, `-copy2`…."""
+    payload = request.get_json() or {}
+    slug = payload.get('slug', '').strip()
+    if not slug:
+        return jsonify({'success': False, 'error': 'slug обязателен'}), 400
+    content = load_content()
+    page = next((p for p in content['pages'] if p['slug'] == slug), None)
+    if not page:
+        return jsonify({'success': False, 'error': 'Страница не найдена'}), 404
+    new_slug = slug + '-copy'
+    n = 2
+    existing = {p['slug'] for p in content['pages']}
+    while new_slug in existing:
+        new_slug = f'{slug}-copy{n}'
+        n += 1
+    copy = dict(page)
+    copy['slug'] = new_slug
+    copy['url'] = f'/{new_slug}/'
+    copy['title'] = (page.get('title') or slug) + ' (копия)'
+    copy['h1'] = (page.get('h1') or page.get('title') or slug) + ' (копия)'
+    copy['updated_at'] = datetime.now(timezone.utc).isoformat(timespec='seconds')
+    if isinstance(copy.get('blocks'), list):
+        copy['blocks'] = [dict(b) for b in copy['blocks'] if isinstance(b, dict)]
+        copy['content_html'] = blocks_module.render_blocks(copy['blocks'])
+    content['pages'].append(copy)
+    save_content(content)
+    invalidate_site_cache()
+    return jsonify({'success': True, 'slug': new_slug})
 
 
 @app.route('/admin/api/rebuild', methods=['POST'])

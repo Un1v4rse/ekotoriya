@@ -1,0 +1,9 @@
+{% extends 'lk_base.html' %}
+{% block title %}Страница не найдена — {{ site.name or 'Экотория' }}{% endblock %}
+{% block extra %}{{ blocks_html | safe }}{% endblock %}
+{% block content %}
+<h1>Страница не найдена</h1>
+<div class="lk-card">
+    <p style="margin:0;">К сожалению, такой страницы нет. Вернитесь на <a href="/">главную</a> или в <a href="/catalog/">каталог</a>.</p>
+</div>
+{% endblock %}

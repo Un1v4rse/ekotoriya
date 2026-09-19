@@ -115,6 +115,11 @@
             mock: '<div style="width:100%;height:100%;background:#f4f4f8;border-radius:6px;display:flex;flex-direction:column;justify-content:center;gap:5px;padding:10px;"><div class="gm-bar" style="width:50%;height:7px;background:#9a8269;"></div><div class="gm-bar" style="width:80%;height:5px;"></div><div class="gm-bar" style="width:70%;height:5px;"></div><div class="gm-bar" style="width:60%;height:5px;"></div></div>',
             make: () => ({type: 'contacts', title: 'Свяжитесь с нами', phone: '8 800 201-08-24', email: 'info@ekotoriya.ru', address: '', worktime: 'Пн–Пт, 9:00–18:00'}),
         },
+        timer: {
+            icon: '⏳', label: 'Таймер акции', desc: 'Обратный отсчёт до конца акции с кнопкой',
+            mock: '<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;"><div class="gm-bar" style="width:60%;height:8px;background:#9a8269;"></div><div class="gm-bar" style="width:80%;height:10px;background:#c00;"></div><div class="gm-btn" style="font-size:0.6rem;padding:2px 8px;">КНОПКА</div></div>',
+            make: () => ({type: 'timer', title: 'До конца акции', date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), button_text: 'Успеть купить', button_link: '/catalog/'}),
+        },
     };
 
     let blocks = [];
@@ -126,15 +131,26 @@
     let dirty = false;
     let contentEl = null;
     let refreshTimer = null;
+    let serverUpdatedAt = '';    // updated_at страницы на сервере (защита от конфликтов, CN-5)
+    const openedAt = Date.now(); // момент открытия редактора (восстановление черновика)
+
+    /* История изменений структуры (undo/redo, CN-5): снимки blocks, лимит 50 */
+    const HISTORY_LIMIT = 50;
+    let history = [];
+    let historyIdx = -1;
+    let historyTimer = null;
 
     /* ---------------- UI-элементы ---------------- */
     const topbar = el('div', '', {id: 'pe-topbar'});
     topbar.innerHTML =
         '<span class="pe-title">🛠 Редактирование страницы</span>' +
         '<span class="pe-status" id="pe-status"></span>' +
+        '<span class="pe-draft-badge" id="pe-draft-badge" style="display:none;"></span>' +
+        '<button type="button" id="pe-btn-undo" title="Отменить (Ctrl+Z)">↶</button>' +
+        '<button type="button" id="pe-btn-redo" title="Повторить (Ctrl+Shift+Z)">↷</button>' +
         '<button type="button" id="pe-btn-structure">☰ Структура</button>' +
         '<button type="button" id="pe-btn-props">⚙ Параметры страницы</button>' +
-        '<button type="button" class="pe-save" id="pe-btn-save">💾 Сохранить</button>' +
+        '<button type="button" class="pe-save" id="pe-btn-save" title="Опубликовать страницу (сделать изменения видимыми посетителям)">💾 Опубликовать</button>' +
         '<button type="button" class="pe-exit" id="pe-btn-exit">✖ Выйти</button>';
 
     const highlight = el('div', 'pe-highlight');
@@ -197,6 +213,8 @@
         document.body.append(topbar, highlight, dropLine, addBtn, addBtnBridge, badgesLayer, structure, drawer, pageProps, galleryOverlay);
         $('pe-btn-save').addEventListener('click', save);
         $('pe-btn-exit').addEventListener('click', exitEditor);
+        $('pe-btn-undo').addEventListener('click', undo);
+        $('pe-btn-redo').addEventListener('click', redo);
         $('pe-btn-props').addEventListener('click', () => pageProps.classList.toggle('open'));
         $('pe-btn-structure').addEventListener('click', () => structure.classList.toggle('open'));
         $('pe-structure-close').addEventListener('click', () => structure.classList.remove('open'));
@@ -205,15 +223,40 @@
         addBtn.addEventListener('click', () => openGallery(insertIndexAfter(addBtn.dataset.target)));
         galleryOverlay.querySelector('.pe-gallery-close').addEventListener('click', closeGallery);
         galleryOverlay.addEventListener('click', e => { if (e.target === galleryOverlay) closeGallery(); });
-        document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeGallery(); closeDrawer(); pageProps.classList.remove('open'); structure.classList.remove('open'); } });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') { closeGallery(); closeDrawer(); pageProps.classList.remove('open'); structure.classList.remove('open'); }
+            // Undo/redo (CN-5): Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y; в полях ввода не перехватываем
+            const typing = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable);
+            if ((e.ctrlKey || e.metaKey) && !typing) {
+                if (e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+                else if ((e.key.toLowerCase() === 'z' && e.shiftKey) || e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
+            }
+        });
 
         fetch(`${location.origin}/admin/api/page-blocks?slug=${encodeURIComponent(SLUG)}`)
             .then(r => r.json())
             .then(d => {
-                if (!d.success) { status('Ошибка: ' + (d.error || '')); return; }
+                if (!d.success) throw new Error(d.error || 'ошибка загрузки блоков');
                 blocks = d.blocks;
                 pageMeta = d.page;
                 hasLegacy = d.legacy;
+                serverUpdatedAt = d.updated_at || '';
+                history = [JSON.stringify(blocks)];
+                historyIdx = 0;
+                return fetchDraft();   // предложить восстановить свежий серверный черновик (CN-5)
+            })
+            .then(draft => {
+                if (draft && draft.blocks && Array.isArray(draft.blocks) && draft.blocks.length) {
+                    const savedAt = Date.parse(draft.saved_at || '');
+                    // Черновик свежее, чем открытие страницы минус минута — предлагаем восстановить
+                    if (!isNaN(savedAt) && savedAt > openedAt - 60000) {
+                        if (confirm('Найден несохранённый черновик этой страницы (сохранён ' +
+                                new Date(savedAt).toLocaleString('ru-RU') + '). Восстановить черновик?')) {
+                            blocks = draft.blocks;
+                            markDirty();
+                        }
+                    }
+                }
                 document.querySelector('#pe-topbar .pe-title').textContent = '🛠 Редактирование: ' + (pageMeta.h1 || pageMeta.title || pageMeta.url);
                 $('pe-pp-title').value = pageMeta.title || '';
                 $('pe-pp-h1').value = pageMeta.h1 || '';
@@ -223,6 +266,7 @@
                 $('pe-pp-desc').addEventListener('input', e => { pageMeta.meta_description = e.target.value; markDirty(); });
                 buildMap();
                 bindPageEvents();
+                startDraftAutosave();
                 status(hasLegacy ? 'Страница с перенесённым дизайном: редактируйте блоки вокруг него' : 'Готово к редактированию');
             })
             .catch(e => status('Ошибка загрузки: ' + e.message));
@@ -236,7 +280,80 @@
         return e;
     }
     function status(text) { const s = $('pe-status'); if (s) s.textContent = text; }
-    function markDirty() { dirty = true; status('есть несохранённые изменения'); }
+    function markDirty() {
+        dirty = true;
+        status('есть несохранённые изменения');
+        scheduleDraftSave();   // автосохранение черновика (CN-5)
+    }
+
+    /* ---------------- История изменений: undo/redo (CN-5) ---------------- */
+    function recordHistory() {
+        // Вызывать ПОСЛЕ изменения blocks: сохраняем новое состояние
+        clearTimeout(historyTimer);
+        history = history.slice(0, historyIdx + 1);
+        history.push(JSON.stringify(blocks));
+        if (history.length > HISTORY_LIMIT) history.shift();
+        historyIdx = history.length - 1;
+    }
+    function recordHistoryDebounced() {
+        // Для частых изменений настроек блока — дебаунс 500 мс
+        clearTimeout(historyTimer);
+        historyTimer = setTimeout(recordHistory, 500);
+    }
+    function restoreHistory() {
+        blocks = JSON.parse(history[historyIdx]);
+        selectedIdx = -1;
+        closeDrawer();
+        markDirty();
+        if (hasLegacy) { location.reload(); return; }   // перенесённый дизайн корректно рендерится только целиком
+        refreshPage();
+    }
+    function undo() {
+        if (historyIdx <= 0) { status('отменить нечего'); return; }
+        historyIdx--;
+        restoreHistory();
+    }
+    function redo() {
+        if (historyIdx >= history.length - 1) { status('повторить нечего'); return; }
+        historyIdx++;
+        restoreHistory();
+    }
+
+    /* ---------------- Автосохранение черновика (CN-5/CN-7) ---------------- */
+    let draftTimer = null;
+    function scheduleDraftSave() {
+        clearTimeout(draftTimer);
+        draftTimer = setTimeout(saveDraft, 5000);   // дебаунс 5 с после изменений
+    }
+    async function fetchDraft() {
+        try {
+            const resp = await fetch(`${location.origin}/admin/api/page-draft?slug=${encodeURIComponent(SLUG)}`);
+            if (!resp.ok) return null;
+            const result = await resp.json();
+            return result.success ? result.draft : null;
+        } catch (e) { return null; }
+    }
+    async function saveDraft() {
+        if (!dirty || textEdit.active) return;
+        try {
+            const resp = await fetch(`${location.origin}/admin/api/page-draft`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                body: JSON.stringify({slug: SLUG, blocks}),
+            });
+            const result = await resp.json();
+            if (result.success) {
+                const badge = $('pe-draft-badge');
+                if (badge) {
+                    badge.style.display = 'inline';
+                    badge.textContent = 'Черновик сохранён ' + new Date().toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
+                }
+            }
+        } catch (e) { /* сеть недоступна — молча пропускаем */ }
+    }
+    function startDraftAutosave() {
+        setInterval(saveDraft, 30000);   // и раз в 30 секунд
+    }
 
     /* ---------------- Карта блоков на странице ---------------- */
     function buildMap() {
@@ -636,6 +753,7 @@
                 b.html = textEdit.targets.map(t => t.innerHTML).join('');
             }
             markDirty();
+            recordHistory();
             scheduleRefresh();
         }
         if (textEdit.doneBar) textEdit.doneBar.remove();
@@ -668,6 +786,7 @@
     /* ---------------- Обновление страницы после изменений ---------------- */
     function afterStructuralChange(selectIdx) {
         markDirty();
+        recordHistory();           // undo/redo (CN-5)
         closeDrawer();
         toolbar.innerHTML = '';      // убрать «устаревшие» кнопки со старыми индексами
         toolbar.style.display = 'none';
@@ -874,7 +993,7 @@
     }
 
     function renderBlockSettings(block, idx, container) {
-        const set = (k, v) => { block[k] = v; markDirty(); scheduleRefresh(); };
+        const set = (k, v) => { block[k] = v; markDirty(); recordHistoryDebounced(); scheduleRefresh(); };
         const type = block.legacy ? 'html' : (block.type || 'text');
 
         if (type === 'heading') {
@@ -1073,23 +1192,43 @@
             container.appendChild(field('Адрес', textInput(block.address, v => set('address', v))));
             container.appendChild(field('Режим работы', textInput(block.worktime, v => set('worktime', v), 'Пн–Пт, 9:00–18:00')));
             styleFields(container, block, set);
+        } else if (type === 'timer') {
+            container.appendChild(field('Заголовок', textInput(block.title, v => set('title', v), 'До конца акции')));
+            container.appendChild(field('Дата окончания акции', textInput(block.date, v => set('date', v), '2026-12-31')));
+            container.appendChild(field('Текст на кнопке', textInput(block.button_text, v => set('button_text', v), 'Успеть купить')));
+            container.appendChild(field('Ссылка кнопки', textInput(block.button_link, v => set('button_link', v), '/catalog/')));
+            container.appendChild(helpEl('Формат даты: ГГГГ-ММ-ДД. Когда дата наступит, посетители увидят «Акция завершена».'));
+            styleFields(container, block, set);
         }
     }
 
     /* ---------------- Сохранение и выход ---------------- */
-    async function save() {
+    async function save(force) {
         if (textEdit.active) finishTextEdit(true);
         status('Сохранение…');
         try {
+            const body = {slug: SLUG, page: pageMeta, blocks};
+            // CN-5: защита от конфликта двух админов — сохраняем только если страница
+            // не менялась с момента загрузки редактора (force — повторная попытка после 409)
+            if (serverUpdatedAt && !force) body.expected_updated_at = serverUpdatedAt;
             const resp = await fetch(`${location.origin}/admin/api/page-save`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
-                body: JSON.stringify({slug: SLUG, page: pageMeta, blocks}),
+                body: JSON.stringify(body),
             });
+            if (resp.status === 409) {
+                // Страницу сохранил другой админ: перезаписываем только по подтверждению
+                if (confirm('Страница была изменена другим администратором. Перезаписать его изменения вашей версией?')) {
+                    return save(true);
+                }
+                status('Сохранение отменено — страница изменена другим админом');
+                return;
+            }
             const result = await resp.json();
             if (result.success) {
                 dirty = false;
-                status('Сохранено ✓');
+                serverUpdatedAt = result.updated_at || serverUpdatedAt;
+                status('Опубликовано ✓');
                 setTimeout(() => location.reload(), 400);
             } else {
                 status('Ошибка: ' + (result.error || ''));
