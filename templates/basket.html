@@ -1,0 +1,85 @@
+{% extends 'lk_base.html' %}
+{% block title %}Корзина — {{ site.name or 'Экотория' }}{% endblock %}
+{% block content %}
+<h1>Корзина</h1>
+
+{% if items %}
+<div class="lk-card">
+    <table class="lk-table">
+        <thead>
+            <tr><th>Товар</th><th>Цена</th><th>Количество</th><th>Сумма</th><th></th></tr>
+        </thead>
+        <tbody>
+            {% for it in items %}
+            <tr>
+                <td>
+                    <a href="/catalog/{{ it.product.get('source', 'wb') }}/{{ it.product.get('nm_id') or it.product.get('id') }}/" style="color:inherit;text-decoration:none;">
+                        {{ it.product.get('name', 'Товар') }}
+                    </a>
+                </td>
+                <td>{{ it.price }} ₽</td>
+                <td>
+                    <input type="number" min="0" value="{{ it.qty }}" style="width:70px;margin:0;"
+                           onchange="updateQty('{{ it.key }}', this.value)">
+                </td>
+                <td><strong>{{ it.price * it.qty }} ₽</strong></td>
+                <td><button class="lk-btn secondary" style="padding:0.3rem 0.7rem;" onclick="updateQty('{{ it.key }}', 0)">✕</button></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p style="text-align:right;font-size:1.15rem;margin:1rem 0 0;">Итого: <strong>{{ total }} ₽</strong></p>
+</div>
+
+<div class="lk-card" id="checkout-card">
+    <h2>Оформление заявки</h2>
+    <p class="lk-muted">Оплата при подтверждении заказа менеджером. Заявка попадёт в базу заявок админки.</p>
+    <div class="lk-msg" id="checkout-msg"></div>
+    <form id="checkout-form">
+        <label class="lk-label" for="co-name">Имя</label>
+        <input type="text" id="co-name" name="name" value="{{ customer.name if customer else '' }}" placeholder="Ваше имя" required>
+        <label class="lk-label" for="co-phone">Телефон</label>
+        <input type="tel" id="co-phone" name="phone" value="{{ customer.phone if customer else '' }}" placeholder="+7 900 123-45-67" required>
+        <label class="lk-label" for="co-email">Email (необязательно)</label>
+        <input type="email" id="co-email" name="email" value="{{ customer.email if customer else '' }}" placeholder="you@example.com">
+        <label class="lk-check">
+            <input type="checkbox" name="consent_pd" value="1" required>
+            <span>Соглашаюсь с обработкой персональных данных</span>
+        </label>
+        <button class="lk-btn" type="submit">Оформить заявку</button>
+    </form>
+</div>
+{% else %}
+<div class="lk-card">
+    <p>Корзина пуста. Перейдите в <a href="/catalog/" style="color:var(--theme-link, #9a8269);">каталог</a>, чтобы добавить товары.</p>
+</div>
+{% endif %}
+
+<script>
+function showMsg(id, text, ok) {
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.className = 'lk-msg ' + (ok ? 'ok' : 'err');
+}
+async function updateQty(key, qty) {
+    await fetch('/api/cart/update', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({key, qty: parseInt(qty, 10) || 0})});
+    location.reload();
+}
+document.getElementById('checkout-form')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const body = Object.fromEntries(new FormData(this).entries());
+    try {
+        const resp = await fetch('/api/cart/checkout', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+        const data = await resp.json();
+        if (data.success) {
+            showMsg('checkout-msg', 'Заявка оформлена! Мы свяжемся с вами для подтверждения.', true);
+            setTimeout(() => location.href = '/personal/orders/', 1200);
+        } else {
+            showMsg('checkout-msg', data.error || 'Ошибка', false);
+        }
+    } catch (err) {
+        showMsg('checkout-msg', 'Ошибка сети: ' + err.message, false);
+    }
+});
+</script>
+{% endblock %}

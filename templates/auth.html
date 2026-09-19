@@ -1,0 +1,67 @@
+{% extends 'lk_base.html' %}
+{% block title %}Вход и регистрация — {{ site.name or 'Экотория' }}{% endblock %}
+{% block content %}
+<div style="max-width:520px;margin:0 auto;">
+    <h1>Вход и регистрация</h1>
+
+    <div class="lk-card" id="login-card">
+        <h2>Вход</h2>
+        <div class="lk-msg" id="login-msg"></div>
+        <form id="login-form">
+            <label class="lk-label" for="login-phone">Телефон</label>
+            <input type="tel" id="login-phone" name="phone" placeholder="+7 900 123-45-67" required autocomplete="tel">
+            <label class="lk-label" for="login-password">Пароль</label>
+            <input type="password" id="login-password" name="password" placeholder="Пароль" required autocomplete="current-password">
+            <label class="lk-check"><input type="checkbox" name="remember" value="1"> Запомнить меня</label>
+            <button class="lk-btn" type="submit">Войти</button>
+        </form>
+    </div>
+
+    <div class="lk-card" id="register-card">
+        <h2>Регистрация</h2>
+        <p class="lk-muted">Телефон и пароль. Без SMS-подтверждения.</p>
+        <div class="lk-msg" id="register-msg"></div>
+        <form id="register-form">
+            <label class="lk-label" for="reg-name">Имя</label>
+            <input type="text" id="reg-name" name="name" placeholder="Ваше имя">
+            <label class="lk-label" for="reg-phone">Телефон</label>
+            <input type="tel" id="reg-phone" name="phone" placeholder="+7 900 123-45-67" required autocomplete="tel">
+            <label class="lk-label" for="reg-email">Email (необязательно)</label>
+            <input type="email" id="reg-email" name="email" placeholder="you@example.com" autocomplete="email">
+            <label class="lk-label" for="reg-password">Пароль (не короче 6 символов)</label>
+            <input type="password" id="reg-password" name="password" placeholder="Придумайте пароль" required minlength="6" autocomplete="new-password">
+            <label class="lk-check"><input type="checkbox" name="remember" value="1"> Запомнить меня</label>
+            <button class="lk-btn" type="submit">Зарегистрироваться</button>
+        </form>
+    </div>
+</div>
+<script>
+function showMsg(id, text, ok) {
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.className = 'lk-msg ' + (ok ? 'ok' : 'err');
+}
+async function submitForm(formId, msgId, url) {
+    const form = document.getElementById(formId);
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const fd = new FormData(this);
+        const body = Object.fromEntries(fd.entries());
+        try {
+            const resp = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+            const data = await resp.json();
+            if (data.success) {
+                showMsg(msgId, 'Готово! Переходим в личный кабинет…', true);
+                setTimeout(() => location.href = '/personal/', 400);
+            } else {
+                showMsg(msgId, data.error || 'Ошибка', false);
+            }
+        } catch (err) {
+            showMsg(msgId, 'Ошибка сети: ' + err.message, false);
+        }
+    });
+}
+submitForm('login-form', 'login-msg', '/api/client/login');
+submitForm('register-form', 'register-msg', '/api/client/register');
+</script>
+{% endblock %}

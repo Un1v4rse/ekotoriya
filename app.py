@@ -21,6 +21,7 @@ import secrets
 import shutil
 import threading
 import time
+from datetime import datetime, timezone
 from functools import wraps
 from pathlib import Path
 
@@ -36,6 +37,8 @@ import wb_sync
 import blocks as blocks_module
 import storage
 import db as db_module
+from db import db
+from models import Customer, Order
 from werkzeug.security import check_password_hash, generate_password_hash
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -214,7 +217,107 @@ def add_cache_headers(response):
 
 
 def check_auth(username, password):
+    """Проверка учётных данных админа (AD-2): сначала таблица admin_users,
+    фолбэк — ADMIN_CREDENTIALS (главный суперадмин из файла)."""
+    user = _find_admin_user(username)
+    if user is not None:
+        return check_password_hash(user['password_hash'], password)
     return username == ADMIN_CREDENTIALS.get('user') and check_password_hash(ADMIN_CREDENTIALS['hash'], password)
+
+
+def _find_admin_user(username):
+    """AdminUser по логину + ленивый перенос ADMIN_CREDENTIALS в таблицу (AD-2)."""
+    from models import AdminUser
+    try:
+        row = db.session.query(AdminUser).filter_by(username=username).first()
+        if row is None and username == ADMIN_CREDENTIALS.get('user'):
+            # Первый запуск: заводим главного админа как суперадмина
+            row = AdminUser(
+                username=username,
+                password_hash=ADMIN_CREDENTIALS['hash'],
+                role='superadmin',
+                must_change_password=bool(ADMIN_CREDENTIALS.get('must_change_password')),
+            )
+            db.session.add(row)
+            db.session.commit()
+        if row is None:
+            return None
+        return {'username': row.username, 'role': row.role or 'superadmin',
+                'password_hash': row.password_hash,
+                'must_change_password': bool(row.must_change_password)}
+    except Exception:
+        db.session.rollback()
+        return None
+
+
+def _admin_role():
+    """Роль текущего админа из сессии (AD-2)."""
+    role = session.get('admin_role')
+    if role:
+        return role
+    user = session.get('admin_user')
+    if not user:
+        return None
+    found = _find_admin_user(user)
+    return found['role'] if found else None
+
+
+# AD-2: каким ролям какие разделы доступны.
+# superadmin — всё; content — контент сайта; orders — заявки/клиенты/товары.
+ROLE_SECTIONS = {
+    'superadmin': {'pages', 'theme', 'menu', 'socials', 'seo', 'site', 'integrations',
+                   'customers', 'backup', 'dashboard', 'audit', 'users'},
+    'content': {'pages', 'theme', 'menu', 'socials', 'seo', 'site', 'backup'},
+    'orders': {'dashboard', 'customers', 'integrations', 'backup'},
+}
+
+# Префикс пути → раздел (проверяется в порядке следования).
+ADMIN_PATH_SECTIONS = [
+    ('/admin/api/admin-user', 'users'),
+    ('/admin/api/dashboard', 'dashboard'),
+    ('/admin/api/audit', 'audit'),
+    ('/admin/api/backup', 'backup'),
+    ('/admin/api/restore', 'backup'),
+    ('/admin/api/customer', 'customers'),
+    ('/admin/api/customers', 'customers'),
+    ('/admin/api/segments', 'customers'),
+    ('/admin/api/orders', 'customers'),
+    ('/admin/api/order-status', 'customers'),
+    ('/admin/page/', 'pages'),
+    ('/admin/api/page', 'pages'),
+    ('/admin/api/upload', 'pages'),
+    ('/admin/api/add-page', 'pages'),
+    ('/admin/api/delete-page', 'pages'),
+    ('/admin/api/render-blocks', 'pages'),
+    ('/admin/api/rebuild', 'pages'),
+    ('/admin/api/theme', 'theme'),
+    ('/admin/api/seo', 'seo'),
+    ('/admin/api/wb-products', 'integrations'),
+    ('/admin/api/product-discount', 'integrations'),
+    ('/admin/api/discount', 'integrations'),
+    ('/admin/api/export-settings', 'integrations'),
+    ('/admin/api/wb-sync', 'integrations'),
+    ('/admin/api/ozon', 'integrations'),
+    ('/admin/api/wb-token', 'integrations'),
+    ('/admin/api/wb-autosync', 'integrations'),
+    ('/admin/api/save', 'site'),
+    ('/admin/api/full-content', 'backup'),
+    ('/admin/api/recent-uploads', 'pages'),
+    ('/admin/', 'dashboard'),
+]
+
+
+def _section_for_path(path):
+    for prefix, section in ADMIN_PATH_SECTIONS:
+        if path.startswith(prefix):
+            return section
+    return None
+
+
+def _role_allows(role, section):
+    if not section:
+        return True
+    return section in ROLE_SECTIONS.get(role or '', set())
 
 
 def get_csrf_token():
@@ -254,6 +357,12 @@ def admin_required(f):
             if request.path.startswith('/admin/api/'):
                 return jsonify({'success': False, 'error': 'Требуется авторизация'}), 401
             return redirect(url_for('admin_login', next=request.path))
+        # AD-2: роль должна иметь доступ к разделу этого пути
+        section = _section_for_path(request.path)
+        if not _role_allows(_admin_role(), section):
+            if request.path.startswith('/admin/api/'):
+                return jsonify({'success': False, 'error': 'Недостаточно прав для этого раздела'}), 403
+            return 'Недостаточно прав для этого раздела', 403
         # Пароль не сменён после первого входа — никуда, кроме формы смены, нельзя
         if (ADMIN_CREDENTIALS.get('must_change_password')
                 and request.path not in ('/admin/change-password', '/admin/logout')):
@@ -274,6 +383,8 @@ def admin_login():
         if check_auth(username, password):
             session['admin_user'] = username
             session.pop('csrf_token', None)  # новый токен для новой сессии
+            found = _find_admin_user(username)
+            session['admin_role'] = found['role'] if found else 'superadmin'
             if ADMIN_CREDENTIALS.get('must_change_password'):
                 return redirect(url_for('admin_change_password'))
             return redirect(request.args.get('next') or url_for('admin'))
@@ -432,6 +543,14 @@ def make_context(content, page):
         'seo_og_image': _absolute_url(site.get('logo'), host_url) or (host_url.rstrip('/') + '/static/noimage.png'),
         'seo_product': None,
     }
+    # Текущий клиент (LC-2): шаблоны показывают «ЛК/Выйти» вместо «Войти».
+    cid = session.get('customer_id')
+    if cid:
+        row = db.session.get(Customer, cid)
+        if row is not None:
+            ctx['current_customer'] = row.to_dict()
+        else:
+            session.pop('customer_id', None)
     # Главная: персональные рекомендации по истории сессии/клиента (RS-2, 3.3).
     # Аноним с пустой историей получит fallback на популярное (RS-5).
     if page.get('slug') == 'index':
@@ -500,18 +619,211 @@ def favicon():
     return send_from_directory(BASE_DIR / 'static', 'favicon.ico')
 
 
+def _cart_items():
+    """Корзина из сессии: [{key, product, qty, price}] (LC-4)."""
+    cart = session.get('cart') or {}
+    products = get_products()
+    by_key = {f"{p.get('source', 'wb')}:{p.get('nm_id') or p.get('id')}": p
+              for p in products}
+    items, total = [], 0
+    for key, qty in cart.items():
+        p = by_key.get(key)
+        if p is None:
+            continue
+        qty = max(1, int(qty or 1))
+        price = int(p.get('final_price') or p.get('price') or 0)
+        items.append({'key': key, 'product': p, 'qty': qty, 'price': price})
+        total += price * qty
+    return items, total
+
+
 @app.route('/basket/')
-def basket_stub():
-    """Basket placeholder — real checkout is handled by one-click orders."""
-    return render_template_string('<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Корзина</title><link rel="stylesheet" href="/theme.css"></head><body style="padding:2rem;font-family:sans-serif;"><h1>Корзина</h1><p>Оформление заказа происходит через кнопку «Купить в 1 клик» на карточке товара или по телефону {{ site.phone }}.</p><p><a href="/">Вернуться на главную</a></p></body></html>', site=load_content().get('site', {}))
+def basket_page():
+    """Корзина (LC-4): список товаров, количество, оформление заявкой без оплаты."""
+    content = load_content()
+    items, total = _cart_items()
+    customer = None
+    cid = session.get('customer_id')
+    if cid:
+        row = db.session.get(Customer, cid)
+        if row is not None:
+            customer = row.to_dict()
+    return render_template('basket.html', site=content.get('site', {}),
+                           menu=content.get('menu', []), items=items,
+                           total=total, customer=customer)
+
+
+@app.route('/api/cart/add', methods=['POST'])
+def api_cart_add():
+    """Добавить товар в корзину (LC-4)."""
+    data = request.get_json() or request.form.to_dict() or {}
+    source = data.get('source') or 'wb'
+    pid = str(data.get('product_id') or data.get('nm_id') or '').strip()
+    if not pid:
+        return jsonify({'success': False, 'error': 'product_id обязателен'}), 400
+    try:
+        qty = max(1, int(data.get('qty') or 1))
+    except (TypeError, ValueError):
+        qty = 1
+    key = f'{source}:{pid}'
+    cart = session.get('cart') or {}
+    cart[key] = int(cart.get(key, 0)) + qty
+    session['cart'] = cart
+    session.modified = True
+    return jsonify({'success': True, 'cart': cart, 'count': sum(cart.values())})
+
+
+@app.route('/api/cart/update', methods=['POST'])
+def api_cart_update():
+    """Изменить количество / удалить позицию (qty=0 — удалить)."""
+    data = request.get_json() or {}
+    key = str(data.get('key') or '').strip()
+    cart = session.get('cart') or {}
+    if key not in cart:
+        return jsonify({'success': False, 'error': 'Позиция не найдена'}), 404
+    try:
+        qty = int(data.get('qty') or 0)
+    except (TypeError, ValueError):
+        qty = 0
+    if qty <= 0:
+        cart.pop(key, None)
+    else:
+        cart[key] = qty
+    session['cart'] = cart
+    session.modified = True
+    return jsonify({'success': True, 'cart': cart, 'count': sum(cart.values())})
+
+
+@app.route('/api/cart/checkout', methods=['POST'])
+def api_cart_checkout():
+    """Оформление корзины заявкой без оплаты (LC-4).
+
+    Каждая позиция → заявка source='basket' в базе админки. При совпадении
+    телефона с аккаунтом заявки привязываются к нему (LC-5).
+    """
+    data = request.get_json() or request.form.to_dict() or {}
+    name = data.get('name', '').strip()
+    phone = data.get('phone', '').strip()
+    email = data.get('email', '').strip()
+    if not name or not phone:
+        return jsonify({'success': False, 'error': 'Имя и телефон обязательны'}), 400
+    items, _total = _cart_items()
+    if not items:
+        return jsonify({'success': False, 'error': 'Корзина пуста'}), 400
+    orders = []
+    for it in items:
+        p = it['product']
+        order = customers.add_order(
+            name, phone, email, p.get('nm_id') or p.get('id'), p.get('name', ''),
+            it['price'], qty=it['qty'], source='basket',
+            consent_pd=bool(data.get('consent_pd')))
+        orders.append(order)
+    session['cart'] = {}
+    session.modified = True
+    invalidate_site_cache()
+    return jsonify({'success': True, 'orders': orders})
+
+
+def _client_required(f):
+    """Только для залогиненного клиента (LC-2): иначе 401 (API) / редирейт на /auth/."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('customer_id'):
+            if request.path.startswith('/api/'):
+                return jsonify({'success': False, 'error': 'Требуется вход'}), 401
+            return redirect(url_for('auth_page', next=request.path))
+        return f(*args, **kwargs)
+    return decorated
 
 
 @app.route('/personal/')
 @app.route('/personal/favorite/')
 @app.route('/personal/orders/')
-def personal_stub():
-    """Personal account placeholder."""
-    return render_template_string('<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Личный кабинет</title><link rel="stylesheet" href="/theme.css"></head><body style="padding:2rem;font-family:sans-serif;"><h1>Личный кабинет</h1><p>Личный кабинет в разработке. Для проверки заказов свяжитесь с нами по телефону {{ site.phone }}.</p><p><a href="/">Вернуться на главную</a></p></body></html>', site=load_content().get('site', {}))
+@_client_required
+def personal_page():
+    """Личный кабинет (LC-3): контакты, заявки со статусами, избранное,
+    персональные рекомендации. Маршруты favorite/orders — для старых ссылок."""
+    content = load_content()
+    customer = db.session.get(Customer, session['customer_id']).to_dict()
+    orders = customers.get_customer_orders(customer['id'])
+    likes = customers.get_customer_likes(customer['id'])
+    stats = customers.get_customer_stats(customer['id'])
+    # Избранное с полными карточками товаров
+    products = get_products()
+    liked_ids = {str(l['product_id']) for l in likes}
+    favorite_products = [p for p in products
+                         if str(p.get('nm_id') or p.get('id')) in liked_ids]
+    try:
+        import recommendations
+        personal = recommendations.personal_products(
+            products, customer_id=customer['id'], limit=8)
+    except Exception:
+        personal = []
+    return render_template('personal.html', site=content.get('site', {}),
+                           menu=content.get('menu', []), customer=customer,
+                           orders=orders, likes=likes, stats=stats,
+                           favorite_products=favorite_products,
+                           personal_products=_rec_block_items(personal))
+
+
+@app.route('/api/client/profile', methods=['POST'])
+@_client_required
+def api_client_profile():
+    """Обновление контактов клиента из ЛК (LC-3)."""
+    data = request.get_json() or {}
+    updated = customers.update_customer_profile(
+        session['customer_id'], name=data.get('name'), email=data.get('email'))
+    if not updated:
+        return jsonify({'success': False, 'error': 'Клиент не найден'}), 404
+    return jsonify({'success': True, 'customer': updated})
+
+
+@app.route('/auth/')
+def auth_page():
+    """Страница входа/регистрации клиента (LC-1)."""
+    if session.get('customer_id'):
+        return redirect(url_for('personal_page'))
+    content = load_content()
+    return render_template('auth.html', site=content.get('site', {}),
+                           menu=content.get('menu', []), error=None)
+
+
+@app.route('/api/client/register', methods=['POST'])
+def api_client_register():
+    """Регистрация клиента: телефон + пароль (LC-1)."""
+    data = request.get_json() or request.form.to_dict() or {}
+    customer, error = customers.register_client(
+        phone=data.get('phone', '').strip(),
+        password=data.get('password', ''),
+        name=data.get('name', '').strip(),
+        email=data.get('email', '').strip())
+    if error:
+        return jsonify({'success': False, 'error': error}), 400
+    if data.get('remember'):
+        session.permanent = True
+    session['customer_id'] = customer['id']
+    return jsonify({'success': True, 'customer': customer})
+
+
+@app.route('/api/client/login', methods=['POST'])
+def api_client_login():
+    """Вход клиента по телефону+паролю (LC-1, LC-2)."""
+    data = request.get_json() or request.form.to_dict() or {}
+    customer = customers.login_client(data.get('phone', '').strip(),
+                                      data.get('password', ''))
+    if not customer:
+        return jsonify({'success': False, 'error': 'Неверный телефон или пароль'}), 401
+    if data.get('remember'):
+        session.permanent = True
+    session['customer_id'] = customer['id']
+    return jsonify({'success': True, 'customer': customer})
+
+
+@app.route('/api/client/logout', methods=['POST'])
+def api_client_logout():
+    """Выход клиента (LC-2)."""
+    session.pop('customer_id', None)
+    return jsonify({'success': True})
 
 
 def _css_color(value, default):
@@ -742,7 +1054,8 @@ def admin():
         sp = dict(p)
         sp['content_html'] = ''
         slim['pages'].append(sp)
-    return render_template('admin.html', content=slim, csrf_token=get_csrf_token())
+    return render_template('admin.html', content=slim, csrf_token=get_csrf_token(),
+                           admin_role=_admin_role() or 'superadmin')
 
 
 @app.route('/admin/api/page-html')
@@ -1570,6 +1883,172 @@ def api_recommendations():
 def admin_api_customers():
     """Return all customers for admin panel."""
     return jsonify({'success': True, 'customers': customers.get_customers()})
+
+
+@app.route('/admin/api/dashboard')
+@admin_required
+def admin_api_dashboard():
+    """Дашборд (AD-3): заявки, новые клиенты, ошибки синка, популярные товары."""
+    from models import SyncLog
+    now = datetime.now(timezone.utc)
+    orders_all = db.session.query(Order).all()
+    orders_new = [o for o in orders_all if o.status == 'new']
+    customers_all = db.session.query(Customer).all()
+    new_customers = [c for c in customers_all
+                     if c.created_at and (now - _aware(c.created_at)).days <= 7]
+    sync_errors = [e.to_dict() for e in
+                   db.session.query(SyncLog).filter_by(status='error')
+                   .order_by(SyncLog.id.desc()).limit(10).all()]
+    popular = customers.get_popular_products(get_products(), limit=5)
+    return jsonify({
+        'success': True,
+        'orders_total': len(orders_all),
+        'orders_new': len(orders_new),
+        'orders_today': len([o for o in orders_all
+                             if o.created_at and (now - _aware(o.created_at)).days < 1]),
+        'customers_total': len(customers_all),
+        'customers_new_7d': len(new_customers),
+        'sync_errors': sync_errors,
+        'popular_products': [{'nm_id': p['product'].get('nm_id') or p['product'].get('id'),
+                              'name': p['product'].get('name'),
+                              'orders': p.get('orders', 0), 'likes': p.get('likes', 0),
+                              'score': p.get('score', 0)} for p in popular],
+    })
+
+
+@app.route('/admin/api/audit')
+@admin_required
+def admin_api_audit():
+    """Аудит-лог действий админов (AD-4)."""
+    from models import AuditLog
+    limit = request.args.get('limit', type=int) or 200
+    limit = max(1, min(1000, limit))
+    rows = (db.session.query(AuditLog)
+            .order_by(AuditLog.id.desc()).limit(limit).all())
+    return jsonify({'success': True, 'entries': [r.to_dict() for r in rows]})
+
+
+@app.route('/admin/api/admin-users', methods=['GET', 'POST'])
+@admin_required
+def admin_api_admin_users():
+    """Список админов / создание нового (только суперадмин, AD-2)."""
+    from models import AdminUser
+    if _admin_role() != 'superadmin':
+        return jsonify({'success': False, 'error': 'Только суперадмин'}), 403
+    if request.method == 'GET':
+        rows = db.session.query(AdminUser).order_by(AdminUser.id).all()
+        return jsonify({'success': True, 'users': [{
+            'id': r.id, 'username': r.username, 'role': r.role or 'superadmin',
+            'created_at': r.created_at.isoformat() if r.created_at else '',
+        } for r in rows]})
+    data = request.get_json() or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    role = data.get('role', '').strip()
+    if not username or not password or role not in ('superadmin', 'content', 'orders'):
+        return jsonify({'success': False, 'error': 'Нужны username, password и роль (superadmin|content|orders)'}), 400
+    if db.session.query(AdminUser).filter_by(username=username).first():
+        return jsonify({'success': False, 'error': 'Такой логин уже есть'}), 400
+    db.session.add(AdminUser(username=username,
+                             password_hash=generate_password_hash(password), role=role,
+                             must_change_password=True))
+    db.session.commit()
+    _audit_log('admin_user.create', 'admin_user', username, {'role': role})
+    return jsonify({'success': True})
+
+
+@app.route('/admin/api/admin-user/delete', methods=['POST'])
+@admin_required
+def admin_api_admin_user_delete():
+    """Удаление админа (суперадмин; себя удалить нельзя, AD-2)."""
+    from models import AdminUser
+    if _admin_role() != 'superadmin':
+        return jsonify({'success': False, 'error': 'Только суперадмин'}), 403
+    data = request.get_json() or {}
+    username = data.get('username', '').strip()
+    if not username or username == session.get('admin_user'):
+        return jsonify({'success': False, 'error': 'Нельзя удалить себя'}), 400
+    row = db.session.query(AdminUser).filter_by(username=username).first()
+    if row is None:
+        return jsonify({'success': False, 'error': 'Пользователь не найден'}), 404
+    db.session.delete(row)
+    db.session.commit()
+    _audit_log('admin_user.delete', 'admin_user', username)
+    return jsonify({'success': True})
+
+
+def _aware(dt):
+    """Наивный datetime (SQLite) → aware UTC для арифметики."""
+    if dt is None:
+        return datetime.now(timezone.utc)
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _sqlite_db_path():
+    """Путь к файлу SQLite БД из DATABASE_URL (None если не sqlite)."""
+    uri = app.config.get('SQLALCHEMY_DATABASE_URI') or os.environ.get('DATABASE_URL', '')
+    if uri.startswith('sqlite:///'):
+        return Path(uri[len('sqlite:///'):])
+    return None
+
+
+@app.route('/admin/api/backup/full')
+@admin_required
+def admin_api_backup_full():
+    """Полный бэкап (AD-5): zip с файлом БД и полным контентом. Суперадмин."""
+    if _admin_role() != 'superadmin':
+        return jsonify({'success': False, 'error': 'Только суперадмин'}), 403
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        db_file = _sqlite_db_path()
+        if db_file and db_file.exists():
+            zf.write(db_file, 'ekotoriya.db')
+        content = load_content()
+        zf.writestr('content.json', json.dumps(content, ensure_ascii=False, indent=2))
+    _audit_log('backup.create', 'backup', '', {})
+    return Response(buf.getvalue(), mimetype='application/zip', headers={
+        'Content-Disposition': 'attachment; filename="ekotoriya-backup.zip"'})
+
+
+@app.route('/admin/api/restore', methods=['POST'])
+@admin_required
+def admin_api_restore():
+    """Восстановление из бэкапа (AD-5): zip с content.json и/или ekotoriya.db."""
+    if _admin_role() != 'superadmin':
+        return jsonify({'success': False, 'error': 'Только суперадмин'}), 403
+    import zipfile
+    upload = request.files.get('file')
+    if not upload or not upload.filename.endswith('.zip'):
+        return jsonify({'success': False, 'error': 'Нужен .zip файл бэкапа'}), 400
+    try:
+        zf = zipfile.ZipFile(upload.stream)
+        names = set(zf.namelist())
+        restored = []
+        if 'content.json' in names:
+            content = json.loads(zf.read('content.json').decode('utf-8'))
+            save_content(content)
+            restored.append('content.json')
+        if 'ekotoriya.db' in names:
+            db_file = _sqlite_db_path()
+            if db_file is None:
+                return jsonify({'success': False, 'error': 'Восстановление БД доступно только для SQLite'}), 400
+            backup_current = db_file.with_suffix('.db.before-restore')
+            if db_file.exists():
+                shutil.copy2(db_file, backup_current)
+            db_file.write_bytes(zf.read('ekotoriya.db'))
+            db.engine.dispose()  # переподключение к новому файлу БД
+            restored.append('ekotoriya.db')
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Ошибка восстановления: {e}'}), 400
+    if not restored:
+        return jsonify({'success': False, 'error': 'В архиве нет content.json или ekotoriya.db'}), 400
+    invalidate_site_cache()
+    _audit_log('backup.restore', 'backup', '', {'restored': restored})
+    return jsonify({'success': True, 'restored': restored})
 
 
 @app.route('/admin/api/customers/export')

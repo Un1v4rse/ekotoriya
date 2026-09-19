@@ -49,6 +49,24 @@
                 }
             });
         });
+        container.querySelectorAll('.wb-cart-btn').forEach(btn => {
+            if (btn.dataset.wbBound) return;
+            btn.dataset.wbBound = '1';
+            btn.addEventListener('click', async function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                    const resp = await fetch('/api/cart/add', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({product_id: this.dataset.id, source: this.dataset.source || 'wb'})});
+                    const data = await resp.json();
+                    if (data.success) {
+                        this.textContent = '✓ В корзине (' + data.count + ')';
+                        setTimeout(() => { location.href = '/basket/'; }, 500);
+                    }
+                } catch (err) {
+                    console.error('cart error', err);
+                }
+            });
+        });
         container.querySelectorAll('.wb-like-btn').forEach(btn => {
             if (btn.dataset.wbBound) return;
             btn.dataset.wbBound = '1';

@@ -286,7 +286,14 @@
 </head>
 <body>
     <header>
-        <h1>🛠 Управление сайтом «Экотория»</h1>
+        <h1>🛠 Управление сайтом «Экотория»
+            <small style="font-size:0.6em;font-weight:400;color:#999;">
+                {% if admin_role == 'superadmin' %}суперадмин
+                {% elif admin_role == 'content' %}контент-менеджер
+                {% elif admin_role == 'orders' %}менеджер заявок
+                {% else %}{{ admin_role }}{% endif %}
+            </small>
+        </h1>
         <div>
             <a href="/" target="_blank">Открыть сайт ↗</a>
             <a href="/admin/change-password">🔑 Сменить пароль</a>
@@ -320,16 +327,59 @@
                     <div id="add-page-result" class="help" style="margin-top:0.4rem;"></div>
                 </div>
                 <hr style="border:0;border-top:1px solid var(--border);margin:0.9rem 0;">
-                <button data-tab="site">🏠 Настройки сайта</button>
-                <button data-tab="theme">🎨 Дизайн: цвета и шрифты</button>
-                <button data-tab="menu">☰ Меню сайта</button>
-                <button data-tab="socials">👍 Соцсети</button>
-                <button data-tab="wildberries">🛒 Интеграции (WB / Ozon)</button>
-                <button data-tab="customers">👥 Клиенты и заявки</button>
-                <button data-tab="seo">📈 Продвижение (SEO)</button>
-                <button data-tab="backup">💾 Резервная копия</button>
+                <button data-tab="dashboard" data-section="dashboard">📊 Дашборд</button>
+                <button data-tab="site" data-section="site">🏠 Настройки сайта</button>
+                <button data-tab="theme" data-section="theme">🎨 Дизайн: цвета и шрифты</button>
+                <button data-tab="menu" data-section="menu">☰ Меню сайта</button>
+                <button data-tab="socials" data-section="socials">👍 Соцсети</button>
+                <button data-tab="wildberries" data-section="integrations">🛒 Интеграции (WB / Ozon)</button>
+                <button data-tab="customers" data-section="customers">👥 Клиенты и заявки</button>
+                <button data-tab="seo" data-section="seo">📈 Продвижение (SEO)</button>
+                <button data-tab="backup" data-section="backup">💾 Резервная копия</button>
+                {% if admin_role == 'superadmin' %}
+                <button data-tab="users" data-section="users">🛡 Пользователи</button>
+                <button data-tab="audit" data-section="audit">📋 Аудит-лог</button>
+                {% endif %}
             </nav>
             <main>
+                <section id="tab-dashboard">
+                    <h2>Дашборд</h2>
+                    <div id="dashboard-body"><p class="help">Загрузка…</p></div>
+                </section>
+
+                <section id="tab-users">
+                    <h2>Пользователи админки</h2>
+                    <div class="field">
+                        <button type="button" class="secondary" onclick="loadAdminUsers()">🔄 Обновить список</button>
+                    </div>
+                    <h3>Новый пользователь</h3>
+                    <div class="row">
+                        <div class="field"><label>Логин</label><input type="text" id="au-username" placeholder="manager"></div>
+                        <div class="field"><label>Пароль</label><input type="password" id="au-password" placeholder="минимум 6 символов"></div>
+                        <div class="field">
+                            <label>Роль</label>
+                            <select id="au-role">
+                                <option value="content">Контент-менеджер (страницы, дизайн, SEO)</option>
+                                <option value="orders">Менеджер заявок (дашборд, клиенты, заявки)</option>
+                                <option value="superadmin">Суперадмин (полный доступ)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <button type="button" class="primary" onclick="createAdminUser()">➕ Создать</button>
+                        <div class="help">При первом входе пользователь должен сменить пароль.</div>
+                    </div>
+                    <div id="admin-users-list" class="table-wrap"></div>
+                </section>
+
+                <section id="tab-audit">
+                    <h2>Аудит-лог действий админов</h2>
+                    <div class="field">
+                        <button type="button" class="secondary" onclick="loadAudit()">🔄 Обновить</button>
+                    </div>
+                    <div id="audit-list" class="table-wrap"></div>
+                </section>
+
                 <section id="tab-page" class="active">
                     <div class="page-head">
                         <div>
@@ -775,6 +825,18 @@
 
                 <section id="tab-backup">
                     <h2>Резервная копия</h2>
+                    {% if admin_role == 'superadmin' %}
+                    <div class="field">
+                        <a class="btn secondary" href="/admin/api/backup/full" download style="display:inline-block;text-decoration:none;">⬇ Полный бэкап (БД + контент, ZIP)</a>
+                        <div class="help">Архив содержит файл базы данных и весь контент сайта.</div>
+                    </div>
+                    <div class="field">
+                        <label for="restore-file">Восстановление из бэкапа (ZIP)</label>
+                        <input type="file" id="restore-file" accept=".zip">
+                        <button type="button" class="secondary" onclick="restoreBackup()">♻ Восстановить</button>
+                        <div class="help" id="restore-result">Внимание: текущие данные будут заменены данными из архива.</div>
+                    </div>
+                    {% endif %}
                     <div class="field">
                         <button type="button" class="secondary" onclick="downloadBackup()">⬇ Скачать резервную копию сайта (JSON)</button>
                         <div class="help">Сохраните файл — в нём весь контент, настройки, меню и страницы.</div>
@@ -2152,14 +2214,166 @@
             } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
         }
 
+        /* ================= Дашборд (AD-3) ================= */
+        async function loadDashboard() {
+            const box = $('dashboard-body');
+            box.innerHTML = '<p class="help">Загрузка…</p>';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/dashboard`);
+                const d = await resp.json();
+                if (!d.success) { box.innerHTML = '<p class="help">Ошибка: ' + (d.error || '') + '</p>'; return; }
+                let html = '<div class="row3" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.8rem;margin-bottom:1rem;">';
+                const card = (label, value) => `<div style="border:1px solid var(--border);border-radius:8px;padding:0.9rem;text-align:center;"><div style="font-size:1.6rem;font-weight:700;">${value}</div><div class="help">${label}</div></div>`;
+                html += card('Заявок всего', d.orders_total);
+                html += card('Новых заявок', d.orders_new);
+                html += card('Заявок сегодня', d.orders_today);
+                html += card('Клиентов всего', d.customers_total);
+                html += card('Новых клиентов (7 дней)', d.customers_new_7d);
+                html += '</div>';
+                html += '<h3>Популярные товары</h3>';
+                if (d.popular_products.length) {
+                    html += '<table class="adm"><thead><tr><th>Товар</th><th>Заявок</th><th>Лайков</th></tr></thead><tbody>';
+                    d.popular_products.forEach(p => {
+                        html += `<tr><td>${escapeHtml(p.name || '')} <small>(${p.nm_id || ''})</small></td><td>${p.orders}</td><td>${p.likes}</td></tr>`;
+                    });
+                    html += '</tbody></table>';
+                } else {
+                    html += '<p class="help">Пока нет данных — события появятся после заказов и лайков.</p>';
+                }
+                html += '<h3 style="margin-top:1.2rem;">Ошибки синхронизации</h3>';
+                if (d.sync_errors.length) {
+                    html += '<table class="adm"><thead><tr><th>Источник</th><th>Ошибка</th><th>Когда</th></tr></thead><tbody>';
+                    d.sync_errors.forEach(e => {
+                        html += `<tr><td>${escapeHtml(e.source || '')}</td><td>${escapeHtml(e.message || '')}</td><td>${formatDate(e.time || '')}</td></tr>`;
+                    });
+                    html += '</tbody></table>';
+                } else {
+                    html += '<p class="help">Ошибок нет ✅</p>';
+                }
+                box.innerHTML = html;
+            } catch (e) {
+                box.innerHTML = '<p class="help">Ошибка: ' + e.message + '</p>';
+            }
+        }
+
+        /* ================= Аудит-лог (AD-4) ================= */
+        async function loadAudit() {
+            const box = $('audit-list');
+            box.innerHTML = '<p class="help">Загрузка…</p>';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/audit?limit=200`);
+                const d = await resp.json();
+                if (!d.success || !d.entries.length) { box.innerHTML = '<p class="help">Записей пока нет.</p>'; return; }
+                let html = '<table class="adm"><thead><tr><th>Когда</th><th>Админ</th><th>Действие</th><th>Объект</th><th>Детали</th></tr></thead><tbody>';
+                d.entries.forEach(e => {
+                    html += `<tr><td>${formatDate(e.created_at)}</td><td>${escapeHtml(e.admin_user)}</td><td>${escapeHtml(e.action)}</td><td>${escapeHtml((e.object_type || '') + (e.object_id ? ':' + e.object_id : ''))}</td><td><small>${escapeHtml(JSON.stringify(e.detail || {}))}</small></td></tr>`;
+                });
+                box.innerHTML = html + '</tbody></table>';
+            } catch (e) {
+                box.innerHTML = '<p class="help">Ошибка: ' + e.message + '</p>';
+            }
+        }
+
+        /* ================= Пользователи админки (AD-2) ================= */
+        async function loadAdminUsers() {
+            const box = $('admin-users-list');
+            box.innerHTML = '<p class="help">Загрузка…</p>';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/admin-users`);
+                const d = await resp.json();
+                if (!d.success) { box.innerHTML = '<p class="help">Ошибка: ' + (d.error || '') + '</p>'; return; }
+                const roleName = {superadmin: 'Суперадмин', content: 'Контент-менеджер', orders: 'Менеджер заявок'};
+                let html = '<table class="adm"><thead><tr><th>Логин</th><th>Роль</th><th>Создан</th><th></th></tr></thead><tbody>';
+                d.users.forEach(u => {
+                    const del = u.username === '{{ session.get('admin_user', '') }}' ? '' : `<button type="button" class="danger" onclick="deleteAdminUser('${escapeHtml(u.username)}')">Удалить</button>`;
+                    html += `<tr><td>${escapeHtml(u.username)}</td><td>${roleName[u.role] || u.role}</td><td>${formatDate(u.created_at)}</td><td>${del}</td></tr>`;
+                });
+                box.innerHTML = html + '</tbody></table>';
+            } catch (e) {
+                box.innerHTML = '<p class="help">Ошибка: ' + e.message + '</p>';
+            }
+        }
+
+        async function createAdminUser() {
+            const body = {
+                username: $('au-username').value.trim(),
+                password: $('au-password').value,
+                role: $('au-role').value,
+            };
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/admin-users`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN}, body: JSON.stringify(body)
+                });
+                const result = await resp.json();
+                showMsg(result.success ? 'Пользователь создан' : 'Ошибка: ' + (result.error || ''), result.success);
+                if (result.success) { $('au-username').value = ''; $('au-password').value = ''; loadAdminUsers(); }
+            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
+        }
+
+        async function deleteAdminUser(username) {
+            if (!confirm('Удалить пользователя «' + username + '»?')) return;
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/admin-user/delete`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN}, body: JSON.stringify({username})
+                });
+                const result = await resp.json();
+                showMsg(result.success ? 'Пользователь удалён' : 'Ошибка: ' + (result.error || ''), result.success);
+                if (result.success) loadAdminUsers();
+            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
+        }
+
+        /* ================= Восстановление из бэкапа (AD-5) ================= */
+        async function restoreBackup() {
+            const file = $('restore-file').files[0];
+            if (!file) { $('restore-result').textContent = 'Выберите .zip файл бэкапа.'; return; }
+            if (!confirm('Восстановить данные из архива? Текущие данные будут заменены.')) return;
+            const fd = new FormData();
+            fd.append('file', file);
+            $('restore-result').textContent = 'Восстановление…';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/restore`, {
+                    method: 'POST', headers: {'X-CSRF-Token': window.CSRF_TOKEN}, body: fd
+                });
+                const result = await resp.json();
+                $('restore-result').textContent = result.success
+                    ? 'Восстановлено: ' + (result.restored || []).join(', ') + '. Обновите страницу (F5).'
+                    : 'Ошибка: ' + (result.error || '');
+            } catch (e) {
+                $('restore-result').textContent = 'Ошибка сети: ' + e.message;
+            }
+        }
+
         /* ================= Вкладки ================= */
+        // AD-2: разделы, доступные ролям (сервер дублирует проверку — UI лишь прячет)
+        const ROLE_SECTIONS = {
+            superadmin: ['pages','theme','menu','socials','seo','site','integrations','customers','backup','dashboard','audit','users'],
+            content: ['pages','theme','menu','socials','seo','site','backup'],
+            orders: ['dashboard','customers','integrations','backup'],
+        };
+        const ADMIN_ROLE = '{{ admin_role }}';
+        window.ADMIN_ROLE = ADMIN_ROLE;
+        const allowedSections = new Set(ROLE_SECTIONS[ADMIN_ROLE] || []);
         document.querySelectorAll('nav button[data-tab]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('nav button[data-tab]').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('main section').forEach(s => s.classList.remove('active'));
-                btn.classList.add('active');
-                $(`tab-${btn.dataset.tab}`).classList.add('active');
-            });
+            const sec = btn.dataset.section;
+            if (sec && !allowedSections.has(sec)) btn.style.display = 'none';
+        });
+        // Если активная вкладка недоступна роли — активируем первую доступную
+        (function activateAllowedTab() {
+            const activeBtn = document.querySelector('nav button[data-tab].active');
+            if (activeBtn && activeBtn.style.display !== 'none') return;
+            const first = [...document.querySelectorAll('nav button[data-tab]')]
+                .find(b => b.style.display !== 'none');
+            if (first) switchTab(first.dataset.tab);
+        })();
+        function switchTab(name) {
+            document.querySelectorAll('nav button[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+            document.querySelectorAll('main section').forEach(s => s.classList.toggle('active', s.id === 'tab-' + name));
+            if (name === 'dashboard') loadDashboard();
+            if (name === 'audit') loadAudit();
+            if (name === 'users') loadAdminUsers();
+        }
+        document.querySelectorAll('nav button[data-tab]').forEach(btn => {
+            btn.addEventListener('click', () => switchTab(btn.dataset.tab));
         });
 
         /* ================= Инициализация ================= */

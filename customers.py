@@ -91,6 +91,57 @@ def get_customer_by_phone(phone):
     return customer.to_dict() if customer else None
 
 
+def register_client(phone, password, name='', email=''):
+    """Регистрация клиента по телефону+паролю (LC-1).
+
+    Дедупликация по нормализованному телефону. Пароль — только хэш Werkzeug.
+    Если клиент с таким телефоном уже зарегистрирован (есть password_hash) —
+    ошибка. Без SMS и верификации номера (по ТЗ).
+    """
+    from werkzeug.security import generate_password_hash
+    phone_norm = normalize_phone(phone)
+    if not phone_norm:
+        return None, 'Телефон обязателен'
+    if not password or len(password) < 6:
+        return None, 'Пароль должен быть не короче 6 символов'
+    existing = db.session.query(Customer).filter_by(phone=phone_norm).first()
+    if existing is not None and existing.password_hash:
+        return None, 'Этот телефон уже зарегистрирован. Войдите.'
+    customer = add_customer(name, phone_norm, email)
+    row = db.session.get(Customer, customer['id'])
+    row.password_hash = generate_password_hash(password)
+    db.session.commit()
+    return row.to_dict(), None
+
+
+def login_client(phone, password):
+    """Вход клиента: проверка хэша пароля (LC-1, LC-2)."""
+    from werkzeug.security import check_password_hash
+    phone_norm = normalize_phone(phone)
+    row = db.session.query(Customer).filter_by(phone=phone_norm).first()
+    if row is None or not row.password_hash:
+        return None
+    if not check_password_hash(row.password_hash, password or ''):
+        return None
+    _touch(row)
+    db.session.commit()
+    return row.to_dict()
+
+
+def update_customer_profile(customer_id, name=None, email=None):
+    """Обновление контактов клиента из ЛК (LC-3)."""
+    row = db.session.get(Customer, int(customer_id))
+    if row is None:
+        return None
+    if name is not None:
+        row.name = name.strip()
+    if email is not None:
+        row.email = email.strip()
+    _touch(row)
+    db.session.commit()
+    return row.to_dict()
+
+
 def add_order(name, phone, email, product_id, product_name, price, qty=1,
               source='oneclick', status='new', customer_id=None, consent_pd=False):
     """Новая заявка + гарантированное создание клиента (CL-1)."""

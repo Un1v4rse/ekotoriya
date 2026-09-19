@@ -80,6 +80,25 @@
 
 (новые записи — сверху, под этой строкой; самая свежая запись всегда первая)
 
+## [2026-09-19 22:55] Задача: [этап-4] — Регистрация, ЛК, корзина, роли (LC-1…LC-5, AD-2…AD-5)
+- Статус: done (весь Этап 4)
+- Сделано:
+  - 4.1 (LC-1, LC-2): `customers.register_client/login_client/update_customer_profile` — телефон нормализуется, пароль только хэш Werkzeug, дедуп по телефону, повторная регистрация → ошибка «Войдите», минимум 6 символов. Роуты `/api/client/register|login|logout` (remember → session.permanent), страница `/auth/` (templates/auth.html на lk_base.html). Сессия клиента: `session['customer_id']` — рекомендации (Этап 3) сразу подхватили.
+  - 4.2 (LC-3): `/personal/` (+ `/personal/favorite/`, `/personal/orders/` для старых ссылок) — templates/personal.html: контакты (редактирование через `/api/client/profile`), заявки со статусами-бейджами, избранное (лайки → карточки товаров), персональные рекомендации, статистика (сумма, количество, последняя активность). Аноним → редирект на `/auth/` (`_client_required`).
+  - 4.3 (LC-4): корзина в сессии (`session['cart']`, ключ `source:id`): `/api/cart/add|update|checkout`; `/basket/` (templates/basket.html) — таблица, изменение количества, удаление, оформление заявкой БЕЗ оплаты (имя/телефон/email + чекбокс ПДн) → заявки source='basket' в базе админки, корзина очищается. Кнопка «🛒 В корзину» на карточках (wb_catalog_block.html, recommendations_block_inner.html + wb-actions.js).
+  - 4.4: заглушки `basket_stub`, `personal_stub` удалены, заменены реальными страницами (роутинг тех же URL сохранён).
+  - 4.5 (LC-5): привязка автоматическая — `add_order` дедупит клиента по телефону, поэтому 1-клик и корзина с телефоном аккаунта привязываются к нему (покрыто тестом).
+  - 4.5 (AD-2): роли суперадмин/content/orders. `check_auth` → таблица admin_users (ленивый перенос главного админа из ADMIN_CREDENTIALS как superadmin при первом запросе). `ROLE_SECTIONS` + `ADMIN_PATH_SECTIONS` + `_section_for_path` — проверка в `admin_required` (403 для API). Роль хранится в сессии (`session['admin_role']`), бейдж в шапке админки. CRUD: `/admin/api/admin-users` (GET/POST), `/admin/api/admin-user/delete` (себя нельзя), только суперадмин. UI: вкладка «🛡 Пользователи» + скрытие недоступных разделов навигации по роли (сервер всё равно проверяет).
+  - 4.5 (AD-3): `/admin/api/dashboard` — заявки всего/новые/сегодня, клиенты всего/новые за 7 дней, ошибки синка (sync_logs status='error', последние 10), топ-5 популярных товаров. Вкладка «📊 Дашборд» (первая в навигации, активна по умолчанию для роли orders).
+  - 4.5 (AD-4): аудит уже писался через `_audit_log`; добавлен просмотр: `/admin/api/audit?limit=` + вкладка «📋 Аудит-лог» (только суперадмин).
+  - 4.5 (AD-5): `/admin/api/backup/full` — zip (ekotoriya.db + content.json, только суперадмин, аудит backup.create); `/admin/api/restore` POST multipart — zip с content.json и/или ekotoriya.db (текущая БД копируется в *.before-restore, `db.engine.dispose()` для переподключения, аудит backup.restore). UI в вкладке «Резервная копия»: скачать ZIP + форма восстановления (суперадмин). Старый JSON-бэкап сохранён.
+  - 4.6 (TS-3): `tests/test_client_lk.py` — регистрация/вход/выход/дубликаты/короткий пароль/неверный пароль; ЛК требует входа и рендерится; профиль; корзина add/update/checkout (source='basket', очистка); привязка заявок к аккаунту по телефону (1-клик и корзина, LC-5) + видимость в ЛК; роли (orders не может страницы/пользователей, content не может клиентов); CRUD пользователей; дашборд/аудит; бэкап-zip/restore/отказ не-zip; backup только суперадмин.
+- Изменённые файлы: app.py, customers.py, templates/admin.html, templates/lk_base.html (новый), templates/auth.html (новый), templates/personal.html (новый), templates/basket.html (новый), templates/wb_catalog_block.html, templates/recommendations_block_inner.html, static/js/wb-actions.js, tests/test_client_lk.py (новый)
+- Проверки: `pytest tests/ -q` → **108 passed**; smoke: 32 страницы 200, /basket/, /auth/ 200, /personal/ → 302 анониму, theme.css/robots/sitemap/noimage OK, /api/register|order|like OK, demo-синк OK; Jinja-валидация 5 шаблонов OK; E2E-сценарий «зарегистрировался → купил → вижу в ЛК» покрыт тестом test_orders_attach_to_account_by_phone.
+- Бэкапы: backup_2026-09-19_22-18, backup_2026-09-19_22-25 (№5, перед этапом), backup_2026-09-19_22-55 (№6, после этапа; старейший 21-55 удалён — макс. 3)
+- Следующий шаг: Этап 5 (CN-1…CN-7, SEO-1…SEO-8): дублирование страниц, дерево страниц, блоки «HTML-код»/«Таймер акции», undo/redo + автосохранение черновика, предупреждение о конфликте двух админов, пресеты темы, черновик/публикация; SEO-дополнения.
+- Примечания: в тестах SimpleCache живёт между тестами — корзинный тест вызывает `invalidate_site_cache()` после демо-синка (зафиксировано в коде теста). `SyncLog` — поле `status` ('ok'/'error'), не `success` (исправлено в дашборде).
+
 ## [2026-09-19 22:18] Задача: [этап-3] — Рекомендации, события, клиенты (RS-1…RS-7, CL-1…CL-6)
 - Статус: done (весь Этап 3)
 - Сделано:
