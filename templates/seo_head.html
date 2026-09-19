@@ -1,6 +1,49 @@
+{% if page.meta_keywords %}<meta name="keywords" content="{{ page.meta_keywords }}" />
+{% endif %}
+<link rel="canonical" href="{{ seo_canonical }}" />
+<meta property="og:title" content="{{ page.title }}" />
+<meta property="og:description" content="{{ page.meta_description or site.meta_description }}" />
+<meta property="og:url" content="{{ seo_canonical }}" />
+<meta property="og:type" content="{% if seo_product %}product{% else %}website{% endif %}" />
+<meta property="og:image" content="{{ seo_og_image }}" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="{{ page.title }}" />
+<meta name="twitter:description" content="{{ page.meta_description or site.meta_description }}" />
+<meta name="twitter:image" content="{{ seo_og_image }}" />
 {% if seo_product %}
 <script type="application/ld+json">{{ seo_product | tojson }}</script>
 {% endif %}
 <script type="application/ld+json">{{ seo_org | tojson }}</script>
-<meta property="og:description" content="{{ page.meta_description or site.meta_description }}" />
-<meta property="og:image" content="{{ seo_og_image }}" />
+{% if seo_breadcrumbs %}
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{% for c in seo_breadcrumbs %}{"@type":"ListItem","position":{{ loop.index }},"name":{{ c.name | tojson }},"item":{{ c.url | tojson }}}{{ ',' if not loop.last }}{% endfor %}]}</script>
+{% endif %}
+{% if seo_faq %}
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{% for f in seo_faq %}{"@type":"Question","name":{{ f.q | tojson }},"acceptedAnswer":{"@type":"Answer","text":{{ f.a | tojson }}}}{{ ',' if not loop.last }}{% endfor %}]}</script>
+{% endif %}
+{% if site.seo.yandex_metrika_id %}
+<!-- Yandex.Metrika counter -->
+<script>
+   (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+   m[i].l=1*new Date();
+   for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+   k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+   (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+   ym({{ site.seo.yandex_metrika_id | int }}, "init", {
+        clickmap:true,
+        trackLinks:true,
+        accurateTrackBounce:true,
+        webvisor:true
+   });
+</script>
+{% endif %}
+{% if site.seo.google_analytics_id %}
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ site.seo.google_analytics_id | urlencode }}"></script>
+<script>
+   window.dataLayer = window.dataLayer || [];
+   function gtag(){dataLayer.push(arguments);}
+   gtag('js', new Date());
+   gtag('config', '{{ site.seo.google_analytics_id }}');
+</script>
+{% endif %}
+{% if site.seo.extra_head %}{{ site.seo.extra_head | safe }}
+{% endif %}

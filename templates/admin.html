@@ -816,18 +816,29 @@
                     <div class="help">Счётчики подключаются к каждой странице автоматически. Заодно для поисковиков работают <a href="/robots.txt" target="_blank">robots.txt ↗</a> и <a href="/sitemap.xml" target="_blank">sitemap.xml ↗</a> (обновляются сами).</div>
                     <div class="field" style="margin-top:0.8rem;">
                         <label for="seo-product-title">Шаблон заголовка карточки товара</label>
-                        <input type="text" id="seo-product-title" data-path="site.seo.product_title_template" placeholder="{name} — купить в интернет-магазине Экотория">
-                        <div class="help">Переменные: {name} — название товара, {brand} — бренд, {price} — цена со скидкой.</div>
+                        <textarea id="seo-product-title" data-path="site.seo.product_title_template" rows="2" placeholder="{name} — купить от {price} ₽ | {site_name}"></textarea>
+                        <div class="help">Переменные: {name} — название, {brand} — бренд, {price} — цена со скидкой, {category} — категория, {discount} — «, скидка N%» (если есть), {site_name} — название сайта.</div>
                     </div>
                     <div class="field">
                         <label for="seo-product-desc">Шаблон описания карточки товара</label>
-                        <input type="text" id="seo-product-desc" data-path="site.seo.product_description_template" placeholder="{name}. Бренд {brand}. Цена {price} ₽. Доставка по России.">
-                        <div class="help">Те же переменные: {name}, {brand}, {price}.</div>
+                        <textarea id="seo-product-desc" data-path="site.seo.product_description_template" rows="2" placeholder="{name}. Бренд {brand}. Цена {price} ₽{discount}"></textarea>
+                        <div class="help">Те же переменные: {name}, {brand}, {price}, {category}, {discount}, {site_name}.</div>
                     </div>
                     <div class="field">
                         <label for="seo-redirects">301-редиректы (строка = «откуда → куда»)</label>
                         <textarea id="seo-redirects" rows="4" data-path="site.seo.redirects" placeholder="/old-page/ → /catalog/"></textarea>
                         <div class="help">Одна строка — один редирект: /старый-адрес/ → /новый-адрес/. Строки без «→» игнорируются.</div>
+                    </div>
+                    <div class="field">
+                        <label for="seo-redirects-csv">Импорт редиректов из CSV</label>
+                        <textarea id="seo-redirects-csv" rows="4" placeholder="/old-page/,/catalog/&#10;/old-page-2/;/contacts/"></textarea>
+                        <button type="button" class="secondary" onclick="importRedirects()">⬆ Импорт редиректов CSV</button>
+                        <div class="help" id="seo-import-result">Формат: old_path,new_path — по одному на строку (разделитель запятая, «;» или «→»). Дубликаты пропускаются.</div>
+                    </div>
+                    <div class="field">
+                        <button type="button" class="secondary" onclick="runSeoAudit()">🔍 Запустить SEO-аудит</button>
+                        <div class="help">Проверяет страницы: пустые описания и H1, одинаковые title, битые ссылки в блоках.</div>
+                        <div id="seo-audit-results" class="table-wrap" style="margin-top:0.6rem;"></div>
                     </div>
                     <details class="dev">
                         <summary>Дополнительно (для специалистов)</summary>
@@ -1971,6 +1982,69 @@
                 showMsg('Копия скачана', true);
             } catch (e) {
                 showMsg('Ошибка: ' + e.message, false);
+            }
+        }
+
+        /* ================= SEO: импорт редиректов и аудит ================= */
+        const SEO_AUDIT_TYPES = {
+            'no_description': 'Нет описания',
+            'no_h1': 'Нет заголовка H1',
+            'duplicate_title': 'Одинаковый title',
+            'broken_link': 'Битая ссылка',
+        };
+
+        async function importRedirects() {
+            const text = $('seo-redirects-csv').value.trim();
+            if (!text) { $('seo-import-result').textContent = 'Сначала вставьте строки редиректов'; return; }
+            $('seo-import-result').textContent = 'Импорт…';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/redirects-import`, {
+                    method: 'POST',
+                    headers: {'X-CSRF-Token': window.CSRF_TOKEN, 'Content-Type': 'application/json'},
+                    body: JSON.stringify({text}),
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    $('seo-import-result').textContent = `Готово: добавлено ${result.added}, пропущено ${result.skipped}.`;
+                    $('seo-redirects-csv').value = '';
+                    // Обновить список редиректов в форме и в данных «Сохранить всё»
+                    if (result.redirects) {
+                        setDeep(data, 'site.seo.redirects', result.redirects);
+                        $('seo-redirects').value = Object.entries(result.redirects)
+                            .map(([f, t]) => f + ' → ' + t).join('\n');
+                    }
+                } else {
+                    $('seo-import-result').textContent = 'Ошибка: ' + (result.error || '');
+                }
+            } catch (e) {
+                $('seo-import-result').textContent = 'Ошибка сети: ' + e.message;
+            }
+        }
+
+        async function runSeoAudit() {
+            const container = $('seo-audit-results');
+            container.innerHTML = '<p class="help">Аудит выполняется…</p>';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/seo-audit`);
+                const result = await resp.json();
+                if (!result.success) {
+                    container.innerHTML = '<p class="help">Ошибка: ' + escapeHtml(result.error || '') + '</p>';
+                    return;
+                }
+                if (!result.issues.length) {
+                    container.innerHTML = '<p class="help">✅ Проблем не найдено.</p>';
+                    return;
+                }
+                let html = '<p class="help">Найдено проблем: ' + result.issues.length + '</p>' +
+                    '<table class="adm"><thead><tr><th>Тип</th><th>Страница</th><th>Детали</th></tr></thead><tbody>';
+                result.issues.forEach(issue => {
+                    html += '<tr><td>' + escapeHtml(SEO_AUDIT_TYPES[issue.type] || issue.type) + '</td><td>' +
+                        escapeHtml(issue.url || issue.page || '') + '</td><td>' +
+                        escapeHtml(issue.detail || '') + '</td></tr>';
+                });
+                container.innerHTML = html + '</tbody></table>';
+            } catch (e) {
+                container.innerHTML = '<p class="help">Ошибка сети: ' + escapeHtml(e.message) + '</p>';
             }
         }
 

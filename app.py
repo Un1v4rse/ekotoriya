@@ -293,6 +293,8 @@ ADMIN_PATH_SECTIONS = [
     ('/admin/api/rebuild', 'pages'),
     ('/admin/api/theme', 'theme'),
     ('/admin/api/seo', 'seo'),
+    ('/admin/api/redirects-import', 'seo'),
+    ('/admin/api/seo-audit', 'seo'),
     ('/admin/api/wb-products', 'integrations'),
     ('/admin/api/product-discount', 'integrations'),
     ('/admin/api/discount', 'integrations'),
@@ -462,8 +464,8 @@ SEO_DEFAULTS = {
     'google_analytics_id': '',
     'robots_txt': 'User-agent: *\nDisallow: /admin\nAllow: /\n',
     'extra_head': '',
-    'product_title_template': '{name} — купить в интернет-магазине Экотория',
-    'product_description_template': '{name}. Бренд {brand}. Цена {price} ₽. Доставка по России.',
+    'product_title_template': '{name} — купить от {price} ₽ | {site_name}',
+    'product_description_template': '{name}. Бренд {brand}. Цена {price} ₽{discount}',
     'redirects': {},
 }
 
@@ -527,6 +529,76 @@ def _seo_org(content, host_url):
     return org
 
 
+def _render_meta_template(template, product, site):
+    """Шаблон мета карточки товара (SEO-2): подстановка {name} {brand} {price}
+    {category} {discount} {site_name}. Неизвестные/битые переменные не роняют
+    рендер — возвращаем шаблон как есть."""
+    price = product.get('final_price') or product.get('price') or 0
+    try:
+        price = int(price)
+    except (TypeError, ValueError):
+        price = 0
+    discount = ''
+    try:
+        base = int(product.get('price') or 0)
+        final = int(product.get('final_price') or 0)
+    except (TypeError, ValueError):
+        base = final = 0
+    if final and base and final < base:
+        # {discount} — «, скидка N%» по разнице price → final_price (SEO-2)
+        discount = f', скидка {round((base - final) * 100 / base)}%'
+    values = {
+        'name': product.get('name', ''),
+        'brand': product.get('brand') or 'Экотория',
+        'price': price,
+        'category': product.get('category') or '',
+        'discount': discount,
+        'site_name': site.get('name') or site.get('title') or 'Экотория',
+    }
+    try:
+        return str(template or '').format(**values)
+    except (KeyError, ValueError, IndexError):
+        return str(template or '')
+
+
+def _seo_breadcrumbs(content, page, host_url):
+    """Хлебные крошки (SEO-4): Главная → …уровни URL страницы.
+    Названия уровней — title соответствующих страниц, иначе сегмент пути."""
+    crumbs = [{'name': 'Главная', 'url': host_url}]
+    url = (page.get('url') or '/').strip('/')
+    if not url:
+        return crumbs
+    parts = url.split('/')
+    for i in range(1, len(parts) + 1):
+        path = '/' + '/'.join(parts[:i]) + '/'
+        parent = get_page_by_url(content, path)
+        name = (parent.get('title') or parent.get('h1') or parts[i - 1]) if parent else parts[i - 1]
+        crumbs.append({'name': name, 'url': host_url.rstrip('/') + path})
+    return crumbs
+
+
+def _seo_faq_items(page):
+    """Вопросы-ответы блоков faq страницы (SEO-4) — для JSON-LD FAQPage."""
+    items = []
+    blocks = page.get('blocks')
+    if not isinstance(blocks, list):
+        return items
+    for b in blocks:
+        if not isinstance(b, dict) or b.get('type') != 'faq':
+            continue
+        raw = b.get('items')
+        if not isinstance(raw, list):
+            continue
+        for it in raw:
+            if not isinstance(it, dict):
+                continue
+            q = str(it.get('q') or '').strip()
+            a = str(it.get('a') or '').strip()
+            if q and a:
+                items.append({'q': q, 'a': a})
+    return items
+
+
 def make_context(content, page):
     all_products = get_products()
     popular = _popular_cached()
@@ -542,6 +614,12 @@ def make_context(content, page):
         'recommended_products': _rec_block_items(popular),
         'seo_org': _seo_org(content, host_url),
         'seo_og_image': _absolute_url(site.get('logo'), host_url) or (host_url.rstrip('/') + '/static/noimage.png'),
+        'seo_breadcrumbs': _seo_breadcrumbs(content, page, host_url),
+        'seo_faq': _seo_faq_items(page),
+        # canonical: поле страницы в приоритете, иначе — абсолютный URL текущей
+        # страницы (SEO-1). Для карточки товара _product_page переопределяет.
+        'seo_canonical': _absolute_url(page.get('canonical'), host_url)
+                         or (host_url.rstrip('/') + request.path),
         'seo_product': None,
     }
     # Текущий клиент (LC-2): шаблоны показывают «ЛК/Выйти» вместо «Войти».
@@ -569,7 +647,7 @@ def make_context(content, page):
 @app.route('/')
 def index():
     content = load_content()
-    page = get_page_by_slug(content, 'index')
+    page = get_page_by_slug(content, 'index') or get_page_by_url(content, '/')
     if not page:
         return 'Index page not found', 404
     return render_template(page['template'], **make_context(content, page))
@@ -1104,12 +1182,174 @@ def sitemap_xml():
     content = load_content()
     site_url = request.host_url.rstrip('/')
     xml = ['<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n']
+    # Приоритеты зафиксированы правилом по URL (SEO-3, не настраиваются):
+    # главная 1.0, /catalog/ 0.8, остальные страницы 0.5, карточки товаров 0.6.
+    def _priority(url):
+        if url.rstrip('/') == '':
+            return '1.0'
+        if url.rstrip('/') == '/catalog':
+            return '0.8'
+        return '0.5'
+
     for page in content.get('pages', []):
         if page.get('slug') in SYSTEM_PAGE_SLUGS:
             continue   # системные страницы — свои роуты, в sitemap не нужны
-        xml.append(f'<url><loc>{site_url}{page["url"]}</loc><priority>0.8</priority></url>\n')
+        lastmod = str(page.get('updated_at') or '')[:10]   # ISO date
+        lm = f'<lastmod>{lastmod}</lastmod>' if lastmod else ''
+        xml.append(f'<url><loc>{site_url}{page["url"]}</loc>{lm}'
+                   f'<priority>{_priority(page["url"])}</priority></url>\n')
+    for p in get_products():
+        nm = p.get('nm_id') or p.get('id')
+        if not nm:
+            continue
+        lastmod = str(p.get('updated_at') or '')[:10]
+        lm = f'<lastmod>{lastmod}</lastmod>' if lastmod else ''
+        xml.append(f'<url><loc>{site_url}/catalog/{p.get("source", "wb")}/{nm}/</loc>{lm}'
+                   f'<priority>0.6</priority></url>\n')
     xml.append('</urlset>')
     return Response(''.join(xml), mimetype='application/xml')
+
+
+def _redirect_path_ok(path):
+    """Валидация пути редиректа (SEO-3): начинается с '/', без пробелов и запятых."""
+    return bool(re.fullmatch(r'/[^,\s]*', str(path or '')))
+
+
+@app.route('/admin/api/redirects-import', methods=['POST'])
+@admin_required
+def admin_redirects_import():
+    """Массовый импорт 301-редиректов из CSV-текста (SEO-3).
+
+    Принимает JSON {text}: по строке на редирект «old_path,new_path»
+    (поддерживаются разделители , ; и →). Дубликаты и невалидные строки
+    пропускаются; валидные добавляются к site.seo.redirects.
+    """
+    payload = request.get_json() or {}
+    text = str(payload.get('text') or '')
+    content = load_content()
+    seo = content.setdefault('site', {}).setdefault('seo', {})
+    redirects = seo.get('redirects')
+    if not isinstance(redirects, dict):
+        redirects = {}
+    added = skipped = 0
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if '→' in line:
+            parts = line.split('→')
+        elif ';' in line:
+            parts = line.split(';')
+        else:
+            parts = line.split(',')
+        if len(parts) != 2:
+            skipped += 1
+            continue
+        src, dst = parts[0].strip(), parts[1].strip()
+        if not _redirect_path_ok(src) or not _redirect_path_ok(dst):
+            skipped += 1
+            continue
+        if src in redirects:
+            skipped += 1
+            continue
+        redirects[src] = dst
+        added += 1
+    seo['redirects'] = redirects
+    if added:
+        save_content(content)
+        invalidate_site_cache()
+    return jsonify({'success': True, 'added': added, 'skipped': skipped,
+                    'redirects': redirects})
+
+
+# Поля блоков, в которых ищем ссылки для аудита (SEO-8).
+_AUDIT_LINK_KEYS = ('url', 'link', 'href', 'src', 'image', 'icon', 'photo', 'button_link')
+
+
+def _collect_block_links(value, links):
+    """Рекурсивно собрать строки-ссылки из полей блоков страницы."""
+    if isinstance(value, dict):
+        for k, v in value.items():
+            if k in _AUDIT_LINK_KEYS and isinstance(v, str):
+                links.append(v.strip())
+            else:
+                _collect_block_links(v, links)
+    elif isinstance(value, list):
+        for item in value:
+            _collect_block_links(item, links)
+
+
+@app.route('/admin/api/seo-audit')
+@admin_required
+def admin_seo_audit():
+    """SEO-аудит страниц (SEO-8): пустые description/h1, дубли title, битые ссылки.
+
+    Битой считаем локальную ссылку (начинается с '/', не /static/, не /catalog/),
+    не входящую в известные URL: страницы, меню, /basket/ /personal/ /auth/.
+    Внешние http(s)-ссылки не проверяем.
+    """
+    content = load_content()
+    pages = content.get('pages', [])
+    known = {'/'}
+    for p in pages:
+        u = str(p.get('url') or '').strip()
+        if u:
+            known.add(u)
+    known.update(SYSTEM_PAGE_SLUGS.values())
+
+    def _menu_urls(items):
+        for item in items or []:
+            if not isinstance(item, dict):
+                continue
+            u = str(item.get('url') or '').strip()
+            if u:
+                known.add(u)
+            _menu_urls(item.get('children'))
+
+    _menu_urls(content.get('menu'))
+
+    issues = []
+    by_title = {}
+    for p in pages:
+        if not str(p.get('meta_description') or '').strip():
+            issues.append({'type': 'no_description', 'page': p.get('slug', ''),
+                           'url': p.get('url', ''), 'detail': 'Пустой meta description'})
+        if not str(p.get('h1') or '').strip():
+            issues.append({'type': 'no_h1', 'page': p.get('slug', ''),
+                           'url': p.get('url', ''), 'detail': 'Пустой H1'})
+        title = str(p.get('title') or '').strip()
+        if title:
+            by_title.setdefault(title, []).append(p)
+    for title, group in by_title.items():
+        if len(group) < 2:
+            continue
+        for p in group:
+            others = ', '.join(g.get('slug', '') for g in group if g is not p)
+            issues.append({'type': 'duplicate_title', 'page': p.get('slug', ''),
+                           'url': p.get('url', ''),
+                           'detail': f'Название «{title}» совпадает со страницами: {others}'})
+    for p in pages:
+        links = []
+        _collect_block_links(p.get('blocks') or [], links)
+        seen = set()
+        for link in links:
+            if not link or link in seen:
+                continue
+            seen.add(link)
+            if link.startswith(('http://', 'https://', 'mailto:', 'tel:', '#')):
+                continue   # внешние ссылки не проверяем
+            if not link.startswith('/'):
+                continue
+            if link.startswith('/static/') or link.startswith('/catalog/'):
+                continue   # статика и карточки/разделы каталога
+            path = link.split('?')[0].split('#')[0]
+            if not path.endswith('/'):
+                path += '/'
+            if path not in known:
+                issues.append({'type': 'broken_link', 'page': p.get('slug', ''),
+                               'url': p.get('url', ''),
+                               'detail': f'Ссылка «{link}» ведёт на несуществующую страницу'})
+    return jsonify({'success': True, 'issues': issues})
 
 
 @app.route('/static/<path:path>/')
@@ -1306,7 +1546,7 @@ def admin_page_blocks():
         blocks = [{'type': 'html', 'legacy': True, 'html': page.get('content_html', '')}]
     return jsonify({
         'success': True,
-        'page': {k: page.get(k, '') for k in ('slug', 'url', 'title', 'h1', 'meta_description')},
+        'page': {k: page.get(k, '') for k in ('slug', 'url', 'title', 'h1', 'meta_description', 'meta_keywords', 'canonical')},
         'blocks': blocks,
         'legacy': any(isinstance(b, dict) and b.get('legacy') for b in blocks),
         'updated_at': page.get('updated_at', ''),
@@ -1379,7 +1619,7 @@ def admin_page_save():
     if _admin_role() != 'superadmin':
         blocks = [b for b in blocks if b.get('type') != 'html']
     meta = payload.get('page') or {}
-    for k in ('title', 'h1', 'meta_description'):
+    for k in ('title', 'h1', 'meta_description', 'meta_keywords', 'canonical'):
         if k in meta:
             page[k] = meta[k]
     page['blocks'] = blocks
@@ -1418,7 +1658,7 @@ def admin_preview():
             'meta_description': '',
         }
     preview_page = dict(page)
-    for k in ('title', 'h1', 'meta_description', 'url'):
+    for k in ('title', 'h1', 'meta_description', 'meta_keywords', 'canonical', 'url'):
         if page_fields.get(k):
             preview_page[k] = page_fields[k]
     preview_page['content_html'] = blocks_module.render_blocks(blocks)
@@ -1991,27 +2231,23 @@ def _product_page(source, nm_id):
     except Exception:
         pass
 
-    # SEO title/description из шаблонов с переменными {name} {brand} {price}
+    # SEO title/description из шаблонов с переменными {name} {brand} {price}… (SEO-2)
     seo = content.get('site', {}).get('seo', {})
-    values = {
-        'name': product.get('name', ''),
-        'brand': product.get('brand') or 'Экотория',
-        'price': product.get('final_price') or product.get('price') or 0,
-    }
-
-    def _format(tpl):
-        try:
-            return str(tpl or '').format(**values)
-        except (KeyError, ValueError):
-            return str(tpl or '')
-
     page = dict(get_page_by_slug(content, 'catalog__namatrasniki'))
-    page['title'] = _format(seo.get('product_title_template')) or page.get('title', '')
-    page['meta_description'] = _format(seo.get('product_description_template')) or page.get('meta_description', '')
+    page['title'] = _render_meta_template(seo.get('product_title_template'), product, content.get('site', {})) or page.get('title', '')
+    page['meta_description'] = _render_meta_template(seo.get('product_description_template'), product, content.get('site', {})) or page.get('meta_description', '')
 
     ctx = make_context(content, page)
     ctx['seo_product'] = _seo_product(product, request.host_url)
     ctx['seo_og_image'] = _absolute_url(product.get('photo'), request.host_url) or ctx['seo_og_image']
+    # Крошки и canonical карточки: Главная → Каталог → товар (SEO-1/SEO-4)
+    product_url = request.host_url.rstrip('/') + request.path
+    ctx['seo_canonical'] = product_url
+    ctx['seo_breadcrumbs'] = [
+        {'name': 'Главная', 'url': request.host_url},
+        {'name': 'Каталог', 'url': request.host_url.rstrip('/') + '/catalog/'},
+        {'name': product.get('name', ''), 'url': product_url},
+    ]
     return render_template('pages/catalog__namatrasniki.html', **ctx, wb_product=product)
 
 

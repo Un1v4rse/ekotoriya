@@ -40,6 +40,7 @@ MINIMAL_CONTENT = {
             'title': 'Главная',
             'h1': 'Экотория',
             'meta_description': '',
+            'template': 'pages/index.html',
             'blocks': [{'type': 'heading', 'level': 2, 'text': 'Привет'}],
         },
         {

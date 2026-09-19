@@ -196,7 +196,9 @@
     pageProps.innerHTML =
         '<div class="field"><label>Название вкладки браузера (title)</label><input type="text" id="pe-pp-title"></div>' +
         '<div class="field"><label>Заголовок страницы (H1)</label><input type="text" id="pe-pp-h1"></div>' +
-        '<div class="field" style="margin-bottom:0"><label>Описание для поисковиков</label><textarea id="pe-pp-desc" rows="2"></textarea></div>';
+        '<div class="field"><label>Описание для поисковиков</label><textarea id="pe-pp-desc" rows="2"></textarea></div>' +
+        '<div class="field"><label>Ключевые слова (keywords)</label><input type="text" id="pe-pp-keywords"></div>' +
+        '<div class="field" style="margin-bottom:0"><label>Canonical URL (если отличается от адреса страницы)</label><input type="text" id="pe-pp-canonical" placeholder="https://…"></div>';
 
     const galleryOverlay = el('div', '', {id: 'pe-gallery-overlay'});
     galleryOverlay.innerHTML = '<div id="pe-gallery"><div class="pe-gallery-head"><h3>Добавить блок</h3>' +
@@ -261,9 +263,13 @@
                 $('pe-pp-title').value = pageMeta.title || '';
                 $('pe-pp-h1').value = pageMeta.h1 || '';
                 $('pe-pp-desc').value = pageMeta.meta_description || '';
+                $('pe-pp-keywords').value = pageMeta.meta_keywords || '';
+                $('pe-pp-canonical').value = pageMeta.canonical || '';
                 $('pe-pp-title').addEventListener('input', e => { pageMeta.title = e.target.value; markDirty(); });
                 $('pe-pp-h1').addEventListener('input', e => { pageMeta.h1 = e.target.value; markDirty(); });
                 $('pe-pp-desc').addEventListener('input', e => { pageMeta.meta_description = e.target.value; markDirty(); });
+                $('pe-pp-keywords').addEventListener('input', e => { pageMeta.meta_keywords = e.target.value; markDirty(); });
+                $('pe-pp-canonical').addEventListener('input', e => { pageMeta.canonical = e.target.value; markDirty(); });
                 buildMap();
                 bindPageEvents();
                 startDraftAutosave();
