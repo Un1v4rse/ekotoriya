@@ -23,11 +23,118 @@
 import html
 import json
 import re
+from html.parser import HTMLParser
 from urllib.parse import urlparse, parse_qs, quote
 
 
 def esc(value):
     return html.escape(str(value or ''), quote=True)
+
+
+# HTML-санитайзер (Этап 6.1): второй слой защиты для блока «HTML-код».
+# Пропускает только безопасные теги; script/style/iframe вырезаются целиком
+# вместе с содержимым; из остальных тегов удаляются on*-атрибуты и
+# javascript:/data:-URL. Реализован на stdlib html.parser (без зависимостей).
+_SANITIZE_ALLOWED_TAGS = {
+    'a', 'b', 'i', 'em', 'strong', 'u', 's', 'p', 'br',
+    'ul', 'ol', 'li', 'div', 'span',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'img',
+}
+_SANITIZE_DROP_WITH_CONTENT = {'script', 'style', 'iframe', 'object', 'embed'}
+_SANITIZE_ALLOWED_ATTRS = {
+    'a': {'href', 'title', 'target', 'rel'},
+    'img': {'src', 'alt', 'title', 'width', 'height'},
+    '*': {'class', 'id', 'title', 'align'},
+}
+
+
+def _sanitize_url(value):
+    """Разрешить только http(s): и относительные ссылки; иначе пустая строка."""
+    value = (value or '').strip()
+    if not value:
+        return ''
+    low = value.lower()
+    if low.startswith(('javascript:', 'data:', 'vbscript:')):
+        return ''
+    if low.startswith(('http://', 'https://', '/', '#', 'mailto:', 'tel:')):
+        return value
+    return ''
+
+
+class _SanitizeHTMLParser(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.out = []
+        self._drop_stack = []   # вложенность вырезаемых тегов (script/style/iframe)
+
+    def _dropping(self):
+        return bool(self._drop_stack)
+
+    def handle_starttag(self, tag, attrs):
+        tag = tag.lower()
+        if tag in _SANITIZE_DROP_WITH_CONTENT:
+            self._drop_stack.append(tag)
+            return
+        if self._dropping() or tag not in _SANITIZE_ALLOWED_TAGS:
+            return
+        allowed = _SANITIZE_ALLOWED_ATTRS.get(tag, set()) | _SANITIZE_ALLOWED_ATTRS['*']
+        clean = []
+        for name, value in attrs:
+            name = name.lower()
+            if name.startswith('on') or name not in allowed:
+                continue
+            if name in ('href', 'src'):
+                value = _sanitize_url(value)
+                if not value:
+                    continue
+            if name == 'target' and value not in ('_blank', '_self'):
+                continue
+            if name in ('width', 'height') and not re.fullmatch(r'\d{1,4}', str(value or '')):
+                continue
+            clean.append(f'{name}="{esc(value)}"' if value is not None else name)
+        suffix = ' ' + ' '.join(clean) if clean else ''
+        if tag in ('br', 'img'):
+            self.out.append(f'<{tag}{suffix}>')
+        else:
+            self.out.append(f'<{tag}{suffix}>')
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+
+    def handle_endtag(self, tag):
+        tag = tag.lower()
+        if self._drop_stack:
+            if tag == self._drop_stack[-1]:
+                self._drop_stack.pop()
+            return
+        if tag in _SANITIZE_ALLOWED_TAGS and tag not in ('br', 'img'):
+            self.out.append(f'</{tag}>')
+
+    def handle_data(self, data):
+        if not self._dropping():
+            self.out.append(esc(data))
+
+    def handle_entityref(self, name):
+        if not self._dropping():
+            self.out.append(f'&{name};')
+
+    def handle_charref(self, name):
+        if not self._dropping():
+            self.out.append(f'&#{name};')
+
+    def handle_comment(self, data):
+        pass   # комментарии не пропускаем
+
+
+def _sanitize_html(raw):
+    """Очистить произвольный HTML до безопасного подмножества тегов."""
+    parser = _SanitizeHTMLParser()
+    try:
+        parser.feed(str(raw or ''))
+        parser.close()
+    except Exception:
+        return ''
+    return ''.join(parser.out)
 
 
 def _is_superadmin():
@@ -355,8 +462,10 @@ def render_block(block):
         # Блок «HTML-код» (CN-2): рендерится без эскейпинга ТОЛЬКО для
         # суперадмина; остальным — комментарий-заглушка (сохранение таких
         # блоков не-суперадмином отсекает ещё и сервер, app.py page-save).
+        # Этап 6.1 (defense in depth): даже суперадминский HTML проходит
+        # через санитайзер — script/iframe/on* не доходят до страницы.
         if _is_superadmin():
-            return block.get('html', '') or ''
+            return _sanitize_html(block.get('html', '') or '')
         return '<!-- html block: restricted -->'
 
     if btype == 'timer':

@@ -13,6 +13,7 @@
     Сессионный ключ: env SECRET_KEY (без него сессии сбрасываются при перезапуске).
 """
 import hashlib
+import ipaddress
 import json
 import mimetypes
 import os
@@ -21,6 +22,7 @@ import secrets
 import shutil
 import threading
 import time
+from collections import deque
 from datetime import datetime, timezone
 from functools import wraps
 from pathlib import Path
@@ -66,6 +68,21 @@ cache = Cache(app, config={
     'CACHE_TYPE': os.environ.get('CACHE_TYPE', 'SimpleCache'),
     'CACHE_DEFAULT_TIMEOUT': 300,
 })
+
+# Этап 6.1 (2.2.7 ТЗ): HTTPS-only — выключено по умолчанию, включается env FORCE_HTTPS=1
+# (за nginx с TLS редиректит на https и выставляет HSTS; /health не трогаем).
+FORCE_HTTPS = os.environ.get('FORCE_HTTPS') == '1'
+
+
+@app.before_request
+def force_https_redirect():
+    """308-редирект на https при FORCE_HTTPS=1 (кроме /health для проверок)."""
+    if not FORCE_HTTPS or request.path == '/health':
+        return None
+    proto = request.headers.get('X-Forwarded-Proto', request.scheme)
+    if proto == 'https':
+        return None
+    return redirect(request.url.replace('http://', 'https://', 1), code=308)
 
 
 def invalidate_site_cache():
@@ -193,8 +210,24 @@ def add_cache_headers(response):
     Error responses must never be cached long-term: a cached 404 (e.g. for a
     lazy-loaded include that did not exist yet) would otherwise stick in the
     browser for a year and break the site's lazy-load queue permanently.
+
+    Этап 6.1 (2.2.7 ТЗ): CSP мягкий — на страницах есть инлайн-скрипты/стили
+    (unsafe-inline обязателен), script-src допускает https: (Метрика/GA),
+    frame-src — только Яндекс.Карты и YouTube/Vimeo (блок map/video).
     """
     path = request.path
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "img-src 'self' data: https:; "
+        "style-src 'self' 'unsafe-inline'; "
+        "script-src 'self' 'unsafe-inline' https:; "
+        "font-src 'self' data:; "
+        "connect-src 'self' https:; "
+        "frame-src https://yandex.ru https://yastatic.net https://www.youtube.com https://player.vimeo.com; "
+        "frame-ancestors 'self'"
+    )
+    if FORCE_HTTPS:
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     if response.status_code >= 400:
         response.headers['Cache-Control'] = 'no-store, must-revalidate'
     elif path in ('/static/js/page-editor.js', '/static/css/page-editor.css', '/static/js/wb-actions.js'):
@@ -353,6 +386,77 @@ def csrf_guard():
     return None
 
 
+def _rate_limit(max_per_minute=20):
+    """Простой in-memory rate-limit публичных POST (Этап 6.1, 2.2.7 ТЗ).
+
+    Счётчик — deque временных меток по ключу (ip, endpoint) в памяти
+    процесса, без внешних зависимостей. При превышении — 429.
+    """
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            now = time.monotonic()
+            key = (request.remote_addr or '?', request.endpoint or request.path)
+            with _rate_lock:
+                bucket = _rate_buckets.get(key)
+                if bucket is None:
+                    bucket = _rate_buckets[key] = deque()
+                while bucket and now - bucket[0] > 60:
+                    bucket.popleft()
+                if len(bucket) >= max_per_minute:
+                    return jsonify({'success': False,
+                                    'error': 'Слишком много запросов. Повторите через минуту'}), 429
+                bucket.append(now)
+                # Раз в ~5000 ключей вычищаем давно пустые корзины
+                if len(_rate_buckets) > 5000:
+                    stale = [k for k, b in _rate_buckets.items() if not b or now - b[-1] > 3600]
+                    for k in stale:
+                        _rate_buckets.pop(k, None)
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+_rate_lock = threading.Lock()
+_rate_buckets = {}
+
+# Lockout входа в админку (Этап 6.1): 5 неудачных попыток подряд для
+# пары (логин, IP) → блокировка на 15 минут. In-memory — для одного
+# процесса; при мультисерверном деплое счётчики не общие (см. WORKLOG).
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_BLOCK_SECONDS = 15 * 60
+_login_lock = threading.Lock()
+_login_attempts = {}   # (username, ip) -> {'count': int, 'blocked_until': float}
+
+
+def _login_blocked_left(username):
+    """Остаток блокировки в минутах для пары (логин, IP); 0 — не заблокирован."""
+    key = (str(username or '').lower(), request.remote_addr or '?')
+    with _login_lock:
+        rec = _login_attempts.get(key)
+        if not rec:
+            return 0
+        left = rec.get('blocked_until', 0) - time.monotonic()
+        return -(-int(left) // 60) if left > 0 else 0   # ceil до минут
+
+
+def _login_fail(username):
+    """Зафиксировать неудачную попытку; при 5-й подряд — блокировка на 15 минут."""
+    key = (str(username or '').lower(), request.remote_addr or '?')
+    with _login_lock:
+        rec = _login_attempts.setdefault(key, {'count': 0, 'blocked_until': 0})
+        rec['count'] += 1
+        if rec['count'] >= LOGIN_MAX_ATTEMPTS:
+            rec['blocked_until'] = time.monotonic() + LOGIN_BLOCK_SECONDS
+
+
+def _login_success(username):
+    """Сброс счётчика неудачных попыток после успешного входа."""
+    key = (str(username or '').lower(), request.remote_addr or '?')
+    with _login_lock:
+        _login_attempts.pop(key, None)
+
+
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -383,7 +487,11 @@ def admin_login():
     if request.method == 'POST':
         username = request.form.get('username', '')
         password = request.form.get('password', '')
-        if check_auth(username, password):
+        blocked_min = _login_blocked_left(username)
+        if blocked_min:
+            error = f'Слишком много попыток. Повторите через {blocked_min} минут'
+        elif check_auth(username, password):
+            _login_success(username)
             session['admin_user'] = username
             session.pop('csrf_token', None)  # новый токен для новой сессии
             found = _find_admin_user(username)
@@ -391,7 +499,9 @@ def admin_login():
             if ADMIN_CREDENTIALS.get('must_change_password'):
                 return redirect(url_for('admin_change_password'))
             return redirect(request.args.get('next') or url_for('admin'))
-        error = 'Неверный логин или пароль'
+        else:
+            _login_fail(username)
+            error = 'Неверный логин или пароль'
     return render_template('admin_login.html', error=error)
 
 
@@ -829,6 +939,7 @@ def api_cart_update():
 
 
 @app.route('/api/cart/checkout', methods=['POST'])
+@_rate_limit(20)
 def api_cart_checkout():
     """Оформление корзины заявкой без оплаты (LC-4).
 
@@ -933,6 +1044,7 @@ def auth_page():
 
 
 @app.route('/api/client/register', methods=['POST'])
+@_rate_limit(20)
 def api_client_register():
     """Регистрация клиента: телефон + пароль (LC-1)."""
     data = request.get_json() or request.form.to_dict() or {}
@@ -950,6 +1062,7 @@ def api_client_register():
 
 
 @app.route('/api/client/login', methods=['POST'])
+@_rate_limit(20)
 def api_client_login():
     """Вход клиента по телефону+паролю (LC-1, LC-2)."""
     data = request.get_json() or request.form.to_dict() or {}
@@ -1693,6 +1806,53 @@ def admin_save():
     return jsonify({'success': True})
 
 
+# Валидация загрузки файлов в админку (Этап 6.1, 2.2.7 ТЗ): whitelist
+# расширений, лимит 10 МБ, проверка MIME/содержимого, уникальные имена.
+UPLOAD_ALLOWED_EXTS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg',
+                       'css', 'js', 'txt', 'pdf', 'woff', 'woff2'}
+UPLOAD_MAX_BYTES = 10 * 1024 * 1024
+# Ожидаемый тип содержимого по расширению (префикс content_type файла).
+UPLOAD_CONTENT_PREFIX = {
+    'png': 'image/', 'jpg': 'image/', 'jpeg': 'image/', 'gif': 'image/',
+    'webp': 'image/', 'svg': 'image/',
+    'css': 'text/css', 'js': ('text/javascript', 'application/javascript'),
+    'txt': 'text/plain', 'pdf': 'application/pdf',
+    'woff': ('font/', 'application/'), 'woff2': ('font/', 'application/'),
+}
+# Магические байты растровых изображений (проверяются, если Pillow недоступен).
+_IMAGE_MAGIC = {
+    'png': (b'\x89PNG\r\n\x1a\n',),
+    'jpg': (b'\xff\xd8\xff',),
+    'gif': (b'GIF87a', b'GIF89a'),
+    'webp': (b'RIFF',),   # точное «WEBP» в начале чанка проверяет PIL
+}
+try:
+    from PIL import Image as _PILImage
+except Exception:
+    _PILImage = None
+
+
+def _upload_content_ok(ext, content_type, data):
+    """MIME-проверка file.content_type + сигнатура изображения (PIL опционально)."""
+    expected = UPLOAD_CONTENT_PREFIX.get(ext)
+    if expected:
+        prefixes = expected if isinstance(expected, tuple) else (expected,)
+        ctype = (content_type or '').split(';')[0].strip().lower()
+        if not ctype or not any(ctype.startswith(p) for p in prefixes):
+            return False
+    if ext in ('png', 'jpg', 'jpeg', 'gif', 'webp'):
+        if _PILImage is not None:
+            try:
+                import io
+                img = _PILImage.open(io.BytesIO(data))
+                img.verify()
+                return True
+            except Exception:
+                return False
+        return any(data.startswith(sig) for sig in _IMAGE_MAGIC.get(ext, ()))
+    return True
+
+
 @app.route('/admin/api/upload', methods=['POST'])
 @admin_required
 def admin_upload():
@@ -1701,11 +1861,32 @@ def admin_upload():
     file = request.files['file']
     if file.filename == '':
         return jsonify({'success': False, 'error': 'Empty filename'}), 400
+    # Имя файла из запроса — только источник расширения; путь/имя не доверяем.
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    if ext not in UPLOAD_ALLOWED_EXTS:
+        return jsonify({'success': False,
+                        'error': f'Тип файла .{ext or "?"} не разрешён. '
+                                 f'Разрешены: {", ".join(sorted(UPLOAD_ALLOWED_EXTS))}'}), 400
+    data = file.read()
+    if not data:
+        return jsonify({'success': False, 'error': 'Пустой файл'}), 400
+    if len(data) > UPLOAD_MAX_BYTES:
+        return jsonify({'success': False,
+                        'error': 'Файл больше 10 МБ'}), 400
+    if not _upload_content_ok(ext, file.content_type, data):
+        return jsonify({'success': False,
+                        'error': 'Содержимое файла не соответствует расширению/MIME'}), 400
     upload_dir = BASE_DIR / 'static' / 'uploads'
-    upload_dir.mkdir(exist_ok=True)
-    filename = file.filename
-    path = upload_dir / filename
-    file.save(path)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    # Уникальное имя + запрет перезаписи: коллизия (или повтор) — ошибка, а не затирание.
+    for _ in range(5):
+        filename = f"{secrets.token_hex(8)}.{ext}"
+        path = upload_dir / filename
+        if not path.exists():
+            break
+    else:
+        return jsonify({'success': False, 'error': 'Не удалось сгенерировать уникальное имя'}), 500
+    path.write_bytes(data)
     return jsonify({'success': True, 'url': f'/static/uploads/{filename}'})
 
 
@@ -2284,6 +2465,7 @@ def _seo_product(product, host_url):
 
 
 @app.route('/api/register', methods=['POST'])
+@_rate_limit(20)
 def api_register():
     """Register a new customer (or update existing by phone)."""
     data = request.get_json() or request.form.to_dict() or {}
@@ -2298,6 +2480,7 @@ def api_register():
 
 
 @app.route('/api/order', methods=['POST'])
+@_rate_limit(20)
 def api_order():
     """Create a new order from public form (one-click buy)."""
     data = request.get_json() or request.form.to_dict() or {}
@@ -2328,6 +2511,7 @@ def api_order():
 
 
 @app.route('/api/like', methods=['POST'])
+@_rate_limit(20)
 def api_like():
     """Register a public like for a product."""
     data = request.get_json() or request.form.to_dict() or {}
@@ -2652,47 +2836,106 @@ def ensure_placeholder():
     return placeholder
 
 
+# Разрешённые хосты изображений маркетплейсов (Этап 6.1): точный список
+# шаблонов вместо широких подстрок (защита от SSRF-обхода вида evilbasket-.ru).
+PROXY_HOST_PATTERNS = [
+    re.compile(r'^basket-\d{2}\.wbbasket\.ru$'),
+    re.compile(r'^static-basket-\d{2}\.wb\.ru$'),
+    re.compile(r'^cdn\d*\.wildberries\.ru$'),
+    re.compile(r'^www\.wildberries\.ru$'),
+    re.compile(r'^cdn\d*\.ozone\.ru$'),
+    re.compile(r'^cdn\d*\.ozon\.ru$'),
+]
+_PROXY_BLOCKED_HOSTNAMES = {'localhost', '127.0.0.1', '::1', '0.0.0.0'}
+
+
+def _proxy_host_allowed(host):
+    """True только для разрешённых CDN-хостов маркетплейсов; IP и localhost — запрещены."""
+    host = (host or '').strip().lower().split(':')[0]
+    if not host or host in _PROXY_BLOCKED_HOSTNAMES:
+        return False
+    try:
+        ipaddress.ip_address(host)   # любой IP-литерал (в т.ч. внутренние 10/172.16/192.168)
+        return False
+    except ValueError:
+        pass
+    return any(p.fullmatch(host) for p in PROXY_HOST_PATTERNS)
+
+
+def _convert_to_webp(data, max_side=1600):
+    """Конвертация растрового изображения в WebP с ресайзом до max_side px.
+
+    Pillow опционально: без неё возвращает None и прокси отдаёт оригинал
+    (Этап 6.2). SVG и нерастровые форматы не трогаем.
+    """
+    if _PILImage is None:
+        return None
+    try:
+        import io
+        img = _PILImage.open(io.BytesIO(data))
+        img.load()
+        if max(img.size) > max_side:
+            img.thumbnail((max_side, max_side), _PILImage.LANCZOS)
+        if img.mode not in ('RGB', 'RGBA'):
+            img = img.convert('RGB')
+        buf = io.BytesIO()
+        img.save(buf, 'WEBP', quality=82)
+        return buf.getvalue()
+    except Exception:
+        return None
+
+
 @app.route('/proxy/image')
 def proxy_image():
     """Proxy and cache external product images to avoid ORB/CORS issues.
 
     If the upstream image is unreachable, a local placeholder is returned so
     the layout does not break.
+
+    Этап 6.1: только точный список CDN-хостов WB/Ozon, file:// и внутренние
+    IP запрещены (SSRF). Этап 6.2: новые картинки кэшируются как WebP ≤1600px.
     """
     url = request.args.get('url', '').strip()
-    if not url or not (url.startswith('http://') or url.startswith('https://')):
-        return send_from_directory(BASE_DIR / 'static', 'noimage.png')
-    # Safety: only allow known market image hosts
-    allowed_hosts = ('basket-', 'cdn', 'wildberries.ru', 'wb.ru')
     from urllib.parse import urlparse
-    host = urlparse(url).netloc.lower()
-    if not any(h in host for h in allowed_hosts):
+    parsed = urlparse(url)
+    if parsed.scheme not in ('http', 'https') or not parsed.netloc:
+        return send_from_directory(BASE_DIR / 'static', 'noimage.png')
+    if not _proxy_host_allowed(parsed.hostname):
         return send_from_directory(BASE_DIR / 'static', 'noimage.png')
     cache_key = hashlib.sha256(url.encode('utf-8')).hexdigest()[:32]
-    ext = Path(urlparse(url).path).suffix or '.jpg'
+    ext = Path(parsed.path).suffix or '.jpg'
     if ext.lower() not in ('.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg', '.bmp', '.ico'):
         ext = '.jpg'
-    cache_file = IMAGE_CACHE_DIR / f"{cache_key}{ext}"
-    if not cache_file.exists():
-        try:
-            r = requests.get(url, timeout=6, headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-            })
-            if r.status_code == 200:
-                cache_file.write_bytes(r.content)
-        except Exception:
-            pass
+    webp_file = IMAGE_CACHE_DIR / f'{cache_key}.webp'
+    cache_file = IMAGE_CACHE_DIR / f'{cache_key}{ext}'
+
+    def _serve(path, mimetype):
+        return send_from_directory(IMAGE_CACHE_DIR, path.name,
+                                   mimetype=mimetype, max_age=86400 * 30)
+
+    if webp_file.exists():
+        return _serve(webp_file, 'image/webp')
+    if cache_file.exists():   # старый кэш, записанный до WebP-конвертации
+        content_type, _ = mimetypes.guess_type(str(cache_file))
+        return _serve(cache_file, content_type or 'image/jpeg')
+
+    try:
+        r = requests.get(url, timeout=6, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        })
+        if r.status_code == 200 and r.content:
+            if ext.lower() != '.svg':
+                converted = _convert_to_webp(r.content)
+                if converted:
+                    webp_file.write_bytes(converted)
+                    return _serve(webp_file, 'image/webp')
+            cache_file.write_bytes(r.content)
+    except Exception:
+        pass
     if cache_file.exists():
         content_type, _ = mimetypes.guess_type(str(cache_file))
-        if not content_type:
-            content_type = 'image/jpeg'
-        return send_from_directory(
-            IMAGE_CACHE_DIR,
-            cache_file.name,
-            mimetype=content_type,
-            max_age=86400 * 30,
-        )
+        return _serve(cache_file, content_type or 'image/jpeg')
     placeholder = ensure_placeholder()
     return send_from_directory(
         BASE_DIR / 'static',

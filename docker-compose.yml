@@ -1,0 +1,42 @@
+# Экотория: app + nginx (Этап 6.4, AR-8)
+# Запуск: docker compose up -d --build
+# ENV-переменные (ADMIN_USER, ADMIN_PASS, SECRET_KEY, WB_API_TOKEN, OZON_*)
+# задавайте в .env рядом с этим файлом или через `environment:`.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: sqlite:////app/data/ekotoriya.db
+      CACHE_TYPE: SimpleCache
+      FORCE_HTTPS: "1"            # за nginx с TLS — редирект на https + HSTS
+      SECRET_KEY: ${SECRET_KEY:-}
+      ADMIN_USER: ${ADMIN_USER:-}
+      ADMIN_PASS: ${ADMIN_PASS:-}
+      WB_API_TOKEN: ${WB_API_TOKEN:-}
+      OZON_CLIENT_ID: ${OZON_CLIENT_ID:-}
+      OZON_API_KEY: ${OZON_API_KEY:-}
+    volumes:
+      - app-data:/app/data           # SQLite, image_cache, content-фолбэки
+      - app-uploads:/app/static/uploads  # файлы, загруженные через админку
+    expose:
+      - "8000"
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./static:/var/www/static:ro          # статика напрямую из nginx
+      - app-uploads:/var/www/static/uploads:ro
+      - ./data/image_cache:/var/www/image_cache:ro
+      # - ./certs:/etc/nginx/certs:ro        # TLS: положите fullchain.pem/privkey.pem
+    depends_on:
+      - app
+
+volumes:
+  app-data:
+  app-uploads:
