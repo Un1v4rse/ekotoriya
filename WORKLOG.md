@@ -56,6 +56,23 @@
 
 (новые записи — сверху, под этой строкой; самая свежая запись всегда первая)
 
+## [2026-09-21 23:20] Задача: [цикл2-CN-T10+CN-T12+CN-T4+CN-T8] — Серверная часть конструктора и рендер (2 агента, параллельно)
+- Статус: done
+- Сделано:
+  - **CN-T10/12 (коммит `ce28fe3`, агент-7):** миграция `migrate_cycle2.py` (pages.published_blocks + pages.settings JSON, таблицы page_versions/block_templates, идемпотентна, авто-при старте; БД уже мигрирована, backfill 36/36). Черновик в колонке Page.draft_blocks (fallback на старый site_settings.page_drafts); `POST /admin/api/page-publish` (draft→published, пересборка content_html, автоснапшот версии). Версии: page-version-save (лимит 10), GET page-versions, page-version-restore (в черновик, без авто-публикации). «Мои блоки»: block-templates GET/POST/DELETE. Шаблоны страниц: `page_templates.py` (landing/showcase/contacts), GET page-templates, POST page-templates/create (add-page отрефакторен в `_create_page`, поведение прежнее). Зоны: `zones.py` (default_zones из content.menu/logo/socials, render_zone с полным экранированием, validate_zone), GET/POST /admin/api/global-zones; `_new_page_base.html` переписан в чистый шаблон с зонами (32 legacy-страницы не тронуты); дефолт use_global=False. Настройки страницы: GET/POST /admin/api/page-settings (мета в колонки, og/favicon/bg/link_color/custom_css/js в Page.settings; custom_css/js — только суперадмин; вывод og/favicon/стилей в seo_head.html). Тема: `fonts.py` (35 шрифтов с кириллицей), GET /admin/api/fonts?q=, THEME_DEFAULTS расширен (heading/body_font_google, h1–h6, интерлиньяж, button_shadow/variant), GET/POST /admin/api/theme с историей (≤10, restore_history), /theme.css с новыми переменными и @import только валидных шрифтов.
+  - **CN-T4/8 рендер (коммит `51d44e8`, агент-8):** `_block_wrapper` для всех типов (фон color/image/gradient/video+parallax+opacity, отступы, min_height, container full, content_align, effects: anim/sticky/decor/hide_on/hidden, css_class, custom_css только суперадмину с санитайзом, scoped по uid); `_typo` типографика элементов (font/google-fonts 33 семейства, size/line-height/tracking/weight/italic/caps/align); `_button_style` (variant/radius/shadow/hover/size) для button/banner/timer/form/zero; **Zero-блок** (элементы text/button/image/shape/video/icon в %, rotate, z, адаптив @media 1024/640 из responsive, RuTube); ANIMATIONS_ASSETS (IntersectionObserver + CSS, подключается только при наличии эффектов); Google Fonts link собирается один раз на страницу. html/section на wrapper НЕ мигрированы (сырой HTML/санитайз — осознанно).
+  - **CN-T12.3 (коммит `fdba238`, я):** `GET /admin/api/media` — медиатека static/uploads (поиск ?q=, лимит, mtime desc). Эндпоинта recent-uploads не существовало (был только в списке прав).
+- Изменённые файлы: app.py, models.py, blocks.py, storage.py (нет), zones.py, fonts.py, page_templates.py, migrate_cycle2.py, templates/pages/_new_page_base.html, templates/seo_head.html, tests/test_cycle2_server.py (27 тестов), tests/test_cycle2_blocks.py (35 тестов).
+- Проверки: `pytest` — **214 passed** (152 прежних + 62 новых); сервер стартует (bash-1ltyohxj), `/`, `/catalog/`, `/basket/`, `/auth/`, `/theme.css`, `/sitemap.xml`, `/admin/login` → 200.
+- Бэкапы: 02-55, 03-50, 21_20-45 (без изменений).
+- Следующий шаг: **CN-T1–CN-T3 + CN-T11 — полная переработка фронтенда-редактора** (`static/js/page-editor.js` + `static/css/page-editor.css`): трёхзонный Tilda-layout (библиотека блоков слева / холст / правая панель настроек по вкладкам), верхняя панель (undo/redo, preview 1200/768/360, настройки страницы, черновик/опубликовано, сохранить/опубликовать), инлайн-редактирование с мини-тулбаром, hover-мост «+», панель «Контент страницы», горячие клавиши. API-контракт готов (см. коммиты выше).
+- Примечания:
+  - Агент-7: `published_at` в GET page-draft = updated_at при наличии published_blocks (отдельной колонки в ТЗ нет). У footer добавлен ключ use_global (по аналогии с header). override_* форсирует use_global при рендере. История темы не пушится при сохранении через старые роуты (/admin/api/save, theme-presets) — осознанно.
+  - Агент-7: тест test_duplicate_page копирует текущий `_new_page_base.html` в templates/pages/akcii.html — после прогонов тестов этот файл «грязный», в коммиты не включать (восстанавливать `git checkout -- templates/pages/akcii.html`).
+  - Агент-8: старая разметка блоков без новых полей визуально идентична (отличие — хвостовая `;` в style, тесты сравнивают нормализованно). `_sanitize_url` теперь отсекает URL с кавычками/пробелами/<> (усиление, существующие тесты не пострадали).
+
+---
+
 ## [2026-09-21 20:55] Задача: [цикл2-этап-0] — Аудит и подготовка к циклу 2 (конструктор как Tilda)
 - Статус: done
 - Сделано:
