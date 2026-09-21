@@ -332,6 +332,8 @@
                 <button data-tab="site" data-section="site">🏠 Настройки сайта</button>
                 <button data-tab="theme" data-section="theme">🎨 Дизайн: цвета и шрифты</button>
                 <button data-tab="menu" data-section="menu">☰ Меню сайта (шапка)</button>
+                <button data-tab="zones" data-section="zones">🧱 Шапка и подвал</button>
+                <button data-tab="templates" data-section="pages">📐 Шаблоны</button>
                 <button data-tab="socials" data-section="socials">👍 Соцсети</button>
                 <button data-tab="wildberries" data-section="integrations">🛒 Интеграции (WB / Ozon)</button>
                 <button data-tab="customers" data-section="customers">👥 Клиенты и заявки</button>
@@ -535,6 +537,71 @@
                         </div>
                     </div>
                     <hr style="border:0;border-top:1px solid var(--border);margin:1.2rem 0;">
+                    <h3 style="margin:0 0 0.6rem;">Расширенная тема (уровень Tilda)</h3>
+                    <div class="row">
+                        <div class="field" style="position:relative;">
+                            <label>Шрифт заголовков (Google Fonts)</label>
+                            <input type="text" id="theme-heading-font-google" autocomplete="off" placeholder="Поиск шрифта…">
+                            <div id="theme-heading-font-list" style="position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid var(--border);z-index:30;max-height:260px;overflow:auto;display:none;"></div>
+                            <div class="help" style="margin-top:0.3rem;">Выбрано: <b id="theme-heading-font-current">—</b></div>
+                            <button type="button" class="secondary" style="margin-top:0.2rem;" onclick="clearGoogleFont('heading')">Очистить (системный шрифт)</button>
+                        </div>
+                        <div class="field" style="position:relative;">
+                            <label>Шрифт текста (Google Fonts)</label>
+                            <input type="text" id="theme-body-font-google" autocomplete="off" placeholder="Поиск шрифта…">
+                            <div id="theme-body-font-list" style="position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid var(--border);z-index:30;max-height:260px;overflow:auto;display:none;"></div>
+                            <div class="help" style="margin-top:0.3rem;">Выбрано: <b id="theme-body-font-current">—</b></div>
+                            <button type="button" class="secondary" style="margin-top:0.2rem;" onclick="clearGoogleFont('body')">Очистить (системный шрифт)</button>
+                        </div>
+                    </div>
+                    <div class="row3">
+                        <div class="field"><label for="theme-h1-size">H1</label><input type="text" id="theme-h1-size" data-path="site.theme.h1_size" placeholder="2.5rem"></div>
+                        <div class="field"><label for="theme-h2-size">H2</label><input type="text" id="theme-h2-size" data-path="site.theme.h2_size" placeholder="2rem"></div>
+                        <div class="field"><label for="theme-h3-size">H3</label><input type="text" id="theme-h3-size" data-path="site.theme.h3_size" placeholder="1.6rem"></div>
+                    </div>
+                    <div class="row3">
+                        <div class="field"><label for="theme-h4-size">H4</label><input type="text" id="theme-h4-size" data-path="site.theme.h4_size" placeholder="1.3rem"></div>
+                        <div class="field"><label for="theme-h5-size">H5</label><input type="text" id="theme-h5-size" data-path="site.theme.h5_size" placeholder="1.1rem"></div>
+                        <div class="field"><label for="theme-h6-size">H6</label><input type="text" id="theme-h6-size" data-path="site.theme.h6_size" placeholder="1rem"></div>
+                    </div>
+                    <div class="row">
+                        <div class="field">
+                            <label for="theme-base-line-height">Базовый интерлиньяж</label>
+                            <input type="text" id="theme-base-line-height" data-path="site.theme.base_line_height" placeholder="1.6">
+                        </div>
+                        <div class="field">
+                            <label for="theme-heading-line-height">Интерлиньяж заголовков</label>
+                            <input type="text" id="theme-heading-line-height" data-path="site.theme.heading_line_height" placeholder="1.2">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="field">
+                            <label for="theme-button-variant">Кнопки по умолчанию — вариант</label>
+                            <select id="theme-button-variant" data-path="site.theme.button_variant">
+                                <option value="fill">Заливка</option>
+                                <option value="outline">Обводка</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="theme-button-shadow">Кнопки по умолчанию — тень</label>
+                            <select id="theme-button-shadow" data-path="site.theme.button_shadow">
+                                <option value="0">Нет</option>
+                                <option value="1">Слабая</option>
+                                <option value="2">Сильная</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row" style="align-items:flex-end;">
+                        <button type="button" class="primary" onclick="saveExtendedTheme()">Сохранить расширенную тему</button>
+                        <button type="button" class="secondary" onclick="previewExtendedTheme()">👁 Предпросмотр на главной</button>
+                        <button type="button" class="secondary" onclick="pinThemeVersion()">📌 Зафиксировать версию</button>
+                    </div>
+                    <div id="theme-extended-msg" class="help" style="margin-top:0.5rem;"></div>
+                    <div class="field" style="margin-top:0.8rem;">
+                        <label>История темы (последние 10 изменений)</label>
+                        <div id="theme-history-list" class="help">Загрузка…</div>
+                    </div>
+                    <hr style="border:0;border-top:1px solid var(--border);margin:1.2rem 0;">
                     <h3 style="margin:0 0 0.6rem;">Пресеты темы</h3>
                     <div class="help" style="margin-bottom:0.6rem;">Сохраните текущие цвета и шрифты как пресет, чтобы быстро переключаться между оформлениями. Применённый пресет сразу становится темой сайта.</div>
                     <div class="row" style="align-items:flex-end;">
@@ -555,6 +622,132 @@
                     <div class="help" style="margin-bottom:1rem;">Это меню показывается в шапке сайта (компьютер и телефон). «Подпункты» — выпадающий список при наведении.</div>
                     <div id="menu-editor"></div>
                     <button type="button" class="secondary" onclick="menuAddRoot()">+ Добавить пункт меню</button>
+                </section>
+
+                <!-- Глобальные зоны шапки/подвала (CN-T6) -->
+                <section id="tab-zones">
+                    <h2>Шапка и подвал</h2>
+                    <div class="help" style="margin-bottom:1rem;">Зоны применяются к страницам, созданным из базового шаблона. Для конкретной страницы зону можно переопределить в настройках страницы в редакторе.</div>
+                    <div class="field">
+                        <label><input type="checkbox" id="zone-header-use-global"> Использовать глобальную шапку (зона поверх шаблона страницы)</label>
+                    </div>
+                    <h3 style="margin:0.8rem 0 0.4rem;">Шапка</h3>
+                    <div class="row">
+                        <div class="field">
+                            <label>Логотип</label>
+                            <label><input type="radio" name="zone-header-logo-mode" value="image" id="zone-header-logo-image-mode"> Картинка</label>
+                            <label><input type="radio" name="zone-header-logo-mode" value="text" id="zone-header-logo-text-mode"> Текст</label>
+                        </div>
+                        <div class="field" id="zone-header-logo-image-field">
+                            <label for="zone-header-logo-image">URL логотипа (картинка)</label>
+                            <input type="text" id="zone-header-logo-image" placeholder="/static/uploads/logo.png">
+                            <button type="button" class="secondary" style="margin-top:0.3rem;" onclick="pickMediaFile('zone-header-logo-image')">📁 Медиатека</button>
+                            <button type="button" class="secondary" style="margin-top:0.3rem;" onclick="uploadToField('zone-header-logo-image')">⬆ Загрузить файл</button>
+                            <input type="file" id="zone-header-logo-image-file" accept="image/*" style="margin-top:0.3rem;">
+                        </div>
+                        <div class="field" id="zone-header-logo-text-field">
+                            <label for="zone-header-logo-text">Текстовый логотип</label>
+                            <input type="text" id="zone-header-logo-text" placeholder="Экотория">
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>Меню шапки (2 уровня)</label>
+                        <div id="zone-header-menu"></div>
+                        <button type="button" class="secondary" style="margin-top:0.3rem;" onclick="zoneHeaderMenuAdd()">+ Добавить пункт</button>
+                    </div>
+                    <div class="row">
+                        <div class="field">
+                            <label for="zone-header-phone">Телефон</label>
+                            <input type="text" id="zone-header-phone" placeholder="8 800 201 08 24">
+                        </div>
+                        <div class="field">
+                            <label for="zone-header-email">Email</label>
+                            <input type="email" id="zone-header-email" placeholder="info@ekotoriya.ru">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="field">
+                            <label for="zone-header-cta-text">Кнопка CTA — текст</label>
+                            <input type="text" id="zone-header-cta-text" placeholder="Заказать звонок">
+                        </div>
+                        <div class="field">
+                            <label for="zone-header-cta-url">Кнопка CTA — URL</label>
+                            <input type="text" id="zone-header-cta-url" placeholder="/contacts/">
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>Соцсети шапки (иконка — текст до 4 символов)</label>
+                        <div id="zone-header-socials"></div>
+                        <button type="button" class="secondary" style="margin-top:0.3rem;" onclick="zoneHeaderSocialAdd()">+ Добавить соцсеть</button>
+                    </div>
+                    <div class="row3">
+                        <div class="field">
+                            <label><input type="checkbox" id="zone-header-sticky"> Прилипает при прокрутке (sticky)</label>
+                        </div>
+                        <div class="field">
+                            <label><input type="checkbox" id="zone-header-transparent"> Прозрачная поверх первого блока</label>
+                        </div>
+                        <div class="field">
+                            <label for="zone-header-height">Высота шапки, px</label>
+                            <input type="number" id="zone-header-height" min="30" max="300" step="1" value="80">
+                        </div>
+                    </div>
+                    <hr style="border:0;border-top:1px solid var(--border);margin:1.2rem 0;">
+                    <div class="field">
+                        <label><input type="checkbox" id="zone-footer-use-global"> Использовать глобальный подвал (зона поверх шаблона страницы)</label>
+                    </div>
+                    <h3 style="margin:0.8rem 0 0.4rem;">Подвал</h3>
+                    <div class="field">
+                        <label>Колонки меню подвала</label>
+                        <div id="zone-footer-columns"></div>
+                        <button type="button" class="secondary" style="margin-top:0.3rem;" onclick="zoneFooterColumnAdd()">+ Добавить колонку</button>
+                    </div>
+                    <div class="row">
+                        <div class="field">
+                            <label for="zone-footer-phone">Телефон</label>
+                            <input type="text" id="zone-footer-phone" placeholder="8 800 201 08 24">
+                        </div>
+                        <div class="field">
+                            <label for="zone-footer-email">Email</label>
+                            <input type="email" id="zone-footer-email" placeholder="info@ekotoriya.ru">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="field">
+                            <label for="zone-footer-address">Адрес</label>
+                            <input type="text" id="zone-footer-address" placeholder="Москва, ул. Примерная, 1">
+                        </div>
+                        <div class="field">
+                            <label for="zone-footer-copyright">Копирайт</label>
+                            <input type="text" id="zone-footer-copyright" placeholder="Экотория, 2025">
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>Соцсети подвала</label>
+                        <div id="zone-footer-socials"></div>
+                        <button type="button" class="secondary" style="margin-top:0.3rem;" onclick="zoneFooterSocialAdd()">+ Добавить соцсеть</button>
+                    </div>
+                    <div class="field">
+                        <label>Значки / бейджи (URL картинок)</label>
+                        <div id="zone-footer-badges"></div>
+                        <button type="button" class="secondary" style="margin-top:0.3rem;" onclick="zoneFooterBadgeAdd()">+ Добавить значок</button>
+                    </div>
+                    <button type="button" class="primary" onclick="saveZones()">Сохранить шапку и подвал</button>
+                    <span id="zones-msg" class="help" style="margin-left:0.5rem;"></span>
+                </section>
+
+                <!-- Шаблоны страниц и мои блоки (CN-T9) -->
+                <section id="tab-templates">
+                    <h2>Шаблоны</h2>
+                    <h3 style="margin:0 0 0.4rem;">Шаблоны страниц</h3>
+                    <div class="help" style="margin-bottom:0.6rem;">Готовые наборы блоков: создайте из них страницу одним кликом, затем отредактируйте её в редакторе.</div>
+                    <div id="page-templates-list" class="row" style="flex-wrap:wrap;align-items:stretch;"></div>
+                    <div id="page-templates-msg" class="help" style="margin:0.5rem 0;"></div>
+                    <hr style="border:0;border-top:1px solid var(--border);margin:1.2rem 0;">
+                    <h3 style="margin:0 0 0.4rem;">Мои блоки</h3>
+                    <div class="help" style="margin-bottom:0.6rem;">Сохранить блок в «Мои блоки» можно в редакторе страницы: выбрать блок → меню действий.</div>
+                    <div id="block-templates-list"></div>
+                    <div id="block-templates-msg" class="help" style="margin-top:0.5rem;"></div>
                 </section>
 
                 <section id="tab-socials">
@@ -2586,11 +2779,617 @@
             }
         }
 
+        /* ================= Глобальные зоны шапка/подвал (CN-T6) ================= */
+        let zonesData = null;
+
+        function zoneMoveBtn(list, index, rerender) {
+            const wrap = document.createElement('span');
+            wrap.style.whiteSpace = 'nowrap';
+            const mk = (txt, title, fn, del) => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = txt;
+                b.title = title;
+                if (del) b.classList.add('del');
+                b.addEventListener('click', fn);
+                wrap.appendChild(b);
+            };
+            mk('↑', 'Выше', () => {
+                if (index > 0) { [list[index - 1], list[index]] = [list[index], list[index - 1]]; rerender(); }
+            });
+            mk('↓', 'Ниже', () => {
+                if (index < list.length - 1) { [list[index + 1], list[index]] = [list[index], list[index + 1]]; rerender(); }
+            });
+            mk('✕', 'Удалить', () => { list.splice(index, 1); rerender(); }, true);
+            return wrap;
+        }
+
+        async function loadZones() {
+            if (zonesData) { renderZones(); return; }
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/global-zones`);
+                const result = await resp.json();
+                if (!result.success) { $('zones-msg').textContent = 'Ошибка: ' + (result.error || ''); return; }
+                zonesData = {header: result.header || {}, footer: result.footer || {}};
+                renderZones();
+            } catch (e) { $('zones-msg').textContent = 'Ошибка сети: ' + e.message; }
+        }
+
+        function renderZones() {
+            const h = zonesData.header;
+            $('zone-header-use-global').checked = h.use_global === true;
+            $('zone-header-logo-image').value = h.logo_image || '';
+            $('zone-header-logo-text').value = h.logo_text || '';
+            const logoMode = h.logo_image ? 'image' : 'text';
+            document.querySelectorAll('input[name="zone-header-logo-mode"]').forEach(r => { r.checked = r.value === logoMode; });
+            $('zone-header-phone').value = h.phone || '';
+            $('zone-header-email').value = h.email || '';
+            $('zone-header-cta-text').value = (h.cta || {}).text || '';
+            $('zone-header-cta-url').value = (h.cta || {}).url || '';
+            $('zone-header-sticky').checked = h.sticky === true;
+            $('zone-header-transparent').checked = h.transparent === true;
+            $('zone-header-height').value = h.height != null ? h.height : 80;
+            renderZoneHeaderMenu();
+            renderZoneSocials('zone-header-socials', h.socials);
+            const f = zonesData.footer;
+            $('zone-footer-use-global').checked = f.use_global === true;
+            $('zone-footer-phone').value = f.phone || '';
+            $('zone-footer-email').value = f.email || '';
+            $('zone-footer-address').value = f.address || '';
+            $('zone-footer-copyright').value = f.copyright || '';
+            renderZoneFooterColumns();
+            renderZoneSocials('zone-footer-socials', f.socials);
+            renderZoneFooterBadges();
+        }
+
+        function renderZoneHeaderMenu() {
+            const container = $('zone-header-menu');
+            container.innerHTML = '';
+            (zonesData.header.menu || []).forEach((item, i) => {
+                const menu = zonesData.header.menu;
+                const block = document.createElement('div');
+                block.style.border = '1px solid var(--border)';
+                block.style.borderRadius = '6px';
+                block.style.padding = '0.5rem';
+                block.style.marginBottom = '0.5rem';
+                const row = document.createElement('div');
+                row.className = 'mrow';
+                const title = textInput(item.title, v => { item.title = v; });
+                title.placeholder = 'Название пункта';
+                const url = textInput(item.url, v => { item.url = v; });
+                url.className = 'url';
+                url.placeholder = '/catalog/';
+                row.appendChild(title);
+                row.appendChild(url);
+                row.appendChild(zoneMoveBtn(menu, i, renderZoneHeaderMenu));
+                block.appendChild(row);
+                // Дочерние пункты (2-й уровень)
+                const kidsBox = document.createElement('div');
+                kidsBox.style.marginLeft = '1.2rem';
+                (item.children || []).forEach((child, ci) => {
+                    const kids = item.children;
+                    const crow = document.createElement('div');
+                    crow.className = 'mrow';
+                    const ctitle = textInput(child.title, v => { child.title = v; });
+                    ctitle.placeholder = 'Подпункт';
+                    const curl = textInput(child.url, v => { child.url = v; });
+                    curl.className = 'url';
+                    curl.placeholder = '/catalog/item/';
+                    crow.appendChild(ctitle);
+                    crow.appendChild(curl);
+                    crow.appendChild(zoneMoveBtn(kids, ci, renderZoneHeaderMenu));
+                    kidsBox.appendChild(crow);
+                });
+                block.appendChild(kidsBox);
+                const addKid = document.createElement('button');
+                addKid.type = 'button';
+                addKid.className = 'secondary';
+                addKid.style.marginTop = '0.3rem';
+                addKid.style.marginLeft = '1.2rem';
+                addKid.textContent = '+ Подпункт';
+                addKid.addEventListener('click', () => {
+                    item.children = item.children || [];
+                    item.children.push({title: '', url: ''});
+                    renderZoneHeaderMenu();
+                });
+                block.appendChild(addKid);
+                container.appendChild(block);
+            });
+        }
+        function zoneHeaderMenuAdd() {
+            zonesData.header.menu = zonesData.header.menu || [];
+            zonesData.header.menu.push({title: '', url: '', children: []});
+            renderZoneHeaderMenu();
+        }
+
+        function renderZoneSocials(elId, socials) {
+            const container = $(elId);
+            container.innerHTML = '';
+            (socials || []).forEach((s, i) => {
+                const row = document.createElement('div');
+                row.className = 'mrow';
+                const icon = textInput(s.icon, v => { s.icon = v; });
+                icon.style.maxWidth = '80px';
+                icon.placeholder = 'VK';
+                icon.title = 'Иконка — текст до 4 символов';
+                const url = textInput(s.url, v => { s.url = v; });
+                url.className = 'url';
+                url.placeholder = 'https://…';
+                row.appendChild(icon);
+                row.appendChild(url);
+                row.appendChild(zoneMoveBtn(socials, i, () => renderZoneSocials(elId, socials)));
+                container.appendChild(row);
+            });
+        }
+        function zoneHeaderSocialAdd() {
+            zonesData.header.socials = zonesData.header.socials || [];
+            zonesData.header.socials.push({icon: '', url: ''});
+            renderZoneSocials('zone-header-socials', zonesData.header.socials);
+        }
+        function zoneFooterSocialAdd() {
+            zonesData.footer.socials = zonesData.footer.socials || [];
+            zonesData.footer.socials.push({icon: '', url: ''});
+            renderZoneSocials('zone-footer-socials', zonesData.footer.socials);
+        }
+
+        function renderZoneFooterColumns() {
+            const container = $('zone-footer-columns');
+            container.innerHTML = '';
+            (zonesData.footer.columns || []).forEach((col, i) => {
+                const columns = zonesData.footer.columns;
+                const block = document.createElement('div');
+                block.style.border = '1px solid var(--border)';
+                block.style.borderRadius = '6px';
+                block.style.padding = '0.5rem';
+                block.style.marginBottom = '0.5rem';
+                const head = document.createElement('div');
+                head.className = 'mrow';
+                const title = textInput(col.title, v => { col.title = v; });
+                title.placeholder = 'Название колонки';
+                head.appendChild(title);
+                head.appendChild(zoneMoveBtn(columns, i, renderZoneFooterColumns));
+                block.appendChild(head);
+                const linksBox = document.createElement('div');
+                linksBox.style.marginLeft = '1.2rem';
+                (col.links || []).forEach((link, li) => {
+                    const links = col.links;
+                    const lrow = document.createElement('div');
+                    lrow.className = 'mrow';
+                    const ltitle = textInput(link.title, v => { link.title = v; });
+                    ltitle.placeholder = 'Текст ссылки';
+                    const lurl = textInput(link.url, v => { link.url = v; });
+                    lurl.className = 'url';
+                    lurl.placeholder = '/delivery/';
+                    lrow.appendChild(ltitle);
+                    lrow.appendChild(lurl);
+                    lrow.appendChild(zoneMoveBtn(links, li, renderZoneFooterColumns));
+                    linksBox.appendChild(lrow);
+                });
+                block.appendChild(linksBox);
+                const addLink = document.createElement('button');
+                addLink.type = 'button';
+                addLink.className = 'secondary';
+                addLink.style.marginTop = '0.3rem';
+                addLink.style.marginLeft = '1.2rem';
+                addLink.textContent = '+ Ссылка';
+                addLink.addEventListener('click', () => {
+                    col.links = col.links || [];
+                    col.links.push({title: '', url: ''});
+                    renderZoneFooterColumns();
+                });
+                block.appendChild(addLink);
+                container.appendChild(block);
+            });
+        }
+        function zoneFooterColumnAdd() {
+            zonesData.footer.columns = zonesData.footer.columns || [];
+            zonesData.footer.columns.push({title: '', links: []});
+            renderZoneFooterColumns();
+        }
+
+        function renderZoneFooterBadges() {
+            const container = $('zone-footer-badges');
+            container.innerHTML = '';
+            (zonesData.footer.badges || []).forEach((url, i) => {
+                const badges = zonesData.footer.badges;
+                const row = document.createElement('div');
+                row.className = 'mrow';
+                const inp = textInput(url, v => { badges[i] = v; });
+                inp.className = 'url';
+                inp.placeholder = '/static/uploads/badge.png';
+                row.appendChild(inp);
+                const pick = document.createElement('button');
+                pick.type = 'button';
+                pick.textContent = '📁';
+                pick.title = 'Выбрать из медиатеки';
+                pick.addEventListener('click', () => pickMediaValue(url => { badges[i] = url; renderZoneFooterBadges(); }));
+                row.appendChild(pick);
+                const up = document.createElement('button');
+                up.type = 'button';
+                up.textContent = '⬆';
+                up.title = 'Загрузить файл';
+                up.addEventListener('click', () => uploadMediaValue(url => { badges[i] = url; renderZoneFooterBadges(); }));
+                row.appendChild(up);
+                row.appendChild(zoneMoveBtn(badges, i, renderZoneFooterBadges));
+                container.appendChild(row);
+            });
+        }
+        function zoneFooterBadgeAdd() {
+            zonesData.footer.badges = zonesData.footer.badges || [];
+            zonesData.footer.badges.push('');
+            renderZoneFooterBadges();
+        }
+
+        async function saveZones() {
+            const h = zonesData.header;
+            h.use_global = $('zone-header-use-global').checked;
+            h.logo_image = $('zone-header-logo-image').value.trim();
+            h.logo_text = $('zone-header-logo-text').value.trim();
+            h.phone = $('zone-header-phone').value.trim();
+            h.email = $('zone-header-email').value.trim();
+            h.cta = {text: $('zone-header-cta-text').value.trim(), url: $('zone-header-cta-url').value.trim()};
+            h.sticky = $('zone-header-sticky').checked;
+            h.transparent = $('zone-header-transparent').checked;
+            h.height = parseInt($('zone-header-height').value, 10) || 80;
+            h.socials = (h.socials || []).map(s => ({icon: (s.icon || '').slice(0, 4), url: s.url || ''}));
+            const f = zonesData.footer;
+            f.use_global = $('zone-footer-use-global').checked;
+            f.phone = $('zone-footer-phone').value.trim();
+            f.email = $('zone-footer-email').value.trim();
+            f.address = $('zone-footer-address').value.trim();
+            f.copyright = $('zone-footer-copyright').value.trim();
+            $('zones-msg').textContent = 'Сохранение…';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/global-zones`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({header: h, footer: f})
+                });
+                const result = await resp.json();
+                $('zones-msg').textContent = result.success
+                    ? 'Сохранено. Обновите сайт (F5).'
+                    : 'Ошибка: ' + (result.error || '');
+            } catch (e) { $('zones-msg').textContent = 'Ошибка сети: ' + e.message; }
+        }
+
+        /* ================= Медиатека: выбор / загрузка в поле (CN-T6/T12) ================= */
+        async function pickMediaValue(onPick) {
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/media?limit=200`);
+                const result = await resp.json();
+                const files = result.files || [];
+                if (!files.length) { alert('Медиатека пуста. Загрузите файл кнопкой «Загрузить».'); return; }
+                const list = files.map(f => f.url).join('\n');
+                const chosen = prompt('URL файла из медиатеки (последние файлы):\n\n' + list, files[0].url);
+                if (chosen && chosen.trim()) onPick(chosen.trim());
+            } catch (e) { alert('Ошибка загрузки медиатеки: ' + e.message); }
+        }
+        function pickMediaFile(inputId) { pickMediaValue(url => { $(inputId).value = url; }); }
+
+        async function uploadMediaValue(onDone) {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = async () => {
+                if (!input.files.length) return;
+                const fd = new FormData();
+                fd.append('file', input.files[0]);
+                try {
+                    const resp = await fetch(`${location.origin}/admin/api/upload`, {
+                        method: 'POST', body: fd, headers: {'X-CSRF-Token': window.CSRF_TOKEN}});
+                    const result = await resp.json();
+                    if (result.success) onDone(result.url);
+                    else alert('Ошибка загрузки: ' + (result.error || ''));
+                } catch (e) { alert('Ошибка сети: ' + e.message); }
+            };
+            input.click();
+        }
+        function uploadToField(inputId) { uploadMediaValue(url => { $(inputId).value = url; }); }
+
+        /* ================= Расширенная тема (CN-T7): Google Fonts, шкала H1–H6, история ================= */
+        function extThemeMsg(text) { $('theme-extended-msg').textContent = text; }
+
+        function initGoogleFontPicker(kind) {
+            const input = $(kind === 'heading' ? 'theme-heading-font-google' : 'theme-body-font-google');
+            const list = $(kind === 'heading' ? 'theme-heading-font-list' : 'theme-body-font-list');
+            const key = kind === 'heading' ? 'heading_font_google' : 'body_font_google';
+            let timer = null;
+            input.addEventListener('input', () => {
+                clearTimeout(timer);
+                timer = setTimeout(async () => {
+                    try {
+                        const resp = await fetch(`${location.origin}/admin/api/fonts?q=${encodeURIComponent(input.value)}`);
+                        const result = await resp.json();
+                        list.innerHTML = '';
+                        (result.fonts || []).slice(0, 20).forEach(f => {
+                            const item = document.createElement('div');
+                            item.style.cssText = 'padding:0.4rem 0.6rem;cursor:pointer;border-bottom:1px solid #eee;';
+                            const name = document.createElement('div');
+                            name.textContent = f.family;
+                            name.style.cssText = `font-family:'${f.family}',sans-serif;font-size:1.15rem;`;
+                            const meta = document.createElement('small');
+                            meta.textContent = `${f.category} · ${(f.weights || []).join(', ')}${f.cyrillic ? ' · кириллица' : ''}`;
+                            meta.style.color = '#888';
+                            item.appendChild(name);
+                            item.appendChild(meta);
+                            item.addEventListener('mousedown', ev => {
+                                ev.preventDefault();
+                                setDeep(data, 'site.theme.' + key, f.family);
+                                updateGoogleFontCurrent(kind);
+                                list.style.display = 'none';
+                                input.value = '';
+                            });
+                            list.appendChild(item);
+                        });
+                        list.style.display = list.childNodes.length ? 'block' : 'none';
+                    } catch (e) { /* молча: это подсказка, не критично */ }
+                }, 250);
+            });
+            input.addEventListener('blur', () => setTimeout(() => { list.style.display = 'none'; }, 150));
+        }
+
+        function updateGoogleFontCurrent(kind) {
+            const key = kind === 'heading' ? 'heading_font_google' : 'body_font_google';
+            const cur = getDeep(data, 'site.theme.' + key) || '';
+            $(kind === 'heading' ? 'theme-heading-font-current' : 'theme-body-font-current')
+                .textContent = cur || 'системный шрифт';
+        }
+
+        function clearGoogleFont(kind) {
+            const key = kind === 'heading' ? 'heading_font_google' : 'body_font_google';
+            setDeep(data, 'site.theme.' + key, '');
+            updateGoogleFontCurrent(kind);
+        }
+
+        async function loadThemeHistory() {
+            const box = $('theme-history-list');
+            box.textContent = 'Загрузка…';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/theme`);
+                const result = await resp.json();
+                renderThemeHistory(result.history || []);
+            } catch (e) { box.textContent = 'Ошибка загрузки истории: ' + e.message; }
+        }
+
+        function renderThemeHistory(history) {
+            const box = $('theme-history-list');
+            box.innerHTML = '';
+            if (!history.length) { box.textContent = 'История пустая — сохраните тему, чтобы создать первую запись.'; return; }
+            history.forEach((h, i) => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:center;gap:0.6rem;padding:0.3rem 0;border-bottom:1px solid #eee;';
+                const info = document.createElement('span');
+                info.style.flex = '1';
+                const t = h.theme || {};
+                const main = t.primary_color || '—';
+                const hf = t.heading_font_google || t.heading_font_family || 'системный';
+                info.textContent = `${formatDate(h.saved_at)} · ${h.saved_by || '—'} · основной ${main} · шрифт заголовков: ${hf}`;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'secondary';
+                btn.textContent = 'Откатить';
+                btn.addEventListener('click', () => restoreThemeHistory(i));
+                row.appendChild(info);
+                row.appendChild(btn);
+                box.appendChild(row);
+            });
+        }
+
+        async function restoreThemeHistory(index) {
+            if (!confirm('Откатить тему к этой версии? Текущее состояние уйдёт в историю.')) return;
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/theme`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({action: 'restore_history', index})
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    setDeep(data, 'site.theme', result.theme);
+                    refreshThemeInputs();
+                    updateGoogleFontCurrent('heading');
+                    updateGoogleFontCurrent('body');
+                    renderThemeHistory(result.history || []);
+                    extThemeMsg('Версия восстановлена. Обновите сайт (F5).');
+                } else {
+                    extThemeMsg('Ошибка: ' + (result.error || ''));
+                }
+            } catch (e) { extThemeMsg('Ошибка сети: ' + e.message); }
+        }
+
+        function collectThemeFromInputs() {
+            // Синхронизируем data.site.theme со всеми data-path инпутами вкладки
+            document.querySelectorAll('#tab-theme [data-path^="site.theme."]').forEach(el => {
+                if (el.type === 'checkbox') setDeep(data, el.dataset.path, el.checked);
+                else setDeep(data, el.dataset.path, el.value);
+            });
+            const theme = Object.assign({}, getDeep(data, 'site.theme') || {});
+            delete theme.version;
+            return theme;
+        }
+
+        async function saveExtendedTheme() {
+            const theme = collectThemeFromInputs();
+            extThemeMsg('Сохранение…');
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/theme`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({theme})
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    setDeep(data, 'site.theme', result.theme);
+                    renderThemeHistory(result.history || []);
+                    extThemeMsg('Применено. Обновите сайт (F5).');
+                } else {
+                    extThemeMsg('Ошибка: ' + (result.error || ''));
+                }
+            } catch (e) { extThemeMsg('Ошибка сети: ' + e.message); }
+        }
+
+        async function pinThemeVersion() {
+            const theme = collectThemeFromInputs();
+            extThemeMsg('Фиксация версии…');
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/theme`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({theme})
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    setDeep(data, 'site.theme', result.theme);
+                    renderThemeHistory(result.history || []);
+                    extThemeMsg('Версия зафиксирована: текущее состояние ушло в историю.');
+                } else {
+                    extThemeMsg('Ошибка: ' + (result.error || ''));
+                }
+            } catch (e) { extThemeMsg('Ошибка сети: ' + e.message); }
+        }
+
+        /* ================= Живой предпросмотр темы на главной (CN-T7.4) ================= */
+        async function previewExtendedTheme() {
+            const theme = collectThemeFromInputs();
+            extThemeMsg('Готовим предпросмотр…');
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/theme-preview`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({theme})
+                });
+                const result = await resp.json();
+                if (!result.success) { extThemeMsg('Ошибка: ' + (result.error || '')); return; }
+                const pageResp = await fetch(`${location.origin}/`);
+                let html = await pageResp.text();
+                const styleTag = `<style data-theme-preview>\n${result.css}\n</style>`;
+                if (/href=["'][^"']*\/theme\.css[^"']*["']/i.test(html)) {
+                    html = html.replace(/<link[^>]*href=["'][^"']*\/theme\.css[^"']*["'][^>]*>/i, styleTag);
+                } else {
+                    html = html.replace(/<\/head>/i, styleTag + '</head>');
+                }
+                const blob = new Blob([html], {type: 'text/html;charset=utf-8'});
+                window.open(URL.createObjectURL(blob), '_blank');
+                extThemeMsg('Предпросмотр открыт в новой вкладке. Для постоянного применения нажмите «Сохранить расширенную тему».');
+            } catch (e) { extThemeMsg('Ошибка сети: ' + e.message); }
+        }
+
+        /* ================= Шаблоны страниц и мои блоки (CN-T9) ================= */
+        async function loadTemplatesTab() {
+            loadPageTemplates();
+            loadBlockTemplates();
+        }
+
+        async function loadPageTemplates() {
+            const box = $('page-templates-list');
+            box.innerHTML = 'Загрузка…';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/page-templates`);
+                const result = await resp.json();
+                box.innerHTML = '';
+                (result.templates || []).forEach(t => {
+                    const card = document.createElement('div');
+                    card.style.cssText = 'flex:1;min-width:220px;border:1px solid var(--border);border-radius:8px;padding:0.8rem;';
+                    const title = document.createElement('h4');
+                    title.style.margin = '0 0 0.3rem';
+                    title.textContent = t.name || t.id;
+                    const desc = document.createElement('div');
+                    desc.className = 'help';
+                    desc.textContent = t.description || '';
+                    const blocks = document.createElement('div');
+                    blocks.className = 'help';
+                    blocks.style.marginTop = '0.3rem';
+                    const types = (t.blocks || []).map(b => b && b.type).filter(Boolean);
+                    blocks.textContent = 'Состав: ' + (types.join(', ') || '—');
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'primary';
+                    btn.style.marginTop = '0.5rem';
+                    btn.textContent = 'Создать страницу';
+                    btn.addEventListener('click', () => createPageFromTemplate(t));
+                    card.appendChild(title);
+                    card.appendChild(desc);
+                    card.appendChild(blocks);
+                    card.appendChild(btn);
+                    box.appendChild(card);
+                });
+            } catch (e) { box.textContent = 'Ошибка загрузки шаблонов: ' + e.message; }
+        }
+
+        async function createPageFromTemplate(t) {
+            const slug = prompt(`Создать страницу из шаблона «${t.name}».\n\nАдрес (slug): латиница, цифры, - и _`, (t.id || 'page') + '-copy');
+            if (!slug) return;
+            if (!/^[a-z0-9][a-z0-9\-_]*$/.test(slug)) {
+                $('page-templates-msg').textContent = 'Slug должен состоять из латиницы, цифр, «-» и «_».';
+                return;
+            }
+            const title = prompt('Заголовок страницы:', t.name || '') || t.name || slug;
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/page-templates/create`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({template_id: t.id, slug, title})
+                });
+                const result = await resp.json();
+                if (result.success && result.page) {
+                    $('page-templates-msg').innerHTML =
+                        `Страница «${escapeHtml(result.page.title || slug)}» создана: ` +
+                        `<a href="${escapeHtml(result.page.url || ('/' + slug + '/'))}" target="_blank">${escapeHtml(result.page.url || '')}</a> · ` +
+                        `<a href="/admin/page/${encodeURIComponent(result.page.slug)}">Открыть в редакторе</a>`;
+                } else {
+                    $('page-templates-msg').textContent = 'Ошибка: ' + (result.error || '');
+                }
+            } catch (e) { $('page-templates-msg').textContent = 'Ошибка сети: ' + e.message; }
+        }
+
+        async function loadBlockTemplates() {
+            const box = $('block-templates-list');
+            box.innerHTML = 'Загрузка…';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/block-templates`);
+                const result = await resp.json();
+                box.innerHTML = '';
+                const list = result.templates || [];
+                if (!list.length) { box.textContent = 'Пока нет сохранённых блоков.'; return; }
+                list.forEach(t => {
+                    const row = document.createElement('div');
+                    row.className = 'mrow';
+                    const name = document.createElement('span');
+                    name.style.flex = '1';
+                    const blockType = (t.block && t.block.type) || '';
+                    name.textContent = t.name + (t.category ? ` · ${t.category}` : '') + (blockType ? ` · блок «${blockType}»` : '');
+                    const del = document.createElement('button');
+                    del.type = 'button';
+                    del.className = 'del';
+                    del.textContent = '✕';
+                    del.title = 'Удалить';
+                    del.addEventListener('click', () => deleteBlockTemplate(t.id, t.name));
+                    row.appendChild(name);
+                    row.appendChild(del);
+                    box.appendChild(row);
+                });
+            } catch (e) { box.textContent = 'Ошибка загрузки: ' + e.message; }
+        }
+
+        async function deleteBlockTemplate(id, name) {
+            if (!confirm(`Удалить блок «${name}» из «Мои блоки»?`)) return;
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/block-templates`, {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({id})
+                });
+                const result = await resp.json();
+                $('block-templates-msg').textContent = result.success ? 'Блок удалён.' : 'Ошибка: ' + (result.error || '');
+                if (result.success) loadBlockTemplates();
+            } catch (e) { $('block-templates-msg').textContent = 'Ошибка сети: ' + e.message; }
+        }
+
         /* ================= Вкладки ================= */
         // AD-2: разделы, доступные ролям (сервер дублирует проверку — UI лишь прячет)
         const ROLE_SECTIONS = {
-            superadmin: ['pages','theme','menu','socials','seo','site','integrations','customers','backup','dashboard','audit','users'],
-            content: ['pages','theme','menu','socials','seo','site','backup'],
+            superadmin: ['pages','theme','menu','zones','socials','seo','site','integrations','customers','backup','dashboard','audit','users'],
+            content: ['pages','theme','menu','zones','socials','seo','site','backup'],
             orders: ['dashboard','customers','integrations','backup'],
         };
         const ADMIN_ROLE = '{{ admin_role }}';
@@ -2614,7 +3413,9 @@
             if (name === 'dashboard') loadDashboard();
             if (name === 'audit') loadAudit();
             if (name === 'users') loadAdminUsers();
-            if (name === 'theme') loadThemePresets();
+            if (name === 'theme') { loadThemePresets(); loadThemeHistory(); }
+            if (name === 'zones') loadZones();
+            if (name === 'templates') loadTemplatesTab();
         }
         document.querySelectorAll('nav button[data-tab]').forEach(btn => {
             btn.addEventListener('click', () => switchTab(btn.dataset.tab));
@@ -2629,6 +3430,10 @@
         loadAllProducts();
         loadExportSettings('wb');
         loadThemePresets();
+        initGoogleFontPicker('heading');
+        initGoogleFontPicker('body');
+        updateGoogleFontCurrent('heading');
+        updateGoogleFontCurrent('body');
         document.querySelectorAll('#int-subnav button[data-subtab]').forEach(btn => {
             btn.addEventListener('click', () => switchIntSubtab(btn.dataset.subtab));
         });

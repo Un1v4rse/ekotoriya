@@ -1221,11 +1221,13 @@ def _google_font_stack(family):
     return f"'{card['family']}', {fallback}"
 
 
-@app.route('/theme.css')
-def theme_css():
-    """Generate CSS from site theme settings."""
-    content = load_content()
-    theme = content.get('site', {}).get('theme', {})
+def _theme_css_text(theme):
+    """CSS-текст темы (CN-T7.4): общая генерация для /theme.css и предпросмотра.
+
+    Безопасность значений дублируется даже при переданной теме (/_validated_theme
+    на сервере + те же regex-фолбэки здесь).
+    """
+    theme = theme or {}
     font_family = theme.get('font_family') or THEME_DEFAULTS['font_family']
     if not re.fullmatch(r'[^{}<>;]+', font_family):
         font_family = THEME_DEFAULTS['font_family']
@@ -1327,7 +1329,15 @@ a {{
     {button_variant_css}
 }}
 """
-    return Response(css + BLOCKS_CSS, mimetype='text/css')
+    return css + BLOCKS_CSS
+
+
+@app.route('/theme.css')
+def theme_css():
+    """Generate CSS from site theme settings."""
+    content = load_content()
+    return Response(_theme_css_text(content.get('site', {}).get('theme', {})),
+                    mimetype='text/css')
 
 
 # Стили блоков конструктора страниц (cb-*): подключаются через /theme.css на всех страницах
@@ -2601,6 +2611,17 @@ def admin_theme():
 def admin_fonts():
     """Курируемый список Google-шрифтов (CN-T7.2); ?q= — фильтр по family."""
     return jsonify({'success': True, 'fonts': fonts_module.list_fonts(request.args.get('q'))})
+
+
+@app.route('/admin/api/theme-preview', methods=['POST'])
+@admin_required
+def admin_theme_preview():
+    """Живой предпросмотр темы (CN-T7.4): CSS из переданной темы БЕЗ сохранения."""
+    payload = request.get_json() or {}
+    theme = _validated_theme(payload.get('theme'))
+    if theme is None:
+        return jsonify({'success': False, 'error': 'Некорректная тема'}), 400
+    return jsonify({'success': True, 'css': _theme_css_text(theme)})
 
 
 @app.route('/admin/api/rebuild', methods=['POST'])
