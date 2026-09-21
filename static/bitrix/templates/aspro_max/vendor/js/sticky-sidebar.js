@@ -221,7 +221,7 @@ var stickySidebar = createCommonjsModule(function (module, exports) {
               _this2.container = container;
             });
 
-            if (!containers.length) throw new Error("The container does not contains on the sidebar.");
+            if (!containers.length) { this.container = document.body; return; }
           }
 
           // If top/bottom spacing is not function parse value to integer.

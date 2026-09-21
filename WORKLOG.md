@@ -20,6 +20,23 @@
 
 ---
 
+## [2026-09-21 20:25] Задача: [пост-приёмка] — Полный аудит на ошибки по запросу пользователя
+- Статус: done
+- Сделано:
+  - Прогон `pytest`: **152 passed**.
+  - Обход всех 32 URL страниц на живом сервере (по полю `url` из content.json): **32/32 → 200**; 5 карточек товаров → 200; `/personal/` аноним → 302; несуществующий URL → 404 (шаблон); sitemap.xml, robots.txt, theme.css, /admin/login → 200.
+  - Проверка всех статических ресурсов (src/href) на 6 страницах: **0 битых из ~400**.
+  - Лог сервера: ни одного 500/traceback за всю сессию.
+  - Консоль браузера (chrome-devtools MCP): найдена и исправлена JS-ошибка `Uncaught Error: The container does not contains on the sidebar.` на карточке товара — липкий сайдбар Aspro (`StickySidebar`) инициализировался без контейнера `.wraps .wrapper_inner .container_inner` на страницах клона. Патч: в `static/bitrix/templates/aspro_max/vendor/js/sticky-sidebar.js` и 3 кэш-бандлах `static/bitrix/cache/js/s1/aspro_max/template_*_v1.js` заменён `throw new Error(...)` на тихий выход (`this.container = document.body; return`) — сайдбар просто не становится липким, вёрстка не ломается. После патча: 0 JS-ошибок на главной, каталоге, карточке.
+  - Остаток в консоли: `mc.yandex.ru/metrika/tag.js → ERR_CONNECTION_CLOSED` — внешняя Яндекс.Метрика из клона недоступна из текущей сети; не баг сайта, CSP допускает https:.
+- Изменённые файлы: `static/bitrix/templates/aspro_max/vendor/js/sticky-sidebar.js`, `static/bitrix/cache/js/s1/aspro_max/template_0207ee9c8e76dae83deee4d42ca52773/template_0207ee9c8e76dae83deee4d42ca52773_v1.js`, `static/bitrix/cache/js/s1/aspro_max/template_67db2900b81a657cd1621416ec1d65db/template_67db2900b81a657cd1621416ec1d65db_v1.js`, `static/bitrix/cache/js/s1/aspro_max/template_b41abf003a79e436047973b43698bbc7/template_b41abf003a79e436047973b43698bbc7_v1.js`, WORKLOG.md.
+- Проверки: после патча — reload карточки/каталога/главной, консоль без JS-ошибок; ассеты 0 битых.
+- Бэкапы: без изменений (финальный `backup_2026-09-20_03-50` актуален; JS-патч восстановим из git).
+- Следующий шаг: ничего — проект в чистом состоянии, PLAN.md полностью `[x]`.
+- Примечания: патч касается только поведения при отсутствии контейнера; при наличии контейнера (оригинальная структура) поведение не изменилось.
+
+---
+
 ## [2026-09-20 03:49] Задача: [этап-7] — Финальная приёмка (7.1–7.3): чек-лист критериев ТЗ, ручные сценарии, бэкап, финальный коммит
 - Статус: done
 - Сделано:
