@@ -1867,6 +1867,36 @@ def admin_preview_marked():
     return jsonify({'success': True, 'content_html': blocks_module.render_blocks_marked(blocks)})
 
 
+@app.route('/admin/api/media')
+@admin_required
+def admin_media():
+    """Медиатека (CN-T12.3): список загруженных файлов static/uploads.
+
+    ?q= — фильтр по имени; ?limit= — лимит (по умолчанию 200, макс. 500).
+    Возвращает файлы по убыванию времени изменения: {name, url, size, mtime}.
+    """
+    import glob as _glob
+    q = (request.args.get('q') or '').strip().lower()
+    limit = request.args.get('limit', type=int) or 200
+    limit = max(1, min(500, limit))
+    upload_dir = BASE_DIR / 'static' / 'uploads'
+    files = []
+    if upload_dir.is_dir():
+        for path in upload_dir.rglob('*'):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(upload_dir).as_posix()
+            if q and q not in rel.lower():
+                continue
+            stat = path.stat()
+            files.append({'name': rel,
+                          'url': f'/static/uploads/{rel}',
+                          'size': stat.st_size,
+                          'mtime': stat.st_mtime})
+    files.sort(key=lambda f: -f['mtime'])
+    return jsonify({'success': True, 'files': files[:limit]})
+
+
 @app.route('/admin/api/page-save', methods=['POST'])
 @admin_required
 def admin_page_save():
