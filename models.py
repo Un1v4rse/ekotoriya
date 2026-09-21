@@ -33,8 +33,10 @@ class Page(db.Model):
     canonical = db.Column(db.String(500), default='')
     template = db.Column(db.String(300), default='')
     blocks = db.Column(db.JSON, nullable=True)          # массив блоков конструктора
-    content_html = db.Column(db.Text, default='')       # производный рендер blocks
+    content_html = db.Column(db.Text, default='')       # производный рендер опубликованных блоков
     draft_blocks = db.Column(db.JSON, nullable=True)    # черновик (CN-7), NULL = нет
+    published_blocks = db.Column(db.JSON, nullable=True)  # опубликованные блоки (CN-T10)
+    settings = db.Column(db.JSON, nullable=True)        # настройки страницы (CN-T5), NULL = нет
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
 
     def to_content_dict(self):
@@ -48,9 +50,35 @@ class Page(db.Model):
             'canonical': self.canonical or '',
             'template': self.template or '',
             'blocks': self.blocks if isinstance(self.blocks, list) else None,
+            'published_blocks': self.published_blocks if isinstance(self.published_blocks, list) else None,
+            'settings': self.settings if isinstance(self.settings, dict) else None,
             'content_html': self.content_html or '',
             'updated_at': self.updated_at.isoformat() if self.updated_at else '',
         }
+
+
+class PageVersion(db.Model):
+    """Снапшоты версий страницы (CN-T10.2): блоки + мета-поля, максимум 10 на страницу."""
+    __tablename__ = 'page_versions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    page_slug = db.Column(db.String(190), nullable=False, index=True, default='')
+    blocks = db.Column(db.JSON, nullable=True)          # массив блоков на момент версии
+    page_fields = db.Column(db.JSON, nullable=True)     # title/h1/meta_*/canonical/url
+    label = db.Column(db.String(120), default='')
+    created_by = db.Column(db.String(120), default='')
+    created_at = db.Column(db.DateTime, default=utcnow)
+
+
+class BlockTemplate(db.Model):
+    """«Мои блоки» (CN-T9.1): сохранённые админом блоки для переиспользования."""
+    __tablename__ = 'block_templates'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False, default='')
+    category = db.Column(db.String(60), default='')
+    block = db.Column(db.JSON, nullable=True)           # dict-описание блока
+    created_at = db.Column(db.DateTime, default=utcnow)
 
 
 class SiteSetting(db.Model):

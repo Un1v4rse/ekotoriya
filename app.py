@@ -34,10 +34,15 @@ from flask import Flask, render_template, render_template_string, request, redir
 mimetypes.add_type('text/javascript', '.php')
 mimetypes.add_type('text/css', '.less')
 
+import copy
+
 import customers
 import wb_sync
 import blocks as blocks_module
+import fonts as fonts_module
+import page_templates as page_templates_module
 import storage
+import zones as zones_module
 import db as db_module
 from db import db
 from models import Customer, Order
@@ -61,6 +66,14 @@ app.json.ensure_ascii = False
 
 # База данных (AR-1): SQLite по умолчанию, DATABASE_URL для PostgreSQL.
 db_module.init_app(app)
+
+# Миграция «цикл 2» конструктора (CN-T5/6/7/9/10): pages.published_blocks/settings,
+# таблицы page_versions/block_templates. Идемпотентна, старт не роняет.
+try:
+    import migrate_cycle2
+    migrate_cycle2.migrate(app)
+except Exception as _migrate_err:
+    print(f'[migrate_cycle2] пропущено: {_migrate_err}')
 
 # Кэширование (AR-3): SimpleCache по умолчанию, тип — через env CACHE_TYPE.
 from flask_caching import Cache
@@ -324,6 +337,9 @@ ADMIN_PATH_SECTIONS = [
     ('/admin/api/duplicate-page', 'pages'),
     ('/admin/api/render-blocks', 'pages'),
     ('/admin/api/rebuild', 'pages'),
+    ('/admin/api/block-templates', 'pages'),
+    ('/admin/api/global-zones', 'site'),
+    ('/admin/api/fonts', 'theme'),
     ('/admin/api/theme', 'theme'),
     ('/admin/api/seo', 'seo'),
     ('/admin/api/redirects-import', 'seo'),
@@ -566,6 +582,22 @@ THEME_DEFAULTS = {
     'link_color': '#9a8269',
     'heading_font_family': '',
     'container_width': '1400px',
+    # Google-шрифты из курируемого списка fonts.py (CN-T7.2); '' = не задан
+    'heading_font_google': '',
+    'body_font_google': '',
+    # Кегли заголовков (CN-T7)
+    'h1_size': '2.5rem',
+    'h2_size': '2rem',
+    'h3_size': '1.6rem',
+    'h4_size': '1.3rem',
+    'h5_size': '1.1rem',
+    'h6_size': '1rem',
+    # Интерлиньяж (без единиц)
+    'base_line_height': '1.6',
+    'heading_line_height': '1.2',
+    # Кнопки: тень 0|1|2, вариант fill|outline
+    'button_shadow': '0',
+    'button_variant': 'fill',
     'version': 1,
 }
 
@@ -732,6 +764,28 @@ def make_context(content, page):
                          or (host_url.rstrip('/') + request.path),
         'seo_product': None,
     }
+    # Глобальные зоны шапка/подвал (CN-T6): страница может переопределять конфиг
+    # через page.settings.override_header/footer (+ header_config/footer_config).
+    try:
+        page_settings = page.get('settings') if isinstance(page.get('settings'), dict) else {}
+        zones_cfg = zones_module.get_zones(content)
+        if page_settings.get('override_header') and isinstance(page_settings.get('header_config'), dict):
+            header_cfg = {**zones_module.HEADER_DEFAULTS,
+                          **page_settings['header_config'], 'use_global': True}
+        else:
+            header_cfg = zones_cfg.get('header')
+        if page_settings.get('override_footer') and isinstance(page_settings.get('footer_config'), dict):
+            footer_cfg = {**zones_module.FOOTER_DEFAULTS,
+                          **page_settings['footer_config'], 'use_global': True}
+        else:
+            footer_cfg = zones_cfg.get('footer')
+        ctx['zone_header_html'] = zones_module.render_zone('header', header_cfg, content)
+        ctx['zone_footer_html'] = zones_module.render_zone('footer', footer_cfg, content)
+        ctx['zones_css'] = zones_module.zones_css(header_cfg) if ctx['zone_header_html'] else ''
+    except Exception:
+        ctx['zone_header_html'] = ''
+        ctx['zone_footer_html'] = ''
+        ctx['zones_css'] = ''
     # Текущий клиент (LC-2): шаблоны показывают «ЛК/Выйти» вместо «Войти».
     cid = session.get('customer_id')
     if cid:
@@ -1098,14 +1152,23 @@ def _css_size(value, default):
 # Ключи темы, валидируемые по типу (CN-3: пресеты принимаем только с валидными значениями).
 _THEME_COLOR_KEYS = ('primary_color', 'secondary_color', 'accent_color', 'text_color',
                      'bg_color', 'card_bg', 'button_text_color', 'link_color')
-_THEME_SIZE_KEYS = ('font_size', 'border_radius', 'container_width')
+_THEME_SIZE_KEYS = ('font_size', 'border_radius', 'container_width',
+                    'h1_size', 'h2_size', 'h3_size', 'h4_size', 'h5_size', 'h6_size')
+# Интерлиньяж — число без единиц (CN-T7)
+_THEME_LINE_HEIGHT_KEYS = ('base_line_height', 'heading_line_height')
+# Перечисления (CN-T7)
+_THEME_ENUM_KEYS = {'button_shadow': ('0', '1', '2'), 'button_variant': ('fill', 'outline')}
+# Google-шрифты — только из курируемого вайтлиста fonts.py (CN-T7.2)
+_THEME_GOOGLE_FONT_KEYS = ('heading_font_google', 'body_font_google')
 
 
 def _validated_theme(raw):
     """Оставить только известные ключи темы с безопасными значениями.
 
     Правила те же, что в /theme.css: цвета — HEX, размеры — число+единица,
-    шрифты — без скобок/точек с запятой. None, если не получилось собрать тему.
+    шрифты — без скобок/точек с запятой, интерлиньяж — число, enum — строго из
+    списка допустимых, google-шрифты — только из вайтлиста fonts.py. None, если
+    не получилось собрать тему.
     """
     if not isinstance(raw, dict):
         return None
@@ -1118,6 +1181,18 @@ def _validated_theme(raw):
             theme[k] = _css_color(v, THEME_DEFAULTS[k])
         elif k in _THEME_SIZE_KEYS:
             theme[k] = _css_size(v, THEME_DEFAULTS[k])
+        elif k in _THEME_LINE_HEIGHT_KEYS:
+            v = str(v or '').strip()
+            if re.fullmatch(r'\d+(\.\d+)?', v):
+                theme[k] = v
+        elif k in _THEME_ENUM_KEYS:
+            v = str(v or '').strip()
+            if v in _THEME_ENUM_KEYS[k]:
+                theme[k] = v
+        elif k in _THEME_GOOGLE_FONT_KEYS:
+            v = str(v or '').strip()
+            if not v or fonts_module.is_valid_family(v):
+                theme[k] = v
         elif k == 'version':
             try:
                 theme[k] = int(v)
@@ -1130,6 +1205,22 @@ def _validated_theme(raw):
     return theme or None
 
 
+_BUTTON_SHADOW_CSS = {
+    '0': 'none',
+    '1': '0 2px 6px rgba(0,0,0,0.15)',
+    '2': '0 4px 14px rgba(0,0,0,0.25)',
+}
+
+
+def _google_font_stack(family):
+    """font-family стек для Google-шрифта из вайтлиста; '' если не из списка."""
+    card = fonts_module.find_font(family)
+    if card is None:
+        return ''
+    fallback = 'serif' if card['category'] == 'serif' else 'sans-serif'
+    return f"'{card['family']}', {fallback}"
+
+
 @app.route('/theme.css')
 def theme_css():
     """Generate CSS from site theme settings."""
@@ -1139,7 +1230,37 @@ def theme_css():
     if not re.fullmatch(r'[^{}<>;]+', font_family):
         font_family = THEME_DEFAULTS['font_family']
     heading_font = theme.get('heading_font_family') or font_family
-    css = f""":root {{
+    # Google-шрифты (CN-T7.2): @import только для семейств из курируемого списка
+    import_lines = []
+    seen_fonts = set()
+    for key in ('heading_font_google', 'body_font_google'):
+        fam = str(theme.get(key) or '').strip()
+        if fam and fam not in seen_fonts:
+            seen_fonts.add(fam)
+            url = fonts_module.import_url(fam)   # '' для чужих семейств (защита от инъекции)
+            if url:
+                import_lines.append(f"@import url('{url}');")
+    import_css = '\n'.join(import_lines) + '\n' if import_lines else ''
+    body_google = _google_font_stack(theme.get('body_font_google'))
+    body_family = body_google or font_family
+    heading_google = _google_font_stack(theme.get('heading_font_google'))
+    heading_family = heading_google or heading_font
+    base_lh = str(theme.get('base_line_height') or THEME_DEFAULTS['base_line_height'])
+    if not re.fullmatch(r'\d+(\.\d+)?', base_lh):
+        base_lh = THEME_DEFAULTS['base_line_height']
+    heading_lh = str(theme.get('heading_line_height') or THEME_DEFAULTS['heading_line_height'])
+    if not re.fullmatch(r'\d+(\.\d+)?', heading_lh):
+        heading_lh = THEME_DEFAULTS['heading_line_height']
+    button_shadow = _BUTTON_SHADOW_CSS.get(str(theme.get('button_shadow')), 'none')
+    button_variant = str(theme.get('button_variant') or 'fill')
+    if button_variant not in ('fill', 'outline'):
+        button_variant = 'fill'
+    button_variant_css = (
+        'background:transparent;color:var(--theme-primary);border:2px solid var(--theme-primary);'
+        if button_variant == 'outline' else '')
+    head_sizes = {n: _css_size(theme.get(f'h{n}_size'), THEME_DEFAULTS[f'h{n}_size'])
+                  for n in range(1, 7)}
+    css = f"""{import_css}:root {{
     --theme-primary: {_css_color(theme.get('primary_color'), '#b49d84')};
     --theme-secondary: {_css_color(theme.get('secondary_color'), '#9a8269')};
     --theme-accent: {_css_color(theme.get('accent_color'), '#137333')};
@@ -1151,19 +1272,37 @@ def theme_css():
     --theme-link: {_css_color(theme.get('link_color'), '#9a8269')};
     --theme-heading-font: {heading_font};
     --theme-container-width: {_css_size(theme.get('container_width'), '1400px')};
+    --theme-h1: {head_sizes[1]};
+    --theme-h2: {head_sizes[2]};
+    --theme-h3: {head_sizes[3]};
+    --theme-h4: {head_sizes[4]};
+    --theme-h5: {head_sizes[5]};
+    --theme-h6: {head_sizes[6]};
+    --theme-line-height: {base_lh};
+    --theme-heading-line-height: {heading_lh};
+    --theme-button-shadow: {button_shadow};
+    --theme-button-variant: {button_variant};
 }}
 body {{
-    font-family: {font_family};
+    font-family: {body_family};
     font-size: {_css_size(theme.get('font_size'), '16px')};
+    line-height: var(--theme-line-height);
     color: var(--theme-text);
     background-color: var(--theme-bg);
 }}
 header, .header, .top-block-wrapper, .top_blocks, .front .top_blocks, .footer {{
-    font-family: {font_family};
+    font-family: {body_family};
 }}
-h1, h2, h3, .h1, .h2, .h3 {{
-    font-family: var(--theme-heading-font);
+h1, h2, h3, h4, h5, h6, .h1, .h2, .h3 {{
+    font-family: {heading_family};
+    line-height: var(--theme-heading-line-height);
 }}
+h1 {{ font-size: var(--theme-h1); }}
+h2 {{ font-size: var(--theme-h2); }}
+h3 {{ font-size: var(--theme-h3); }}
+h4 {{ font-size: var(--theme-h4); }}
+h5 {{ font-size: var(--theme-h5); }}
+h6 {{ font-size: var(--theme-h6); }}
 a {{
     color: var(--theme-link);
 }}
@@ -1180,6 +1319,12 @@ a {{
 }}
 .cb-form-fields button {{
     color: var(--theme-button-text);
+    box-shadow: var(--theme-button-shadow);
+    {button_variant_css}
+}}
+.cb-banner-btn, .cb-timer-btn, .zone-cta {{
+    box-shadow: var(--theme-button-shadow);
+    {button_variant_css}
 }}
 """
     return Response(css + BLOCKS_CSS, mimetype='text/css')
@@ -1669,29 +1814,48 @@ def admin_page_blocks():
 @app.route('/admin/api/page-draft', methods=['GET', 'POST'])
 @admin_required
 def admin_page_draft():
-    """Черновики страниц (CN-5/CN-7): {slug: {blocks, saved_at}} в site_settings.
+    """Черновики страниц (CN-5/CN-7 → CN-T10.3): хранятся в Page.draft_blocks.
 
-    POST {slug, blocks} — сохранить черновик; GET ?slug= — получить черновик.
+    POST {slug, blocks} — сохранить черновик в колонку страницы;
+    GET ?slug= — получить черновик (формат ответа прежний: draft: {blocks, saved_at},
+    плюс has_draft, published_at, updated_at). Если в колонке пусто — фолбэк
+    на старый формат site_settings.page_drafts (обратная совместимость).
     """
+    from models import Page
     if request.method == 'GET':
         slug = request.args.get('slug', '').strip()
-        drafts = storage.get_setting('page_drafts') or {}
-        draft = (drafts or {}).get(slug)
+        page = db.session.query(Page).filter_by(slug=slug).first() if slug else None
+        if page is None:
+            return jsonify({'success': False, 'error': 'Страница не найдена'}), 404
+        draft = page.draft_blocks if isinstance(page.draft_blocks, dict) else None
+        if draft is None:
+            drafts = storage.get_setting('page_drafts') or {}
+            legacy = drafts.get(slug) if isinstance(drafts, dict) else None
+            if isinstance(legacy, dict):
+                draft = legacy
         if not isinstance(draft, dict):
             return jsonify({'success': False, 'error': 'Черновик не найден'}), 404
-        return jsonify({'success': True, 'draft': draft})
+        updated_at = page.updated_at.isoformat(timespec='seconds') if page.updated_at else ''
+        return jsonify({
+            'success': True,
+            'draft': draft,
+            'has_draft': True,
+            'published_at': updated_at if page.published_blocks is not None else None,
+            'updated_at': updated_at,
+        })
     payload = request.get_json() or {}
     slug = payload.get('slug', '').strip()
     blocks = payload.get('blocks')
     if not slug or not isinstance(blocks, list):
         return jsonify({'success': False, 'error': 'slug и blocks обязательны'}), 400
-    drafts = storage.get_setting('page_drafts') or {}
-    if not isinstance(drafts, dict):
-        drafts = {}
-    drafts[slug] = {'blocks': blocks,
-                    'saved_at': datetime.now(timezone.utc).isoformat(timespec='seconds')}
-    storage.set_setting('page_drafts', drafts)
-    return jsonify({'success': True, 'saved_at': drafts[slug]['saved_at']})
+    page = db.session.query(Page).filter_by(slug=slug).first()
+    if page is None:
+        return jsonify({'success': False, 'error': 'Страница не найдена'}), 404
+    saved_at = datetime.now(timezone.utc).isoformat(timespec='seconds')
+    page.draft_blocks = {'blocks': [b for b in blocks if isinstance(b, dict)],
+                         'saved_at': saved_at}
+    db.session.commit()
+    return jsonify({'success': True, 'saved_at': saved_at})
 
 
 @app.route('/admin/api/preview-marked', methods=['POST'])
@@ -1893,23 +2057,22 @@ def admin_upload():
 BASE_PAGE_TEMPLATE = 'pages/_new_page_base.html'
 
 
-@app.route('/admin/api/add-page', methods=['POST'])
-@admin_required
-def admin_add_page():
-    """Add a new page to the site. Creates a copy of the base template."""
-    payload = request.get_json() or {}
-    slug = payload.get('slug', '').strip()
-    title = payload.get('title', '').strip()
-    url = payload.get('url', '').strip()
-    if not slug or not url:
-        return jsonify({'success': False, 'error': 'slug и url обязательны'}), 400
+def _create_page(content, slug, title, url, blocks):
+    """Создать страницу: копия BASE_PAGE_TEMPLATE + запись в pages + рендер HTML.
+
+    Общий helper для add-page (CN-1) и создания страницы из пресета (CN-T9.2).
+    Выбрасывает ValueError с сообщением об ошибке (вызывающий маппит в 400).
+    """
+    slug = str(slug or '').strip()
+    url = str(url or '').strip() or f'/{slug}/'
+    if not slug:
+        raise ValueError('slug и url обязательны')
     if not re.match(r'^[a-z0-9_\-]+$', slug):
-        return jsonify({'success': False, 'error': 'slug может содержать только латинские буквы, цифры, - и _'}), 400
-    content = load_content()
+        raise ValueError('slug может содержать только латинские буквы, цифры, - и _')
     if any(p['slug'] == slug for p in content['pages']):
-        return jsonify({'success': False, 'error': 'Страница с таким slug уже существует'}), 400
+        raise ValueError('Страница с таким slug уже существует')
     if any(p['url'] == url for p in content['pages']):
-        return jsonify({'success': False, 'error': 'Страница с таким URL уже существует'}), 400
+        raise ValueError('Страница с таким URL уже существует')
 
     template_name = f'pages/{slug}.html'
     dest = BASE_DIR / 'templates' / template_name
@@ -1920,22 +2083,41 @@ def admin_add_page():
         # Minimal fallback template
         dest.write_text("""<!DOCTYPE html>\n<html lang=\"ru\">\n<head>\n<meta charset=\"UTF-8\">\n<title>{{ page.title }}</title>\n<meta name=\"description\" content=\"{{ page.meta_description }}\">\n<link rel=\"stylesheet\" href=\"/theme.css?v={{ site.theme.version | default(1) }}\">\n</head>\n<body>\n{{ page.content_html | safe }}\n</body>\n</html>\n""", encoding='utf-8')
 
-    content['pages'].append({
+    page = {
         'slug': slug,
         'url': url,
         'title': title or slug,
         'h1': title or slug,
         'meta_description': '',
         'template': template_name,
-        'blocks': [
-            {'type': 'heading', 'level': 'h1', 'text': title or slug},
-            {'type': 'text', 'text': 'Опишите здесь, чем полезна эта страница. Текст можно форматировать абзацами.'},
-        ],
-    })
-    content['pages'][-1]['content_html'] = blocks_module.render_blocks(content['pages'][-1]['blocks'])
+        'blocks': blocks if isinstance(blocks, list) else [],
+    }
+    page['content_html'] = blocks_module.render_blocks(page['blocks'])
+    content['pages'].append(page)
     save_content(content)
     invalidate_site_cache()
-    return jsonify({'success': True, 'page': content['pages'][-1]})
+    return page
+
+
+@app.route('/admin/api/add-page', methods=['POST'])
+@admin_required
+def admin_add_page():
+    """Add a new page to the site. Creates a copy of the base template."""
+    payload = request.get_json() or {}
+    slug = payload.get('slug', '').strip()
+    title = payload.get('title', '').strip()
+    url = payload.get('url', '').strip()
+    if not slug or not url:
+        return jsonify({'success': False, 'error': 'slug и url обязательны'}), 400
+    content = load_content()
+    try:
+        page = _create_page(content, slug, title, url, [
+            {'type': 'heading', 'level': 'h1', 'text': title or slug},
+            {'type': 'text', 'text': 'Опишите здесь, чем полезна эта страница. Текст можно форматировать абзацами.'},
+        ])
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    return jsonify({'success': True, 'page': page})
 
 
 @app.route('/admin/api/delete-page', methods=['POST'])
@@ -1993,6 +2175,402 @@ def admin_duplicate_page():
     save_content(content)
     invalidate_site_cache()
     return jsonify({'success': True, 'slug': new_slug})
+
+
+# ---------- Цикл 2 конструктора (CN-T5/CN-T6/CN-T7/CN-T9/CN-T10/CN-T12) ----------
+
+_VERSION_META_FIELDS = ('title', 'h1', 'meta_description', 'meta_keywords', 'canonical', 'url')
+_PAGE_META_FIELDS = ('title', 'h1', 'meta_description', 'meta_keywords', 'canonical')
+_VERSIONS_PER_PAGE = 10
+
+
+def _page_draft_blocks(page):
+    """Блоки черновика страницы (draft_blocks), если черновика нет — опубликованные/текущие."""
+    draft = page.draft_blocks if isinstance(page.draft_blocks, dict) else None
+    if isinstance(draft, dict) and isinstance(draft.get('blocks'), list):
+        return draft['blocks']
+    return page.published_blocks if isinstance(page.published_blocks, list) else \
+        (page.blocks if isinstance(page.blocks, list) else [])
+
+
+def _save_page_version(page, blocks, label=''):
+    """Снапшот версии страницы (CN-T10.2): блоки + мета-поля; максимум 10 на страницу."""
+    from models import PageVersion
+    fields = {k: (getattr(page, k, '') or '') for k in _VERSION_META_FIELDS}
+    db.session.add(PageVersion(
+        page_slug=page.slug,
+        blocks=copy.deepcopy(blocks),
+        page_fields=fields,
+        label=str(label or '')[:120],
+        created_by=session.get('admin_user') or '',
+    ))
+    versions = (db.session.query(PageVersion)
+                .filter_by(page_slug=page.slug)
+                .order_by(PageVersion.id.desc()).all())
+    for old in versions[_VERSIONS_PER_PAGE:]:
+        db.session.delete(old)
+
+
+@app.route('/admin/api/page-publish', methods=['POST'])
+@admin_required
+def admin_page_publish():
+    """Публикация страницы (CN-T10.3): draft_blocks (или blocks, если черновика нет)
+    → published_blocks, пересборка content_html для посетителей, автоснапшот «Авто»."""
+    from models import Page
+    payload = request.get_json() or {}
+    slug = payload.get('slug', '').strip()
+    if not slug:
+        return jsonify({'success': False, 'error': 'slug обязателен'}), 400
+    page = db.session.query(Page).filter_by(slug=slug).first()
+    if page is None:
+        return jsonify({'success': False, 'error': 'Страница не найдена'}), 404
+    blocks = _page_draft_blocks(page)
+    page.published_blocks = copy.deepcopy(blocks)
+    page.content_html = blocks_module.render_blocks(blocks)
+    page.updated_at = datetime.now(timezone.utc)
+    _save_page_version(page, blocks, label='Авто')
+    db.session.commit()
+    invalidate_site_cache()
+    return jsonify({'success': True,
+                    'updated_at': page.updated_at.isoformat(timespec='seconds')})
+
+
+@app.route('/admin/api/page-version-save', methods=['POST'])
+@admin_required
+def admin_page_version_save():
+    """Сохранить версию страницы (CN-T10.2): снапшот draft_blocks||blocks + мета-полей."""
+    from models import Page
+    payload = request.get_json() or {}
+    slug = payload.get('slug', '').strip()
+    label = str(payload.get('label') or '').strip()[:120]
+    if not slug:
+        return jsonify({'success': False, 'error': 'slug обязателен'}), 400
+    page = db.session.query(Page).filter_by(slug=slug).first()
+    if page is None:
+        return jsonify({'success': False, 'error': 'Страница не найдена'}), 404
+    blocks = _page_draft_blocks(page)
+    _save_page_version(page, blocks, label=label)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/admin/api/page-versions')
+@admin_required
+def admin_page_versions():
+    """Список версий страницы (CN-T10.2): {id, label, created_at, created_by, blocks_count}."""
+    from models import PageVersion
+    slug = request.args.get('slug', '').strip()
+    if not slug:
+        return jsonify({'success': False, 'error': 'slug обязателен'}), 400
+    rows = (db.session.query(PageVersion)
+            .filter_by(page_slug=slug)
+            .order_by(PageVersion.id.desc()).all())
+    return jsonify({'success': True, 'versions': [{
+        'id': r.id,
+        'label': r.label or '',
+        'created_at': r.created_at.isoformat(timespec='seconds') if r.created_at else '',
+        'created_by': r.created_by or '',
+        'blocks_count': len(r.blocks) if isinstance(r.blocks, list) else 0,
+    } for r in rows]})
+
+
+@app.route('/admin/api/page-version-restore', methods=['POST'])
+@admin_required
+def admin_page_version_restore():
+    """Откат к версии (CN-T10.2): blocks+мета версии → draft_blocks (БЕЗ публикации)."""
+    from models import Page, PageVersion
+    payload = request.get_json() or {}
+    slug = payload.get('slug', '').strip()
+    version_id = payload.get('version_id')
+    if not slug or not version_id:
+        return jsonify({'success': False, 'error': 'slug и version_id обязательны'}), 400
+    page = db.session.query(Page).filter_by(slug=slug).first()
+    if page is None:
+        return jsonify({'success': False, 'error': 'Страница не найдена'}), 404
+    try:
+        version_id = int(version_id)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'version_id должен быть числом'}), 400
+    version = db.session.get(PageVersion, version_id)
+    if version is None or version.page_slug != slug:
+        return jsonify({'success': False, 'error': 'Версия не найдена'}), 404
+    blocks = version.blocks if isinstance(version.blocks, list) else []
+    page.draft_blocks = {'blocks': copy.deepcopy(blocks),
+                         'saved_at': datetime.now(timezone.utc).isoformat(timespec='seconds')}
+    fields = version.page_fields if isinstance(version.page_fields, dict) else {}
+    for k in _VERSION_META_FIELDS:
+        if k in fields:
+            setattr(page, k, fields.get(k) or '')
+    db.session.commit()
+    invalidate_site_cache()
+    return jsonify({'success': True})
+
+
+@app.route('/admin/api/block-templates', methods=['GET', 'POST', 'DELETE'])
+@admin_required
+def admin_block_templates():
+    """«Мои блоки» (CN-T9.1): список / создание / удаление сохранённых блоков."""
+    from models import BlockTemplate
+    if request.method == 'GET':
+        rows = db.session.query(BlockTemplate).order_by(BlockTemplate.id).all()
+        return jsonify({'success': True, 'templates': [{
+            'id': r.id,
+            'name': r.name or '',
+            'category': r.category or '',
+            'block': r.block,
+            'created_at': r.created_at.isoformat(timespec='seconds') if r.created_at else '',
+        } for r in rows]})
+    if request.method == 'POST':
+        payload = request.get_json() or {}
+        name = str(payload.get('name') or '').strip()[:120]
+        category = str(payload.get('category') or '').strip()[:60]
+        block = payload.get('block')
+        if not name:
+            return jsonify({'success': False, 'error': 'name обязателен'}), 400
+        if not isinstance(block, dict):
+            return jsonify({'success': False, 'error': 'block должен быть объектом'}), 400
+        row = BlockTemplate(name=name, category=category, block=copy.deepcopy(block))
+        db.session.add(row)
+        db.session.commit()
+        return jsonify({'success': True, 'id': row.id})
+    payload = request.get_json() or {}
+    row_id = payload.get('id')
+    try:
+        row_id = int(row_id)
+    except (TypeError, ValueError):
+        row_id = None
+    row = db.session.get(BlockTemplate, row_id) if row_id else None
+    if row is None:
+        return jsonify({'success': False, 'error': 'Шаблон блока не найден'}), 404
+    db.session.delete(row)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/admin/api/page-templates')
+@admin_required
+def admin_page_templates():
+    """Шаблоны страниц (CN-T9.2): курируемые пресеты блоков."""
+    return jsonify({'success': True, 'templates': page_templates_module.list_templates()})
+
+
+@app.route('/admin/api/page-templates/create', methods=['POST'])
+@admin_required
+def admin_page_templates_create():
+    """Создать страницу из пресета (CN-T9.2): {template_id, slug, title, url?}."""
+    payload = request.get_json() or {}
+    preset = page_templates_module.get_template(payload.get('template_id'))
+    if preset is None:
+        return jsonify({'success': False, 'error': 'Шаблон не найден'}), 404
+    slug = str(payload.get('slug') or '').strip()
+    if not slug:
+        return jsonify({'success': False, 'error': 'slug обязателен'}), 400
+    title = str(payload.get('title') or '').strip()
+    url = str(payload.get('url') or '').strip() or f'/{slug}/'
+    content = load_content()
+    try:
+        page = _create_page(content, slug, title or preset['name'], url,
+                            copy.deepcopy(preset['blocks']))
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    return jsonify({'success': True, 'page': page})
+
+
+@app.route('/admin/api/global-zones', methods=['GET', 'POST'])
+@admin_required
+def admin_global_zones():
+    """Глобальные зоны шапка/подвал (CN-T6): GET — текущие (дефолт создаётся
+    на лету без сохранения), POST — валидация, merge и сохранение."""
+    if request.method == 'GET':
+        zones_cfg = zones_module.get_zones()
+        return jsonify({'success': True, **zones_cfg})
+    payload = request.get_json() or {}
+    current = zones_module.get_zones()
+    if 'header' in payload:
+        current['header'] = zones_module.validate_zone('header', payload.get('header'))
+    if 'footer' in payload:
+        current['footer'] = zones_module.validate_zone('footer', payload.get('footer'))
+    storage.set_setting('global_zones', current)
+    invalidate_site_cache()
+    return jsonify({'success': True, **current})
+
+
+PAGE_SETTINGS_DEFAULTS = {
+    'og_title': '',
+    'og_description': '',
+    'og_image': '',
+    'favicon': '',
+    'page_bg': '',
+    'page_link_color': '',
+    'custom_css': '',
+    'custom_js': '',
+    'override_header': False,
+    'override_footer': False,
+    'header_config': None,
+    'footer_config': None,
+}
+_PAGE_SETTINGS_URL_FIELDS = ('og_image', 'favicon')
+_PAGE_SETTINGS_COLOR_FIELDS = ('page_bg', 'page_link_color')
+
+
+def _page_settings_url_ok(value):
+    """og_image/favicon: http(s) или относительный путь; иначе False."""
+    v = str(value or '').strip()
+    if not v:
+        return True
+    low = v.lower()
+    if low.startswith(('javascript:', 'data:', 'vbscript:')):
+        return False
+    return low.startswith(('http://', 'https://', '/'))
+
+
+@app.route('/admin/api/page-settings', methods=['GET', 'POST'])
+@admin_required
+def admin_page_settings():
+    """Настройки страницы (CN-T5, сервер): мета-поля в колонки Page, остальное
+    в Page.settings JSON. custom_css/custom_js — только суперадмин."""
+    from models import Page
+    payload = request.get_json(silent=True) or {}
+    slug = request.args.get('slug', '') if request.method == 'GET' else payload.get('slug', '')
+    slug = str(slug or '').strip()
+    page = db.session.query(Page).filter_by(slug=slug).first() if slug else None
+    if page is None:
+        return jsonify({'success': False, 'error': 'Страница не найдена'}), 404
+
+    current = dict(PAGE_SETTINGS_DEFAULTS)
+    if isinstance(page.settings, dict):
+        current.update({k: v for k, v in page.settings.items() if k in PAGE_SETTINGS_DEFAULTS})
+
+    if request.method == 'GET':
+        return jsonify({
+            'success': True,
+            'slug': slug,
+            'settings': current,
+            'meta': {k: getattr(page, k) or '' for k in _PAGE_META_FIELDS},
+        })
+
+    # POST: мета-поля → колонки страницы
+    meta = payload.get('meta') or {}
+    if isinstance(meta, dict):
+        for k in _PAGE_META_FIELDS:
+            if k in meta:
+                setattr(page, k, str(meta.get(k) or '')[:500])
+    # URL-поля настроек: невалидные отклоняем целиком
+    for k in _PAGE_SETTINGS_URL_FIELDS:
+        if k in payload and not _page_settings_url_ok(payload.get(k)):
+            return jsonify({'success': False, 'error': f'Некорректный URL в поле {k}'}), 400
+    # custom_css/custom_js — только суперадмин
+    wants_code = any(str(payload.get(k) or '').strip()
+                     for k in ('custom_css', 'custom_js') if k in payload)
+    if wants_code and _admin_role() != 'superadmin':
+        return jsonify({'success': False,
+                        'error': 'custom_css/custom_js доступны только суперадмину'}), 403
+    for k in ('og_title', 'og_description'):
+        if k in payload:
+            current[k] = str(payload.get(k) or '')[:500]
+    for k in _PAGE_SETTINGS_URL_FIELDS:
+        if k in payload:
+            current[k] = str(payload.get(k) or '').strip()[:500]
+    for k in ('custom_css', 'custom_js'):
+        if k in payload:
+            current[k] = str(payload.get(k) or '')[:20000]
+    for k in _PAGE_SETTINGS_COLOR_FIELDS:
+        if k in payload:
+            v = str(payload.get(k) or '').strip()
+            current[k] = v if re.fullmatch(r'#[0-9a-fA-F]{3,8}', v) else current.get(k, '')
+    for k in ('override_header', 'override_footer'):
+        if k in payload:
+            current[k] = bool(payload.get(k))
+    for k, kind in (('header_config', 'header'), ('footer_config', 'footer')):
+        if k not in payload:
+            continue
+        if payload.get(k) is None:
+            current[k] = None
+        elif isinstance(payload.get(k), dict):
+            current[k] = zones_module.validate_zone(kind, payload.get(k))
+        else:
+            return jsonify({'success': False, 'error': f'{k} должен быть объектом'}), 400
+    page.settings = current
+    db.session.commit()
+    invalidate_site_cache()
+    return jsonify({'success': True, 'slug': slug, 'settings': current})
+
+
+THEME_HISTORY_LIMIT = 10
+
+
+def _theme_history():
+    """История темы (CN-T7.3): список {theme, saved_at, saved_by} из site_settings."""
+    history = storage.get_setting('theme_history')
+    if not isinstance(history, list):
+        return []
+    return [h for h in history if isinstance(h, dict)]
+
+
+def _push_theme_history(theme):
+    """Перед сохранением/откатом темы — пушить ТЕКУЩЕЕ состояние в историю (макс. 10)."""
+    history = _theme_history()
+    history.insert(0, {
+        'theme': copy.deepcopy(theme),
+        'saved_at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+        'saved_by': session.get('admin_user') or '',
+    })
+    storage.set_setting('theme_history', history[:THEME_HISTORY_LIMIT])
+
+
+@app.route('/admin/api/theme', methods=['GET', 'POST'])
+@admin_required
+def admin_theme():
+    """Текущая тема (GET) и сохранение/откат с историей (POST) — CN-T7.1/CN-T7.3.
+
+    POST {theme: {...}} — валидация через _validated_theme, merge с текущей,
+    бамп version, пуш текущего состояния в историю.
+    POST {action: 'restore_history', index: N} — откат к записи истории
+    (текущее состояние тоже пушится в историю перед откатом).
+    """
+    content = load_content()
+    site = content.setdefault('site', {})
+    if request.method == 'GET':
+        return jsonify({'success': True,
+                        'theme': site.get('theme') or dict(THEME_DEFAULTS),
+                        'history': _theme_history()})
+    payload = request.get_json() or {}
+    current_theme = site.get('theme') or dict(THEME_DEFAULTS)
+
+    if payload.get('action') == 'restore_history':
+        try:
+            index = int(payload.get('index'))
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'index обязателен'}), 400
+        history = _theme_history()
+        if not 0 <= index < len(history):
+            return jsonify({'success': False, 'error': 'Запись истории не найдена'}), 404
+        _push_theme_history(current_theme)
+        restored = _validated_theme(history[index].get('theme')) or dict(THEME_DEFAULTS)
+        restored['version'] = int(current_theme.get('version') or 1) + 1
+        site['theme'] = restored
+        save_content(content)
+        invalidate_site_cache()
+        return jsonify({'success': True, 'theme': restored, 'history': _theme_history()})
+
+    validated = _validated_theme(payload.get('theme'))
+    if validated is None:
+        return jsonify({'success': False, 'error': 'Некорректная тема'}), 400
+    _push_theme_history(current_theme)
+    theme = dict(current_theme)
+    theme.update(validated)
+    theme['version'] = int(current_theme.get('version') or 1) + 1
+    site['theme'] = theme
+    save_content(content)
+    invalidate_site_cache()
+    return jsonify({'success': True, 'theme': theme, 'history': _theme_history()})
+
+
+@app.route('/admin/api/fonts')
+@admin_required
+def admin_fonts():
+    """Курируемый список Google-шрифтов (CN-T7.2); ?q= — фильтр по family."""
+    return jsonify({'success': True, 'fonts': fonts_module.list_fonts(request.args.get('q'))})
 
 
 @app.route('/admin/api/rebuild', methods=['POST'])

@@ -1,15 +1,29 @@
+{% set ps = page.settings if page.settings is mapping else {} %}
 {% if page.meta_keywords %}<meta name="keywords" content="{{ page.meta_keywords }}" />
 {% endif %}
 <link rel="canonical" href="{{ seo_canonical }}" />
-<meta property="og:title" content="{{ page.title }}" />
-<meta property="og:description" content="{{ page.meta_description or site.meta_description }}" />
+<meta property="og:title" content="{{ ps.get('og_title') or page.title }}" />
+<meta property="og:description" content="{{ ps.get('og_description') or page.meta_description or site.meta_description }}" />
 <meta property="og:url" content="{{ seo_canonical }}" />
 <meta property="og:type" content="{% if seo_product %}product{% else %}website{% endif %}" />
-<meta property="og:image" content="{{ seo_og_image }}" />
+<meta property="og:image" content="{{ ps.get('og_image') or seo_og_image }}" />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="{{ page.title }}" />
-<meta name="twitter:description" content="{{ page.meta_description or site.meta_description }}" />
-<meta name="twitter:image" content="{{ seo_og_image }}" />
+<meta name="twitter:title" content="{{ ps.get('og_title') or page.title }}" />
+<meta name="twitter:description" content="{{ ps.get('og_description') or page.meta_description or site.meta_description }}" />
+<meta name="twitter:image" content="{{ ps.get('og_image') or seo_og_image }}" />
+{% if ps.get('favicon') %}<link rel="icon" href="{{ ps.get('favicon') }}" />
+{% endif %}
+{% if ps.get('page_bg') or ps.get('page_link_color') or ps.get('custom_css') %}
+<style>
+{% if ps.get('page_bg') %}body { background: {{ ps.get('page_bg') }}; }
+{% endif %}
+{% if ps.get('page_link_color') %}a { color: {{ ps.get('page_link_color') }}; }
+{% endif %}
+{{ ps.get('custom_css') | safe }}
+</style>
+{% endif %}
+{% if ps.get('custom_js') %}{{ ps.get('custom_js') | safe }}
+{% endif %}
 {% if seo_product %}
 <script type="application/ld+json">{{ seo_product | tojson }}</script>
 {% endif %}
