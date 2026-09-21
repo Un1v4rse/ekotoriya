@@ -404,7 +404,10 @@
 
     /* ============================== Boot ============================== */
     document.addEventListener('DOMContentLoaded', boot);
-    if (document.readyState !== 'loading') boot();
+    /* defer-скрипт выполняется при readyState 'interactive' — до DOMContentLoaded,
+       но после него ещё не инициализированы const ниже (mediaOverlay и др.).
+       Откладываем boot до завершения всего скрипта. */
+    if (document.readyState !== 'loading') setTimeout(boot, 0);
 
     function boot() {
         if (editorBooted) return;
@@ -412,6 +415,7 @@
         document.body.classList.add('pe-active');
         document.body.append(topbar, leftPanel, rightPanel, highlight, dropLine, addBtn, addBtnBridge,
             badgesLayer, emptyState, legacyBanner, toastBox, mediaOverlay, versionsOverlay, pageSettingsOverlay);
+        $('pe-lib-search').addEventListener('input', debounce(renderLibrary, 200));
         bindTopbar();
         bindCanvasEvents();
         closeRightPanel();
@@ -2761,8 +2765,8 @@
         }
     }
 
-    /* Поиск по библиотеке */
-    $('pe-lib-search').addEventListener('input', debounce(renderLibrary, 200));
+    /* Поиск по библиотеке — биндим в boot(): поле живёт в leftPanel,
+       которая попадает в DOM только там. */
 
     /* ==================== Zero-редактор (CN-T8 UI) ==================== */
     // Формат данных — как в blocks.py zero-рендерере:
