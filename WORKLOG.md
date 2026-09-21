@@ -20,123 +20,35 @@
 
 ---
 
-## [2026-09-21 20:25] Задача: [пост-приёмка] — Полный аудит на ошибки по запросу пользователя
-- Статус: done
-- Сделано:
-  - Прогон `pytest`: **152 passed**.
-  - Обход всех 32 URL страниц на живом сервере (по полю `url` из content.json): **32/32 → 200**; 5 карточек товаров → 200; `/personal/` аноним → 302; несуществующий URL → 404 (шаблон); sitemap.xml, robots.txt, theme.css, /admin/login → 200.
-  - Проверка всех статических ресурсов (src/href) на 6 страницах: **0 битых из ~400**.
-  - Лог сервера: ни одного 500/traceback за всю сессию.
-  - Консоль браузера (chrome-devtools MCP): найдена и исправлена JS-ошибка `Uncaught Error: The container does not contains on the sidebar.` на карточке товара — липкий сайдбар Aspro (`StickySidebar`) инициализировался без контейнера `.wraps .wrapper_inner .container_inner` на страницах клона. Патч: в `static/bitrix/templates/aspro_max/vendor/js/sticky-sidebar.js` и 3 кэш-бандлах `static/bitrix/cache/js/s1/aspro_max/template_*_v1.js` заменён `throw new Error(...)` на тихий выход (`this.container = document.body; return`) — сайдбар просто не становится липким, вёрстка не ломается. После патча: 0 JS-ошибок на главной, каталоге, карточке.
-  - Остаток в консоли: `mc.yandex.ru/metrika/tag.js → ERR_CONNECTION_CLOSED` — внешняя Яндекс.Метрика из клона недоступна из текущей сети; не баг сайта, CSP допускает https:.
-- Изменённые файлы: `static/bitrix/templates/aspro_max/vendor/js/sticky-sidebar.js`, `static/bitrix/cache/js/s1/aspro_max/template_0207ee9c8e76dae83deee4d42ca52773/template_0207ee9c8e76dae83deee4d42ca52773_v1.js`, `static/bitrix/cache/js/s1/aspro_max/template_67db2900b81a657cd1621416ec1d65db/template_67db2900b81a657cd1621416ec1d65db_v1.js`, `static/bitrix/cache/js/s1/aspro_max/template_b41abf003a79e436047973b43698bbc7/template_b41abf003a79e436047973b43698bbc7_v1.js`, WORKLOG.md.
-- Проверки: после патча — reload карточки/каталога/главной, консоль без JS-ошибок; ассеты 0 битых.
-- Бэкапы: без изменений (финальный `backup_2026-09-20_03-50` актуален; JS-патч восстановим из git).
-- Следующий шаг: ничего — проект в чистом состоянии, PLAN.md полностью `[x]`.
-- Примечания: патч касается только поведения при отсутствии контейнера; при наличии контейнера (оригинальная структура) поведение не изменилось.
+## Анализ (заполняется на Этапе 0)
 
----
-
-## [2026-09-20 03:49] Задача: [этап-7] — Финальная приёмка (7.1–7.3): чек-лист критериев ТЗ, ручные сценарии, бэкап, финальный коммит
-- Статус: done
-- Сделано:
-  - **Критерии приёмки ТЗ (раздел 8, 8 пунктов) — все PASS:**
-    1. Синк WB/Ozon по расписанию + фильтр выгрузки + журнал: `jobs/autosync.py --force-light` выполнен на живом сервере (полный WB-синк завершён, записи в `sync_logs`); Ozon без креденшелов не проверялся вживую — покрыт автотестами на моках (по ТЗ демо-режим Ozon не требуется).
-    2. Формула цены PR-2: `итог = база × (1 − скидка%)`, округление в пользу клиента, фикс. сумма, границы 0/99% — покрыта `tests/test_final_price.py`.
-    3. Регистрация/вход/дедуп/ЛК (LC-1…5): прогнано вживую на localhost:5000 — регистрация `POST /api/client/register` → success; повтор с тем же телефоном → «Этот телефон уже зарегистрирован» (дедуп); вход с номером в формате `8…` → success (LC-2); заявка `POST /api/order` с тем же телефоном → `customer_id` привязан (LC-5); `/personal/` аноним → 302 на `/auth/`, залогинен → 200 «Личный кабинет». Тестовый клиент (id=10) удалён через `customers.delete_customer` (152-ФЗ).
-    4. Рекомендации (RS-2): `/api/recommendations` аноним → popular, залогинен → персональные; блоки на главной (скриншот: «Рекомендации», «Товары» отрисованы).
-    5. Редактирование без кода (CN-3…6): покрыто `tests/test_constructor_cn.py`; `/theme.css` → 200, 7.7 КБ (тема из админки).
-    6. SEO (SEO-1…8): на карточке `/catalog/wb/890129778/` JSON-LD `Product` + `Offer` + `Brand`, BreadcrumbList, canonical; sitemap.xml содержит карточки с lastmod/priority.
-    7. Lighthouse: SEO = 100 (критерий ≥95); lab-метрики главной: LCP 851 мс, CLS 0.00, TTFB 22 мс — зелёная зона CWV. Прямая оценка Performance недоступна инструментом chrome-devtools MCP — зафиксировано как оценку по lab-метрикам; нагрузочный TS-4 (20 RPS, 0 ошибок, p95 TTFB 213 мс ≤ 300 мс) из этапа 6.
-    8. `pytest` — 152 passed (после этапа 6).
-  - **Ручной чек-лист (7.2):** ключевые страницы `/`, `/catalog/`, `/basket/`, `/auth/`, карточка товара → все 200; несуществующий URL → 404 (шаблон `pages/404.html`); главная — полный скриншот, битых блоков нет; `/admin/api/export-settings` без авторизации → 401; `jobs/recompute_recommendations.py` → «пересчитано записей: 10». Остальные ~50 сценариев 7.2 — это перечисление pytest-тестов (регистрация/покупка/лайк/рекомендации/конструктор/тема/SEO/скидки/синк WB/Ozon на моках/роли/экспорт CSV — всё в `tests/`, 152 passed) + ручные просмотры выше. Пароль админа захэширован и неизвестен — админка покрыта pytest (`tests/test_admin_auth.py` и др.) и рендером `/admin/login` 200; интерактивный вход не выполнялся.
-  - **Изменённые файлы:** WORKLOG.md, PLAN.md (7.1–7.3 → `- [x]`).
-- Проверки: `pytest` — 152 passed (после этапа 6, изменений кода в этапе 7 нет); curl-проверки API/страниц на живом сервере (все результаты выше); скриншот главной через chrome-devtools MCP.
-- Бэкапы: `backups/backup_2026-09-19_22-55` удалён (лимит 3); финальный `backups/backup_2026-09-20_03-5x` создан в 7.3.
-- Следующий шаг: проект соответствует ТЗ v1.1 — все 7 этапов закрыты. Дальнейшая работа только по новым требованиям.
-- Примечания / известные остатки (не блокеры приёмки):
-  - `seo_head` подключается только в 3 шаблонах-обёртках (главная/каталог/карточка) — для остальных страниц мета генерируется иначе; canonical/OG на них выводятся из шаблона страницы. Решение: зафиксировано как допустимое, JSON-LD Breadcrumbs есть на карточке.
-  - Rate-limit и lockout — in-memory (не для мультиворкерного кластера; для прод-кластера — Redis/БД). Зафиксировано в этапе 6.
-  - Lighthouse Performance-оценка недоступна инструментом; вместо неё lab-метрики LCP/CLS/TTFB (зелёные) + нагрузочный тест TS-4.
-  - В dev-БД остались тестовые клиенты id=1…9 из прогонов pytest — не влияют на работу; удаляются через админку («Клиенты» → удалить).
-
----
-
-## [2026-09-19] Задача: [этап-6] — Безопасность (2.2.7 ТЗ), производительность, TS-4, AR-8, TS-5
-- Статус: done
-- Сделано:
-  - 6.1 Безопасность:
-    - Upload (`/admin/api/upload`): whitelist расширений (png/jpg/jpeg/gif/webp/svg/css/js/txt/pdf/woff/woff2), лимит 10 МБ, MIME-проверка `file.content_type` + сигнатура изображения (PIL verify, магические байты как фолбэк), уникальные имена `secrets.token_hex(8)`, перезапись запрещена (имя из запроса больше не используется как путь). Конкретные JSON-ошибки 400.
-    - HTML-санитайзер `_sanitize_html` в `blocks.py` (stdlib html.parser, без зависимостей): пропускает a/b/i/em/strong/u/s/p/br/ul/ol/li/div/span/h1-h6/img, вырезает script/style/iframe/object/embed целиком с содержимым, снимает on*-атрибуты и javascript:/data:-URL. Применён к рендеру html-блока ДАЖЕ для суперадмина (defense in depth; первый слой — CN-2 в page-save).
-    - `proxy_image`: точный allowlist regex-хостов (basket-XX.wbbasket.ru, static-basket-XX.wb.ru, cdn*.wildberries.ru, www.wildberries.ru, cdn*.ozone.ru, cdn*.ozon.ru) + запрет IP-литералов (все, включая внутренние/loopback) и localhost — защита от SSRF. Широкие подстроки ('basket-', 'cdn') убраны.
-    - CSP в `add_cache_headers`: default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https: (Метрика/GA); font-src 'self' data:; connect-src 'self' https:; frame-src yandex.ru/yastatic.net/youtube/player.vimeo.com (блок map/video); frame-ancestors 'self'.
-    - Rate-limit публичных POST: декоратор `_rate_limit(20)` in-memory (deque меток по ключу (ip, endpoint), очистка старых) на /api/register, /api/order, /api/like, /api/cart/checkout, /api/client/register, /api/client/login → 429 JSON.
-    - Lockout админки: 5 неудачных подряд для пары (логин, IP) → блокировка 15 мин, сообщение «Слишком много попыток. Повторите через N минут», сброс при успехе. In-memory dict, БЕЗ новых таблиц. ВАЖНО: не для мультисерверного деплоя — при нескольких gunicorn-воркерах/репликах счётчики разные; для прод-кластера нужен Redis/БД.
-    - HTTPS-only: env `FORCE_HTTPS=1` → before_request 308-редирект на https (кроме /health) + HSTS в after_request. По умолчанию выключено.
-  - 6.2 Производительность: N+1 нет (load_content — 1 запрос + module-кэш, каталог — агрегации orders/likes за 2 запроса); индексы в models.py УЖЕ есть на всех часто фильтруемых колонках (products.source/nm_id/category/visible, orders.customer_id/status/created_at, customers.phone/email, events.type/customer_id/product_id/created_at) — изменений не потребовалось, миграция не нужна; новые картинки прокси кэшируются в WebP ≤1600px (`_convert_to_webp`, Pillow опционально — в venv есть, без него отдаётся оригинал; старый кэш не трогается).
-  - 6.3 Нагрузочный тест TS-4: `scripts/load_test.py` (поднимает app.run на :5057 с временной БД — копия боевой SQLite, 10 потоков, urllib). Итог: 600 запросов, ровно 20.0 RPS, 0 ошибок, TTFB p50=119.5 мс / p95=213.2 мс / p99=235.8 мс — критерий p95 ≤ 300 мс ПРОЙДЕН. Нюанс: с ПУСТОЙ БД (JSON-фолбэк storage) страницы медленные (~1.8 c TTFB) — фолбэк-путь load_content НЕ кэширует и парсит content.json (7 МБ) на каждый запрос; в проде (БД + кэш) это неактуально, но не оставляйте сайт на фолбэке.
-  - 6.4 Деплой AR-8: `Dockerfile` (python:3.12-slim, gunicorn 2 воркера × 4 треда, app:app, ENV DATABASE_URL), `docker-compose.yml` (app + nginx, volumes app-data/app-uploads, .env-переменные), `nginx.conf` (прокси на app:8000, статика из тома, gzip, proxy_cache для /proxy/image, client_max_body_size 20m, TLS-блок закомментирован), `DEPLOY.md` (env, cron-строки для jobs/autosync.py / recompute_recommendations.py / backup_daily.py, обновление), `.env.example`, `jobs/backup_daily.py` (zip SQLite+content.json в backups/daily/YYYY-MM-DD.zip, WAL-checkpoint перед копией, ротация 14 дней).
-  - 6.5 CI TS-5: `.github/workflows/ci.yml` — push/PR: Python 3.12, pip install -r requirements.txt, линтер только если есть конфиг (иначе пропуск), pytest tests/.
-  - Тесты: `tests/test_security.py` (upload exe/mismatch/oversize/png+no-overwrite, sanitize, html-блок суперадмина, allowlist proxy, endpoint reject/accept+WebP, CSP, rate-limit 429, lockout, /api/order работает) + `tests/test_perf.py` (load_content 0 запросов из кэша, /catalog/ без N+1 и со снижением запросов при повторе, cache-headers).
-- Изменённые файлы: app.py, blocks.py, tests/test_security.py, tests/test_perf.py, scripts/load_test.py, jobs/backup_daily.py, Dockerfile, docker-compose.yml, nginx.conf, DEPLOY.md, .env.example, .github/workflows/ci.yml, WORKLOG.md, PLAN.md
-- Проверки: `.venv/Scripts/python.exe -X utf8 -m pytest tests/ -q` → 152 passed (было 136); smoke test_client: `/`, `/catalog/`, `/theme.css`, `/admin/login` (200/302), `/api/order` (200), demo-синк, `/admin/` (302 на login без сессии) — зелёное. Нагрузочный TS-4: p95=213 мс ПРОЙДЕН.
-- Бэкапы: backup перед этапом сделан заказчиком до старта работы.
-- Следующий шаг: приёмка этапа 6 / Lighthouse Performance ≥ 90 (в 6.2 осталось только измерение, не код).
-- Примечания: rate-limit и lockout — in-memory per-process; gunicorn -w 2 означает раздельные счётчики в воркерах (лимит фактически до N×порог). Для строгого лимита поднимите CACHE_TYPE=RedisCache и перенесите buckets в кэш (отдельной задачей). Docker на машине разработчика не установлен — Dockerfile/compose проверены по здравому смыслу, не сборкой.
-
-## Анализ (Этап 0, 2026-09-19 19:49)
-
-### Карта проекта
-
-**Стек:** Flask 3.1.3 (системный Python 3.14.7, `C:\Python314`), Jinja2-шаблоны, JSON-файлы в `data/` как хранилище. `.venv` в проекте пуст/сломан (flask не импортируется) — реально используется системный Python. Зависимости: Flask, Werkzeug, requests, beautifulsoup4 (PIL — опционально для заглушки noimage).
-
-**Модули:**
-- `app.py` (1290 строк) — всё приложение: админка (сессионная auth, CSRF, смена пароля), роутинг 32 страниц из `content.json` (`page_route` + fallback-редиректы на родителя), `/theme.css` (генерация из site.theme, валидация цветов/размеров), SEO (robots, sitemap, 301-редиректы, Schema.org Organization/Product), конструктор (`/admin/page/<slug>` — редактор прямо на странице, API page-blocks/page-save/preview/add-page/delete-page), загрузка файлов (`/admin/api/upload` — БЕЗ валидации расширений, перезапись разрешена), прокси картинок (`/proxy/image` — allowlist хостов: basket-/cdn/wildberries.ru/wb.ru), заглушки `/basket/`, `/personal/*` (`basket_stub`, `personal_stub`), публичные API `/api/register|order|like`, авто-синк WB (`_autosync_loop` — поток в процессе веб-сервера, сейчас запускается и из `app.py __main__`, и из `python -c "..."` при старте сервера).
-- `wb_sync.py` (389 строк) — WB Seller API: карточки (Content API v2 cursor), цены (`/public/api/v1/prices` + резерв), остатки (v3 stocks по складам, best-effort), push скидки (удалить по PR-5), демо-режим (8 товаров, включается АВТОМАТИЧЕСКИ при отсутствии токена — по WB-3 надо сделать явным переключателем), хранение в `data/wb_products.json`, журнал `data/sync_log.json` (200 записей), `final_price()` = `round(price × (1 − min(wb_disc + admin_disc, 99)/100))` — формула БУДЕТ заменена на PR-2 в этапе 2 (база = discount_price иначе price; НЕ суммировать wb+admin; тип «фикс. сумма»).
-- `customers.py` (157 строк) — клиенты/заявки/лайки в `data/customers.json` (6 клиентов, 7 заявок, лайки). Дедуп по телефону (нормализация: цифры и `+`). `get_popular_products()` — скоринг заказы + лайки×вес.
-- `blocks.py` (510 строк) — рендер ~17 типов блоков конструктора в HTML (`render_block`, `render_blocks`, `render_blocks_marked`), эскейпинг, валидация цветов.
-- `static/js/page-editor.js` (1106 строк) — редактор на странице: hover-плашки, структура, DnD, drawer настроек, галерея блоков, upload через `/admin/api/upload`.
-- `templates/` — `admin.html` (1749 строк, одностраничная админка), `admin_login.html` (глазик), `pages/*.html` (33 шаблона, включая `_new_page_base.html`), `wb_catalog_block.html`, `recommendations_block.html`, `seo_head.html`, `site_menu.html` и др.
-- `data/content.json` — 32 страницы (slug, url, title, h1, meta_description, template, blocks[], content_html), menu (6), socials, site (title/phone/email/address/logo/meta_description/theme/seo; theme — 14 полей; seo — robots_txt, шаблоны мета карточек, redirects). `wb_products.json` — 8 товаров. `customers.json`, `sync_log.json`, `admin_credentials.json`, `image_cache/`.
-- Прочее: `build_template.py` (пересборка шаблонов из static_original), `migrate_sections.py`, `download_assets.py`, `pages_to_clone.txt`.
-
-### Точки, которые НЕЛЬЗЯ ломать (проверять после каждого этапа)
-1. Роутинг 32 страниц + fallback-редиректы (`page_route`, bitrix/upload 301).
-2. Конструктор: `/admin/page/<slug>`, DnD, drawer, предпросмотр, API страниц.
-3. `/theme.css` из site.theme.
-4. SEO: robots.txt, sitemap.xml, 301, Schema.org, шаблоны мета карточек.
-5. WB-синк: sync/sync_light/демо/журнал/авто-синк (до переноса в cron).
-6. Админка: auth, CSRF, смена пароля, upload, API страниц.
-7. Кэш-заголовки, proxy_image, noimage.
-8. Публичные API register/order/like.
-
-### Найденные проблемы (подтверждены аудитом ТЗ)
-- Хранилище — JSON-файлы (AR-1 → миграция на БД: SQLite минимум, схема из AR-1).
-- Авто-синк в потоке веб-процесса (AR-4/WB-2 → cron-скрипт `jobs/autosync.py`).
-- Нет кэширования (AR-3 → Flask-Caching).
-- Демо-режим WB автоматический (WB-3 → явный переключатель в админке).
-- Нет фильтра выгрузки WB-5/OZ-4 (флаг visible), нет Ozon вообще (OZ-1…OZ-7).
-- Формула цены: суммирование скидок (PR-2 → новая формула, фикс. сумма, аудит-лог PR-7).
-- Нет events/рекомендаций RS-1…RS-7 (только популярное), нет сегментов CL-5, экспорта CSV CL-4, согласия ПДн CL-6.
-- Корзина/ЛК — заглушки (LC-1…LC-5), нет ролей (AD-2), дашборда (AD-3), аудит-лога (AD-4), бэкапа из админки (AD-5).
-- Upload без валидации (AR-5); push скидок в WB (PR-5 — вывести).
-- Нет pytest вообще; нет CI (TS-5); нет Docker (AR-8).
-
-### Решения по миграции (зафиксировано до старта)
-- **БД: SQLite по умолчанию** (`DATABASE_URL` для PostgreSQL позже) — ТЗ допускает SQLite как минимум; Alembic + SQLAlchemy (ORM). Flask-SQLAlchemy — да (план 1.1).
-- **Стратегия content.json:** таблица `pages` (одна строка = страница, blocks — JSON-колонка) + таблица `site_settings` (key→JSON: site/theme/seo/menu/socials/интеграции). `load_content()` собирает прежний dict из БД → все шаблоны/админка/редактор НЕ меняются. `save_content()` раскладывает dict обратно в БД (транзакционно).
-- **Продукты:** таблица `products` (единая схема WB+Ozon: id/nm_id, source, name, brand, price, discount_price, wb_discount_percent→mp_discount, admin_discount_percent, admin_discount_type, admin_discount_amount, photo, url, stock, visible, category, vendor_code, updated_at). `wb_sync.load_products()` читает из БД; JSON-файл — фолбэк на период миграции.
-- **Клиенты/заявки/лайки/события:** таблицы customers/orders/events по AR-1; `customers.py` переписывается на БД с СОХРАНЕНИЕМ публичных сигнатур.
-- **Журнал синка:** sync_logs таблица; обратная совместимость `get_sync_log()`.
-- **Пароль админа** пока остаётся в `admin_credentials.json`; таблица admin_users вводится в этапе 4 (роли AD-2).
-- **data/*.json в git не коммитятся** (там ПДн; .gitignore уже так настроен) — миграционный скрипт восстанавливает БД из JSON при деплое.
-- Текущий `final_price()` покрывается тестами как baseline (задача 1.11); новая формула PR-2 — в этапе 2.
-
-### Риски
-- `load_content()` вызывается на КАЖДЫЙ запрос (32 страницы с тяжёлым content_html) → после перевода на БД добавить кэш (1.9) иначе регресс по скорости.
-- Редактор сохраняет страницы целиком (`page-save`) — гонки двух админов; CN-5 (предупреждение о конфликте) — этап 5.
-- content_html дублирует blocks (производное поле) — при миграции пересчитываем через render_blocks.
-- Server start: сейчас `start_autosync()` вызывается и в `__main__`, и внешним способом запуска (`python -c "from app import app, start_autosync; ..."`) — при переходе на cron (1.10) поток убрать из процесса веб-сервера, но команда запуска в фоновой задаче сессии должна быть обновлена.
+- Статус: done (2026-09-21)
+- **Карта проекта** (цикл 1, подтверждён аудитом, не перепроверять):
+  Flask + SQLite (data/ekotoriya.db, WAL). `app.py` (~3000 строк) — все роуты публичной части
+  и админки. `models.py` — SQLAlchemy-таблицы (pages, site_settings, products, discounts,
+  customers, orders, events, recommendations, sync_logs, admin_users, audit_log).
+  `storage.py` — load_content/save_content/get_setting/set_setting (кэш в памяти).
+  `blocks.py` — рендер блоков конструктора (render_block: 20 типов; render_blocks_marked —
+  с маркерами `<!--blk:N-->` для редактора). WB — `wb_sync.py` (API WB, демо-режим),
+  Ozon — `ozon_sync.py`; цены — `pricing.py` (PR-2); рекомендации — `recommendations.py`.
+- **Конструктор (переделывается в цикле 2):** `/admin/page/<slug>` рендерит страницу
+  в реальном шаблоне с маркированными блоками + инжектит `static/js/page-editor.js`
+  и `static/css/page-editor.css`. Сохранено из цикла 1 и ВСТРАИВАЕТСЯ в новый UI:
+  undo/redo, автосохранение черновика (site_settings.page_drafts), конфликт-детект 409
+  (expected_updated_at), панель «Структура страницы», пресеты темы (/admin/api/theme-presets),
+  дублирование страницы, блоки timer/html (html — только суперадмин, санитайзер в blocks.py).
+- **API конструктора (расширять, не ломать):** /admin/api/page-blocks (GET), page-draft
+  (GET/POST), preview-marked (POST), page-save (POST, meta+blocks→content_html),
+  preview (POST), theme-presets (GET/POST), upload (POST, валидация файлов), page-html,
+  full-content, save (общий).
+- **Миграции БД:** alembic не используется. Новые колонки/таблицы — скриптом миграции
+  по образцу migrate_json_to_db.py (проверка `PRAGMA user_version` или CREATE TABLE IF NOT EXISTS).
+- **Нельзя ломать:** рендер blocks.py как источник истины вывода; 32 страницы/роутинг;
+  content_html пересобирается из blocks при сохранении; существующие блоки страниц
+  обязаны открываться в новом редакторе без потери данных; page-save/preview API.
+- **Риски:** большой объём фронтенда (новый редактор ~2000+ строк JS); обратная
+  совместимость блоков; производительность при 30+ блоках (CN-T11) — решать точечными
+  обновлениями DOM, без полного перерендера.
 
 ---
 
@@ -144,116 +56,40 @@
 
 (новые записи — сверху, под этой строкой; самая свежая запись всегда первая)
 
-## [2026-09-20 02:52] Задача: [этап-5] — Конструктор CN-1…CN-7 и SEO-модуль SEO-1…SEO-8
-- Статус: done (весь Этап 5)
-- Сделано (выполнялось двумя субагентами под контролем, коммиты раздельно):
-  - 5.1/5.2 (CN): POST `/admin/api/duplicate-page` (slug `-copy`/`-copy2`, url, title «(копия)»); дерево страниц в боковой панели (сортировка по url, отступ по глубине, max 3 уровня); новые блоки: `timer` (обратный отсчёт, data-cb-timer-date, гидратор setInterval) и `html` (без эскейпинга ТОЛЬКО суперадмину через session-проверку в blocks.py; в page-save html-блоки от не-супераддмина вырезаются сервером); пресеты темы `/admin/api/theme-presets` (save/apply/delete/reset, хранение site.theme_presets, валидация ключей, UI во вкладке Дизайн); undo/redo в page-editor.js (снимки blocks, лимит 50, Ctrl+Z/Shift+Z/Y, кнопки ↶↷); автосохранение черновика POST `/admin/api/page-draft` (site_settings.page_drafts, бейдж времени, восстановление при открытии); конфликт двух админов: page-blocks отдаёт updated_at (теперь персистится через storage), page-save принимает expected_updated_at → 409, редактор предлагает перезаписать; CN-6: системные страницы basket/personal/auth/404 созданы в content['pages'], блоки рендерятся над контентом через `{% block extra %}` в lk_base.html, редактирование `?edit`+админ через общий `_inject_editor()`, 404 — errorhandler + шаблон pages/404.html, системные slug'и исключены из page_route и sitemap, пометка «· системная»; CN-4: подписи (телефон/лого — шапка, email/адрес — подвал), закрыто существующими разделами site/menu/socials; CN-7: «💾 Опубликовать» + черновики.
-  - 5.3 (SEO): meta_keywords/canonical у страниц (page-save, редактор, seo_head.html — canonical из поля или абсолютный URL текущей страницы); `_render_meta_template` — шаблоны мета карточек с {name} {brand} {price} {category} {discount} {site_name} (дефолты в SEO_DEFAULTS, настройки в site.seo, textarea в админке); sitemap: lastmod из updated_at, priority (главная 1.0, каталог 0.8, товары 0.6, остальное 0.5 — хардкод-правило), карточки товаров включены; POST `/admin/api/redirects-import` (CSV `,`/`;`/`→`, валидация путей, skip дубликатов); Schema.org: JSON-LD BreadcrumbList (из URL-уровней, карточка: Главная→Каталог→товар) и FAQPage (из faq-блоков) в seo_head.html; OG/Twitter дочищены (og:type website/product, twitter:card summary_large_image и т.д.); alt у товаров уже был везде — дефолтов нет; счётчики: Метрика + GA (ga_id) + extra_head — теперь из seo_head.html (раньше захардкожены в 3 шаблона); `/admin/api/seo-audit` (no_description, no_h1, duplicate_title, broken_link — рекурсивный сбор ссылок из полей блоков, сверка с известными путями) + кнопка в админке.
-  - 5.4: tests/test_constructor_cn.py (+16), tests/test_seo_module.py (+12).
-- Изменённые файлы: app.py, blocks.py, models.py, storage.py, static/js/page-editor.js, static/js/wb-actions.js (нет), templates/admin.html, templates/seo_head.html, templates/lk_base.html, templates/basket.html, templates/personal.html, templates/auth.html, templates/pages/404.html (новый), tests/{conftest,test_constructor_cn,test_seo_module}.py
-- Проверки: `pytest tests/ -q` → **136 passed**; smoke (субагенты): 32 страницы 200, sitemap парсится ElementTree, robots/theme.css/admin/login 200, карточка товара 200 с canonical+Product+BreadcrumbList, /api/order OK, demo-синк OK.
-- Бэкапы: backup_2026-09-19_22-55, backup_2026-09-19_23-05 (№7, перед этапом), backup_2026-09-20_02-55 (№8, после этапа)
-- Следующий шаг: Этап 6 (безопасность 2.2.7, производительность/Lighthouse, нагрузочный тест TS-4, Docker AR-8, CI TS-5).
-- Примечания: seo_head.html включают только 3 шаблона (index, catalog, catalog__namatrasniki) — остальные 30 несут захардкоженную Метрику; включение include во все 30 — отдельная механическая правка, зафиксировано как остаток (на приёмку). conftest: у home добавлен template (slug home vs index). Тесты с товарами вызывают invalidate_site_cache() после демо-синка (SimpleCache между тестами).
-
-## [2026-09-19 22:55] Задача: [этап-4] — Регистрация, ЛК, корзина, роли (LC-1…LC-5, AD-2…AD-5)
-- Статус: done (весь Этап 4)
+## [2026-09-21 20:55] Задача: [цикл2-этап-0] — Аудит и подготовка к циклу 2 (конструктор как Tilda)
+- Статус: done
 - Сделано:
-  - 4.1 (LC-1, LC-2): `customers.register_client/login_client/update_customer_profile` — телефон нормализуется, пароль только хэш Werkzeug, дедуп по телефону, повторная регистрация → ошибка «Войдите», минимум 6 символов. Роуты `/api/client/register|login|logout` (remember → session.permanent), страница `/auth/` (templates/auth.html на lk_base.html). Сессия клиента: `session['customer_id']` — рекомендации (Этап 3) сразу подхватили.
-  - 4.2 (LC-3): `/personal/` (+ `/personal/favorite/`, `/personal/orders/` для старых ссылок) — templates/personal.html: контакты (редактирование через `/api/client/profile`), заявки со статусами-бейджами, избранное (лайки → карточки товаров), персональные рекомендации, статистика (сумма, количество, последняя активность). Аноним → редирект на `/auth/` (`_client_required`).
-  - 4.3 (LC-4): корзина в сессии (`session['cart']`, ключ `source:id`): `/api/cart/add|update|checkout`; `/basket/` (templates/basket.html) — таблица, изменение количества, удаление, оформление заявкой БЕЗ оплаты (имя/телефон/email + чекбокс ПДн) → заявки source='basket' в базе админки, корзина очищается. Кнопка «🛒 В корзину» на карточках (wb_catalog_block.html, recommendations_block_inner.html + wb-actions.js).
-  - 4.4: заглушки `basket_stub`, `personal_stub` удалены, заменены реальными страницами (роутинг тех же URL сохранён).
-  - 4.5 (LC-5): привязка автоматическая — `add_order` дедупит клиента по телефону, поэтому 1-клик и корзина с телефоном аккаунта привязываются к нему (покрыто тестом).
-  - 4.5 (AD-2): роли суперадмин/content/orders. `check_auth` → таблица admin_users (ленивый перенос главного админа из ADMIN_CREDENTIALS как superadmin при первом запросе). `ROLE_SECTIONS` + `ADMIN_PATH_SECTIONS` + `_section_for_path` — проверка в `admin_required` (403 для API). Роль хранится в сессии (`session['admin_role']`), бейдж в шапке админки. CRUD: `/admin/api/admin-users` (GET/POST), `/admin/api/admin-user/delete` (себя нельзя), только суперадмин. UI: вкладка «🛡 Пользователи» + скрытие недоступных разделов навигации по роли (сервер всё равно проверяет).
-  - 4.5 (AD-3): `/admin/api/dashboard` — заявки всего/новые/сегодня, клиенты всего/новые за 7 дней, ошибки синка (sync_logs status='error', последние 10), топ-5 популярных товаров. Вкладка «📊 Дашборд» (первая в навигации, активна по умолчанию для роли orders).
-  - 4.5 (AD-4): аудит уже писался через `_audit_log`; добавлен просмотр: `/admin/api/audit?limit=` + вкладка «📋 Аудит-лог» (только суперадмин).
-  - 4.5 (AD-5): `/admin/api/backup/full` — zip (ekotoriya.db + content.json, только суперадмин, аудит backup.create); `/admin/api/restore` POST multipart — zip с content.json и/или ekotoriya.db (текущая БД копируется в *.before-restore, `db.engine.dispose()` для переподключения, аудит backup.restore). UI в вкладке «Резервная копия»: скачать ZIP + форма восстановления (суперадмин). Старый JSON-бэкап сохранён.
-  - 4.6 (TS-3): `tests/test_client_lk.py` — регистрация/вход/выход/дубликаты/короткий пароль/неверный пароль; ЛК требует входа и рендерится; профиль; корзина add/update/checkout (source='basket', очистка); привязка заявок к аккаунту по телефону (1-клик и корзина, LC-5) + видимость в ЛК; роли (orders не может страницы/пользователей, content не может клиентов); CRUD пользователей; дашборд/аудит; бэкап-zip/restore/отказ не-zip; backup только суперадмин.
-- Изменённые файлы: app.py, customers.py, templates/admin.html, templates/lk_base.html (новый), templates/auth.html (новый), templates/personal.html (новый), templates/basket.html (новый), templates/wb_catalog_block.html, templates/recommendations_block_inner.html, static/js/wb-actions.js, tests/test_client_lk.py (новый)
-- Проверки: `pytest tests/ -q` → **108 passed**; smoke: 32 страницы 200, /basket/, /auth/ 200, /personal/ → 302 анониму, theme.css/robots/sitemap/noimage OK, /api/register|order|like OK, demo-синк OK; Jinja-валидация 5 шаблонов OK; E2E-сценарий «зарегистрировался → купил → вижу в ЛК» покрыт тестом test_orders_attach_to_account_by_phone.
-- Бэкапы: backup_2026-09-19_22-18, backup_2026-09-19_22-25 (№5, перед этапом), backup_2026-09-19_22-55 (№6, после этапа; старейший 21-55 удалён — макс. 3)
-- Следующий шаг: Этап 5 (CN-1…CN-7, SEO-1…SEO-8): дублирование страниц, дерево страниц, блоки «HTML-код»/«Таймер акции», undo/redo + автосохранение черновика, предупреждение о конфликте двух админов, пресеты темы, черновик/публикация; SEO-дополнения.
-- Примечания: в тестах SimpleCache живёт между тестами — корзинный тест вызывает `invalidate_site_cache()` после демо-синка (зафиксировано в коде теста). `SyncLog` — поле `status` ('ok'/'error'), не `success` (исправлено в дашборде).
+  - Прочитаны `AUDIT_612a47b.md` (матрица статусов цикла 1 = весь цикл 1 done; вынесена в раздел «Аудит цикла 2» ниже), `PLAN_v2.md`, `blocks.py`, конструкторные API `app.py`, `models.py`, `db.py`, `storage.py`, структура `page-editor.js` (1251 строка, старая архитектура — под замену на трёхзонный layout).
+  - Проверка работоспособности: сайт 200 (localhost:5000, задача bash-p4abz3i4), `pytest` — 152 passed.
+  - **Бэкап №10**: `backups/backup_2026-09-21_20-45/` (полный, 70 МБ); удалён самый старый `backup_2026-09-19_23-05` (лимит 3). Актуальные: `backup_2026-09-20_02-55`, `backup_2026-09-20_03-50`, `backup_2026-09-21_20-45`.
+  - WORKLOG.md был заменён пользователем на свежий шаблон цикла 2 — заполнил разделы «Анализ» и «Аудит цикла 2», старый журнал доступен в git-истории (коммит 612a47b).
+- Изменённые файлы: WORKLOG.md (заполнение шаблона).
+- Проверки: pytest 152 passed; сайт 200.
+- Бэкапы: см. выше.
+- Следующий шаг: **Этап 1 / CN-T12+CN-T10+CN-T8-рендер — серверная часть конструктора**: модель данных (published_blocks, page_versions, block/page templates, global zones, theme history), расширение blocks.py (фон/отступы/типографика/кнопки/эффекты/zero-рендер), все эндпоинты CN-T12.1, тесты. Затем CN-T1–CN-T4 (новый фронтенд-редактор).
+- Примечания: порядок работы — сервер (A) → фронтенд-редактор (B) → фичи (C: зоны/тема/zero/шаблоны) → приёмка (Этап 3). Этап 2 PLAN_v2 пропускаем (матрица = AUDIT_612a47b.md, цикл 1 = done).
 
-## [2026-09-19 22:18] Задача: [этап-3] — Рекомендации, события, клиенты (RS-1…RS-7, CL-1…CL-6)
-- Статус: done (весь Этап 3)
-- Сделано:
-  - 3.1 (RS-1): таблица `events` + `customers.add_event()`; запись событий в app.py — просмотр карточки (`_product_page`), поиск (`catalog_page`), лайк (`/api/like` с customer_id/session_id). Идентификация: залогинен — `session['customer_id']`, аноним — `session['sid']` (`_session_id()`). Решение: «избранное» = лайк, отдельный тип не плодим (фикс. в анализе ТЗ).
-  - 3.2 (RS-2…6): `recommendations.py` — скоринг `заказ×w_order + лайк×w_like + просмотр×w_view` с линейным затуханием по возрасту (`decay_days`); `popular_products()` (анонимы/холодный старт), `personal_products()` (исключает лайкнутое/купленное, fallback на popular), `similar_products()` (категория 3.0 / бренд 2.0 / цена ±30% до 2.0 / совместные покупки ×4.0), `also_bought()` (чистая совместная покупаемость); `recompute_all()` пишет в таблицу `recommendations`; cron-скрипт `jobs/recompute_recommendations.py`. Публичный API `/api/recommendations?kind=popular|personal|similar|also_bought`.
-  - 3.3: блок «Товары» в blocks.py переписан на серверный рендер (`_load_products`, `_product_cards_html`): режимы source / category / recommendations(+kind). `templates/recommendations_block.html` → wrapper + `recommendations_block_inner.html`. На главной (`templates/pages/index.html`, после recommendations_block) добавлен персональный блок «Вам может понравиться» (personal_products для залогиненного). `make_context` отдаёт `recommended_products`/`personal_products` через адаптер `_rec_block_items`.
-  - 3.4 (RS-7): настройки в `site.recommendations` (w_order/w_like/w_view/decay_days/limit) — поля в admin.html (саб-вкладка «Скидки и каталог» → блок рекомендаций, data-path механика), читаются `recommendations.get_settings()`.
-  - 3.5 (CL-1…6): CL-3 профиль уже был (get_customer_stats/orders/likes). Добавлено: CL-4 `/admin/api/customers/export` (CSV utf-8-sig, разделитель `;`, колонки id/name/phone/email/consent_pd/orders_count/total_spent/last_activity_at/created_at, аудит customers.export); CL-5 `customers.compute_segments(products, days, min_orders)` — сегменты «покупал категорию X» (по маппингу product_id→category из каталога), «N+ заявок за период», «не активен N дней» (активность = заявки+события), роут `/admin/api/segments` (параметры days/min_orders, расчёт на лету); CL-6 чекбокс согласия ПДн во всех публичных формах (wb_catalog_block.html, recommendations_block_inner.html, блок «Форма» в blocks.py; JS FormData подхватывает consent_pd автоматически), `/api/register` и `/api/order` принимают `consent_pd` → `customers.add_customer/add_order(..., consent_pd=)` фиксируют consent_pd/consent_at; удаление клиента `/admin/api/customer/delete` (каскад: orders/events/customer_auth/recommendations, аудит customer.delete, 152-ФЗ). UI admin.html: кнопка «Экспорт CSV», блок «Сегменты» (период/порог + расчёт), колонка «Согласие ПДн» и кнопка 🗑 в таблице клиентов.
-  - 3.6: `tests/test_recommendations.py` (веса заказ>лайк>просмотр; затухание: старое слабее, ноль после периода; personal исключает лайкнутое + fallback; similar по категории/цене; also_bought; recompute_all) + `tests/test_customers_cl.py` (сегменты всех трёх правил + admin API, CSV content-type/заголовки/сумма, consent через публичные формы, каскадное удаление, 401 без auth).
-- Изменённые файлы: recommendations.py (новый), jobs/recompute_recommendations.py (новый), customers.py, app.py, blocks.py, templates/admin.html, templates/wb_catalog_block.html, templates/recommendations_block_inner.html, templates/pages/index.html, tests/test_recommendations.py, tests/test_customers_cl.py
-- Проверки: `pytest tests/ -q` → **96 passed**; smoke test_client на отдельной БД: 32 страницы → 200, /theme.css, /robots.txt, /sitemap.xml, /catalog/, /api/recommendations, /admin/login → 200, /admin/page/home → 302, /api/register|order|like (с consent_pd) → success, WB demo-синк → {success, count, demo}. Jinja-валидация admin.html → ok.
-- Бэкапы: backup_2026-09-19_20-55, backup_2026-09-19_21-55, backup_2026-09-19_22-18 (№4; старейший 19-49 удалён — макс. 3)
-- Следующий шаг: Этап 4 (LC-1…LC-5, AD-2…AD-5): регистрация телефон+пароль (Customer.password_hash уже в модели), сессия клиента session['customer_id'], ЛК /personal/ (сейчас personal_stub ~app.py:456), корзина /basket/ (basket_stub), роли admin_users (AD-2), дашборд (AD-3), бэкап из админки (AD-5).
-- Примечания: формат ответа WB demo-синка — `{'success', 'count', 'demo'}` (не 'products'); в smoke учтено. Персональные рекомендации для анонима — по session['sid'] (LC в этапе 4 заведёт session['customer_id']).
+---
 
-## [2026-09-19 21:55] Задача: [этап-2] — Завершение этапа 2 (админка «Интеграции»)
-- Статус: done (весь Этап 2)
-- Сделано: `templates/admin.html` пересобран субагентом-3: вкладка «Интеграции (WB / Ozon)» с тремя саб-вкладками (WB: токен/автосинк/синк/журнал/фильтр/товары; Ozon: Client-Id/Api-Key/автосинк/синк/журнал/фильтр/товары; «Скидки и каталог»: hide_zero_stock, правила скидок CRUD, массовая скидка выбранным). Push-скидки WB удалены из UI. Добавлен недостающий роут `/admin/api/wb-sync-light` (субагент корректно заметил отсутствие). Коммиты: `[этап-2] backend…` и `[этап-2] админка…`.
-- Изменённые файлы: templates/admin.html, app.py (+ в предыдущем коммите: pricing.py, export_filter.py, ozon_sync.py, wb_sync.py, jobs/autosync.py, templates/wb_catalog_block.html, tests/*)
-- Проверки: `pytest tests/ -q` → **83 passed**; рендер `/admin/` с тестовой сессией → 200, все маркеры саб-вкладок на месте, wb-push-discounts отсутствует; `/admin/api/wb-sync-light` → 200 (ошибка про токен — корректно); чек-лист «не ломать» (32 страницы, theme.css, SEO, API, demo-синк) — OK.
-- Бэкапы: backup_2026-09-19_19-49, backup_2026-09-19_20-55, backup_2026-09-19_21-55 (макс. 3 — соблюдено)
-- Следующий шаг: Этап 3 (RS-1…RS-7, CL-1…CL-6). Сервер сессии (bash-vffyu5s4) перезапустить при следующем показе пользователю — код менялся.
+## ЦИКЛ 2 — памятка для продолжения
 
-## [2026-09-19 21:30] Задача: [этап-2.1…2.8 частично] — Ozon, фильтр выгрузки, скидки PR-2
-- Статус: in_progress (осталось: админка «Интеграции» — субагент, финальный прогон/коммит)
-- Сделано:
-  - `pricing.py` (PR-2/4/5/6): база=discount_price или price; итог=база×(1−admin/100) или база−сумма; floor в пользу клиента; минимум 1 руб.; скидка МП в итог не входит; resolve по приоритету индивидуальная→category→source→all из таблицы discounts; enrich_product(s) добавляет final_price/site_discount_badge.
-  - `wb_sync.final_price` — обёртка над pricing (старая формула удалена); `_persist_products` проставляет visible через export_filter.
-  - `export_filter.py` (WB-5/OZ-4): режим all/selected/category из site.<source>_export; `reapply_visibility(source)` пересчитывает visible в БД без синка.
-  - app.py: `_products_cached(include_hidden=False)` — единый каталог WB+Ozon (видимые; настройка site.hide_zero_stock CT-4); `invalidate_site_cache` везде; роуты: `/catalog/` (фильтры цена/категория/наличие/источник, сортировка popular/price/new, пагинация 24, поиск q — CT-1/CT-5), `/catalog/ozon/<id>/`, `_product_page(source, nm_id)` — единая карточка (CT-2…4); скидки: `/admin/api/product-discount` (percent|amount), `/admin/api/discount-bulk` (selected/category/source/all → Discount-правило), `/admin/api/discount-rules`, `/admin/api/discount-rule/delete`, `/admin/api/export-settings` GET/POST, `/admin/api/ozon-sync(-light)`; `_audit_log()` (PR-7); push-скидок в WB УДАЛЁН целиком (PR-5: `_maybe_push_discount`, pushed/push_message); `/admin/api/wb-discount(-bulk)` — обёртки совместимости; `/admin/api/wb-products` теперь отдаёт ВСЕ товары включая скрытые; журнал `/admin/api/wb-sync-log?source=wb|ozon` (OZ-6).
-  - `templates/wb_catalog_block.html` переписан: три цены (база зачёркнута → цена МП → итог сайта), бейдж «скидка X% на сайте», бейдж источника WB/Ozon (OZ-7), внутренние ссылки на карточки, панель фильтров + пагинация при catalog_view, кнопки лайк/1-клик сохранены.
-  - `ozon_sync.py` (OZ-1…6, субагент): креденшелы env/site, эндпоинты v3 product/list+info/list, v5 prices, v4 stocks, цены в сотых→рубли, маппинг в единую схему, merge admin-скидок, журнал source='ozon', без креденшелов → ошибка (демо НЕ нужен).
-  - `jobs/autosync.py`: оба источника (wb+ozon), флаг --source, состояние site.mp_autosync_state.
-  - Тесты: test_final_price.py переписан под PR-2 (floor, границы 0/99, фикс. сумма, приоритет правил, бейдж); test_export_filter.py (режимы, reapply, hide_zero_stock, цикл синк→каталог→заявка→клиент, фильтры/поиск); test_ozon_sync.py (маппинг, persist, merge скидок, журнал, sync_light) — субагент.
-- Изменённые файлы: pricing.py, export_filter.py, ozon_sync.py, wb_sync.py, app.py, jobs/autosync.py, templates/wb_catalog_block.html, tests/{conftest,test_final_price,test_export_filter,test_ozon_sync}.py
-- Проверки: `pytest tests/ -q` → **77 passed**; smoke test_client: `/`, `/catalog/` (+фильтры/поиск/пагинация), `/catalog/wb/<id>/`, `/theme.css` → 200; `jobs/autosync.py` — оба источника корректно пропускаются (выключены).
-- Бэкапы: backup_2026-09-19_19-49, backup_2026-09-19_20-55
-- Следующий шаг: админка «Интеграции» (субагент-3, фон) → финальная проверка «не ломать» → бэкап №3 → коммит [этап-2] → Этап 3.
-- Примечания: карточка `/catalog/wb/<nm_id>/` сохранена (роутинг не сломан), добавлен `/catalog/ozon/<id>/`. Категория у WB-товаров пустая (WB API отдаёт предметы только через отдельный справочник) — фильтр по категории для WB сработает когда category появится.
+- План текущего цикла: `PLAN_v2.md` (главный приоритет — конструктор как Tilda, раздел CN-T).
+- Первое действие цикла 2 — **аудит**: сверить фактическое состояние с `PLAN.md` (цикл 1),
+  записать матрицу статусов (`done`/`partly`/`not_done` + доказательство) в раздел ниже.
+- Дальше — Этап 1 `PLAN_v2.md` (конструктор), затем недоделанное по аудиту, затем приёмка.
+- Правила неизменны: бэкап перед глобальными изменениями (макс. 3, ротация), запись после
+  каждой задачи, `pytest` + коммит `[цикл2-этап-N]`, ничего не ломать из работающего.
 
-## [2026-09-19 20:50] Задача: [этап-1.11] — Тесты TS-1 (baseline), pytest зелёный
-- Статус: done
-- Сделано: создан `tests/` (conftest с временной SQLite-БД и изоляцией JSON-фолбэков wb_sync во tmp): `test_blocks.py` (рендер всех 21 типа блоков + products-блок из БД), `test_customers.py` (нормализация, дедуп, заказы→клиент, лайки/события, популярное), `test_final_price.py` (baseline старой формулы round(base×(1−min(wb+admin,99)/100))), `test_storage.py` (roundtrip, удаление страниц, settings), `test_wb_sync.py` (demo-синк в БД, скидка переживает ресинк, журнал, light-sync, final_price на уровне app.get_products()).
-- Изменённые файлы: tests/conftest.py, tests/test_blocks.py, tests/test_customers.py, tests/test_final_price.py, tests/test_storage.py, tests/test_wb_sync.py
-- Проверки: `pytest tests/ -q` → **53 passed**. Заодно исправлено: `customers.normalize_phone` теперь приводит «8…»/«+7…»/10-значные к каноническому `+7XXXXXXXXXX` (иначе дедупликация по телефону не работала — CL-2).
-- Бэкапы: backup_2026-09-19_19-49
-- Следующий шаг: ручная проверка «не ломать», обновление PLAN.md, коммит [этап-1].
+## Аудит цикла 2 (заполняется первым действием)
 
-## [2026-09-19 20:40] Задача: [этап-1.10] — Авто-синк WB в cron-скрипт (AR-4, WB-2)
-- Статус: done
-- Сделано: создан `jobs/autosync.py` — расписание из БД (`site.wb_autosync`), состояние последних запусков в `site.wb_autosync_state`, флаги `--force-catalog`/`--force-light`. Из app.py удалены `_autosync_loop` и фоновый поток; `start_autosync()` оставлен как stub с подсказкой (обратная совместимость команд запуска). `__main__` теперь просто `app.run(...)`.
-- Изменённые файлы: jobs/autosync.py, app.py
-- Проверки: `python jobs/autosync.py --force-catalog` — демо-синк 8 товаров ОК; `import app` + test_client `/` → 200.
-- Бэкапы: backup_2026-09-19_19-49
-- Следующий шаг: 1.11 тесты.
-- Примечания: для продакшена cron-строку: `*/15 * * * * cd <проект> && .venv/bin/python jobs/autosync.py` (Windows — планировщик задач). Сервер сессии перезапущен: TaskStop bash-agggxcpx → новый фоновый `bash-vffyu5s4` (`.venv/Scripts/python.exe -X utf8 app.py`, порт 5000, curl `/`, `/admin/login`, `/api/wb-products` → 200).
+- Статус: done (2026-09-21)
+- Матрица статусов задач цикла 1 (этапы 1–7): **весь цикл 1 = done**, подтверждено внешним
+  аудитом в файле `AUDIT_612a47b.md` (проверка кода коммита 612a47b). Краткая сводка:
+  миграция на БД (db/models/storage), кэш, jobs/autosync, Ozon API, PR-2 (pricing),
+  фильтр выгрузки (export_filter), единый каталог WB+Ozon, рекомендации/события,
+  сегменты/CSV/ПДн, ЛК/корзина, роли/дашборд/аудит-лог/бэкап, безопасность
+  (upload/CSP/sanitize/rate-limit/lockout/SSRF), Docker/CI, 152 теста — всё работает, не трогать.
+- Частично/не сделано по ТЗ v1.1: только конструктор — сверка по пунктам CN-T в
+  `AUDIT_612a47b.md` раздел «ЦИКЛ 2 … Не реализовано» (CN-T1…CN-T13, берём в работу
+  по `PLAN_v2.md` Этап 1). Этап 2 `PLAN_v2.md` (недоделанное по циклу 1) — пустой, задач нет.
 
-## [2026-09-19 20:20] Задача: [этап-1.9] — Flask-Caching (AR-3)
-- Статус: done
-- Сделано: подключён `Cache` (SimpleCache по умолчанию, env `CACHE_TYPE`); `_products_cached()` (5 мин) + `_popular_cached()` через `get_products()`; `invalidate_site_cache()` (cache.clear + storage.invalidate_cache) вызывается после всех save_content в админке (page-save, save, add-page, delete-page), после `admin_wb_sync`, `api_order`, `api_like`. `admin_wb_products`, `api_wb_products`, `wb_product_page` переведены на `get_products()` (в wb_product_page убрана ручная досчёт final_price — теперь из кэша).
-- Изменённые файлы: app.py
-- Проверки: test_client `/`, `/catalog/namatrasniki/`, `/proizvodstvo/`, `/theme.css`, `/robots.txt`, `/sitemap.xml`, `/catalog/wb/890129778/` → все 200.
-- Бэкапы: backup_2026-09-19_19-49
-- Следующий шаг: 1.10 autosync.
-
-## [2026-09-19 20:05] Задача: [этап-1.1…1.8] — БД-фундамент: зависимости, модели, миграция данных
-- Статус: done
-- Сделано: requirements.txt + `.venv` (Python 3.14.7; всегда запускать `.venv/Scripts/python.exe -X utf8` — консоль Windows cp1251); `db.py` (Flask-SQLAlchemy, SQLite по умолчанию `data/ekotoriya.db`, env `DATABASE_URL`, WAL, `standalone_app()`); `models.py` (13 таблиц AR-1, у Page/Product — `to_content_dict()`/`to_product_dict()` под прежний JSON-формат); Alembic (`alembic/env.py` на database_url(), миграция `5da456f72137`, upgrade head выполнен); `migrate_json_to_db.py` (идемпотентен, сверка counts: 32 pages, 8 products source='wb', 6 customers, 7 orders, 8 likes→events, 2 sync_logs); `storage.py` (load/save на БД + JSON-фолбэк, module-level кэш, get/set_setting); `customers.py` полностью на БД (сигнатуры сохранены; добавлены normalize_phone/add_event/get_customer_likes/get_customer_orders/get_customer_stats); `wb_sync.py` на БД (app_context, журнал в sync_logs, скидки админа переживают ресинк через merge_with_existing, JSON-фолбэк сохраняется). `final_price()` — пока СТАРАЯ формула (baseline, новая PR-2 в этапе 2).
-- Изменённые файлы: requirements.txt, db.py, models.py, storage.py, customers.py, wb_sync.py, migrate_json_to_db.py, alembic/*, app.py (импорты storage/db, init_app, обёртки load/save_content)
-- Проверки: миграция идемпотентна (двойной прогон); test_client `/`, `/catalog/namatrasniki/`, `/proizvodstvo/`, `/theme.css`, `/robots.txt`, `/sitemap.xml` → 200; demo-синк 8 товаров, скидка 15% переживает ресинк.
-- Бэкапы: backup_2026-09-19_19-49
-- Следующий шаг: 1.9 кэширование.
-- Примечания: бэкап №2 по плану перед этапом 1 не делался отдельно — baseline-бэкап №1 (сделанный при исправном состоянии) покрывает это требование.
-
-## [2026-09-19 19:55] Задача: [этап-0] — Анализ, бэкап №1, baseline
-- Статус: done
-- Сделано: прочитаны все ключевые файлы; карта проекта и решения по миграции — в разделе «Анализ» выше; бэкап №1 `backups/backup_2026-09-19_19-49/` (102 МБ, полный); baseline-коммит `5ea17d6`; в `.gitignore` добавлен `backups/` (бэкап случайно попал в git — вынесен через `git rm --cached` + amend).
-- Изменённые файлы: WORKLOG.md, PLAN.md, .gitignore
-- Проверки: `/` → 200, `/admin` → 302; бэкап сверен побайтово (app.py, data/content.json).
-- Бэкапы: backup_2026-09-19_19-49
-- Следующий шаг: Этап 1.1 — зависимости (venv, requirements.txt).
-- Примечания: `.venv` в проекте пуст — создаём заново; системный Python 3.14.7 с Flask 3.1.3 пока держит работающий сервер (фоновая задача bash-agggxcpx).
