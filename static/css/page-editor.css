@@ -1,55 +1,494 @@
 /* ==========================================================================
-   Редактор страницы прямо на сайте (режим /admin/page/<slug>)
-   Визуальный язык — как в Tilda: яркие синие рамки, плашки с названиями
-   блоков, панель действий у выбранного блока, кнопки «+ Добавить блок»
-   между блоками, левая панель «Структура страницы».
+   Редактор страницы прямо на сайте (режим /admin/page/<slug>) — цикл 2.
+   Трёхзонный layout уровня Tilda: верхняя панель, левая панель
+   (библиотека блоков + структура), холст-обёртка, правая панель настроек.
+   Тёмная палитра панелей, акцент — фирменный #b49d84 темы сайта.
    ========================================================================== */
 
 :root {
-    --pe-accent: #2979ff;
-    --pe-accent-dark: #1c5fd6;
-    --pe-topbar-h: 46px;
+    --pe-accent: #b49d84;
+    --pe-accent-dark: #9a8269;
+    --pe-bg: #1e1f24;
+    --pe-panel: #2a2c33;
+    --pe-panel-2: #34363e;
+    --pe-border: #3d4048;
+    --pe-text: #e8e8ec;
+    --pe-text-dim: #9a9ca6;
+    --pe-danger: #d9534f;
+    --pe-ok: #5cb85c;
+    --pe-topbar-h: 48px;
+    --pe-left-w: 300px;
+    --pe-right-w: 340px;
 }
 
-/* ---------------- Топбар ---------------- */
+/* ---------------- Базовые состояния body ---------------- */
+body.pe-active { padding-top: var(--pe-topbar-h); }
+#pe-badges { position: absolute; top: 0; left: 0; pointer-events: none; }
+#pe-badges .pe-badge { pointer-events: auto; }
+
+/* ---------------- Верхняя панель ---------------- */
 #pe-topbar {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
+    top: 0; left: 0; right: 0;
     height: var(--pe-topbar-h);
     z-index: 100000;
-    background: #232a36;
-    color: #fff;
+    background: var(--pe-bg);
+    color: var(--pe-text);
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    padding: 0 1rem;
+    gap: 0.45rem;
+    padding: 0 0.7rem;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    font-size: 0.88rem;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    font-size: 0.84rem;
+    border-bottom: 1px solid var(--pe-border);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
-#pe-topbar .pe-title { font-weight: 700; margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#pe-topbar button {
-    border: 0;
-    border-radius: 6px;
-    padding: 0.4rem 0.9rem;
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 600;
-    font-family: inherit;
-    background: #3a4454;
-    color: #fff;
+#pe-topbar .pe-title {
+    font-weight: 700;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
-#pe-topbar button:hover { background: #4a566b; }
-#pe-topbar button.pe-save { background: var(--pe-accent); color: #fff; }
-#pe-topbar button.pe-save:hover { background: var(--pe-accent-dark); }
-#pe-topbar button.pe-exit { background: transparent; border: 1px solid #55617a; }
-#pe-topbar .pe-status { color: #9fb3d9; font-size: 0.8rem; }
-body.pe-active { padding-top: var(--pe-topbar-h); }
+#pe-topbar button {
+    border: 1px solid var(--pe-border);
+    border-radius: 6px;
+    padding: 0.32rem 0.7rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-family: inherit;
+    background: var(--pe-panel-2);
+    color: var(--pe-text);
+    white-space: nowrap;
+}
+#pe-topbar button:hover { background: #40434d; }
+#pe-topbar button.pe-primary { background: var(--pe-accent); border-color: var(--pe-accent); color: #fff; }
+#pe-topbar button.pe-primary:hover { background: var(--pe-accent-dark); }
+#pe-topbar button.pe-tb-icon { padding: 0.32rem 0.55rem; }
+#pe-topbar button:disabled { opacity: 0.4; cursor: default; }
+#pe-topbar button:disabled:hover { background: var(--pe-panel-2); }
+.pe-top-group { display: inline-flex; gap: 2px; }
+.pe-top-spacer { flex: 1; }
+.pe-save-indicator { color: var(--pe-text-dim); font-size: 0.78rem; min-width: 110px; text-align: center; }
+.pe-save-indicator.pe-save-saving { color: #e8c97a; }
+.pe-save-indicator.pe-save-error { color: var(--pe-danger); }
+.pe-save-indicator.pe-save-dirty { color: var(--pe-text-dim); }
+.pe-save-indicator.pe-save-saved { color: var(--pe-ok); }
 
-/* ---------------- Плашки блоков (слева вверху каждого блока) ---------------- */
+.pe-device-switch {
+    display: inline-flex;
+    border: 1px solid var(--pe-border);
+    border-radius: 7px;
+    overflow: hidden;
+}
+.pe-device-switch button {
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: var(--pe-panel) !important;
+    padding: 0.32rem 0.6rem !important;
+}
+.pe-device-switch button.pe-dev-active { background: var(--pe-accent) !important; color: #fff; }
+
+.pe-badge-status {
+    font-size: 0.74rem;
+    font-weight: 700;
+    padding: 0.22rem 0.6rem;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+.pe-badge-status.pe-badge-draft { background: #7a5c00; color: #ffe9ad; }
+.pe-badge-status.pe-badge-published { background: #1f5426; color: #b6e6bd; }
+
+/* ---------------- Обёртка холста (переключатель устройств) ---------------- */
+.pe-canvas-wrap {
+    margin-left: var(--pe-left-w);
+    margin-right: var(--pe-right-w);
+    transition: margin 0.2s ease;
+    min-height: 60vh;
+}
+.pe-canvas-wrap #content {
+    margin: 0 auto;
+    transition: max-width 0.2s ease;
+    background: #fff;
+}
+.pe-canvas-wrap.pe-dev-desktop #content { max-width: 1200px; }
+.pe-canvas-wrap.pe-dev-tablet #content { max-width: 768px; }
+.pe-canvas-wrap.pe-dev-mobile #content { max-width: 360px; }
+
+.pe-empty-state {
+    margin: 2rem auto;
+    max-width: 520px;
+    padding: 2.2rem 1.6rem;
+    border: 2px dashed var(--pe-accent);
+    border-radius: 14px;
+    text-align: center;
+    color: #555;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: rgba(180, 157, 132, 0.06);
+}
+.pe-empty-state .pe-empty-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: #333; }
+
+#pe-legacy-banner {
+    position: fixed;
+    top: var(--pe-topbar-h);
+    left: var(--pe-left-w);
+    right: var(--pe-right-w);
+    z-index: 99990;
+    background: #7a5c00;
+    color: #ffe9ad;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 0.8rem;
+    text-align: center;
+    padding: 0.4rem 1rem;
+}
+
+/* ---------------- Левая панель ---------------- */
+#pe-left {
+    position: fixed;
+    top: var(--pe-topbar-h);
+    left: 0;
+    bottom: 0;
+    width: var(--pe-left-w);
+    z-index: 99999;
+    background: var(--pe-bg);
+    border-right: 1px solid var(--pe-border);
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    color: var(--pe-text);
+}
+.pe-panel-section { display: flex; flex-direction: column; min-height: 0; }
+.pe-panel-grow { flex: 1; overflow-y: auto; }
+.pe-panel-head {
+    padding: 0.6rem 0.9rem 0.4rem;
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--pe-text-dim);
+}
+#pe-lib-search {
+    margin: 0 0.7rem 0.5rem;
+    padding: 0.45rem 0.65rem;
+    background: var(--pe-panel);
+    border: 1px solid var(--pe-border);
+    border-radius: 7px;
+    color: var(--pe-text);
+    font-size: 0.84rem;
+    font-family: inherit;
+}
+#pe-lib-search:focus { outline: none; border-color: var(--pe-accent); }
+#pe-lib { overflow-y: auto; max-height: 46vh; padding: 0 0.6rem 0.8rem; }
+
+body.pe-lib-armed #pe-left { box-shadow: 0 0 0 2px var(--pe-accent), 0 0 28px rgba(180, 157, 132, 0.5); }
+
+.pe-lib-cat { margin-bottom: 0.35rem; }
+.pe-lib-cat summary {
+    cursor: pointer;
+    padding: 0.4rem 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--pe-text);
+    border-radius: 6px;
+    user-select: none;
+    list-style: none;
+}
+.pe-lib-cat summary::before { content: '▸ '; color: var(--pe-accent); }
+.pe-lib-cat[open] summary::before { content: '▾ '; }
+.pe-lib-cat summary:hover { background: var(--pe-panel); }
+.pe-lib-count {
+    float: right;
+    background: var(--pe-panel-2);
+    border-radius: 999px;
+    font-size: 0.68rem;
+    padding: 0.05rem 0.45rem;
+    color: var(--pe-text-dim);
+}
+.pe-lib-card {
+    border: 1px solid var(--pe-border);
+    border-radius: 9px;
+    padding: 0.45rem;
+    margin: 0.35rem 0;
+    background: var(--pe-panel);
+    cursor: grab;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.pe-lib-card:hover { border-color: var(--pe-accent); transform: translateY(-1px); }
+.pe-lib-mock {
+    height: 62px;
+    border-radius: 6px;
+    background: #f4f4f8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px;
+    overflow: hidden;
+}
+.pe-lib-name { font-weight: 700; font-size: 0.78rem; margin-top: 0.35rem; color: var(--pe-text); }
+.pe-lib-presets { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 0.35rem; }
+.pe-lib-preset {
+    border: 1px solid var(--pe-border);
+    background: var(--pe-panel-2);
+    color: var(--pe-text-dim);
+    border-radius: 999px;
+    padding: 0.12rem 0.5rem;
+    font-size: 0.66rem;
+    cursor: pointer;
+    font-family: inherit;
+}
+.pe-lib-preset:hover { border-color: var(--pe-accent); color: var(--pe-text); }
+.pe-lib-empty { color: var(--pe-text-dim); font-size: 0.8rem; padding: 0.8rem 0.4rem; }
+
+/* Mock-превью карточек (gm-* — совместимость с циклом 1) */
+.gm-bar { background: #cfcfcf; border-radius: 3px; width: 100%; height: 6px; }
+.gm-img { width: 100%; height: 100%; background: #e2e2e8; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 1.1rem; }
+.gm-btn { background: var(--pe-accent); color: #fff; border-radius: 20px; padding: 3px 14px; font-size: 0.62rem; font-weight: 700; }
+.gm-video { width: 100%; height: 100%; background: #3a3a3a; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: #fff; }
+.gm-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; width: 100%; }
+.gm-card-mini { background: #fff; border: 1px solid #ddd; border-radius: 4px; height: 28px; padding: 3px; }
+.gm-card-mini .im { background: #eee; height: 12px; border-radius: 2px; }
+.gm-card-mini .tx { background: #ddd; height: 5px; border-radius: 2px; margin-top: 3px; }
+.gm-line { width: 80%; height: 2px; background: #cfcfcf; }
+.gm-code { color: #999; font-family: monospace; }
+
+/* ---------------- Структура страницы ---------------- */
+#pe-structure-list { padding: 0 0.6rem 0.8rem; overflow-y: auto; }
+.pe-str-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.4rem 0.45rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    border: 1px solid transparent;
+    border-top: 2px solid transparent;
+    border-bottom: 2px solid transparent;
+    color: var(--pe-text);
+}
+.pe-str-item:hover { background: var(--pe-panel); }
+.pe-str-item.pe-str-active { background: var(--pe-panel-2); border-color: var(--pe-accent); }
+.pe-str-item.pe-str-hidden { opacity: 0.5; }
+.pe-str-item.pe-str-dragging { opacity: 0.5; }
+.pe-str-item.pe-str-dropbefore { border-top-color: var(--pe-accent); }
+.pe-str-item.pe-str-dropafter { border-bottom-color: var(--pe-accent); }
+.pe-str-grip { color: var(--pe-text-dim); cursor: grab; font-size: 0.75rem; }
+.pe-str-icon { flex: 0 0 auto; }
+.pe-str-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pe-str-rename {
+    flex: 1;
+    background: var(--pe-panel-2);
+    border: 1px solid var(--pe-accent);
+    border-radius: 5px;
+    color: var(--pe-text);
+    font-size: 0.8rem;
+    padding: 0.15rem 0.4rem;
+    font-family: inherit;
+}
+.pe-str-actions { display: flex; gap: 1px; }
+.pe-str-actions button {
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-size: 0.76rem;
+    color: var(--pe-text-dim);
+    padding: 2px 4px;
+    border-radius: 5px;
+}
+.pe-str-actions button:hover { background: var(--pe-panel-2); color: var(--pe-text); }
+.pe-str-actions .pe-str-del:hover { color: #ff8a80; }
+
+/* ---------------- Правая панель ---------------- */
+#pe-right {
+    position: fixed;
+    top: var(--pe-topbar-h);
+    right: 0;
+    bottom: 0;
+    width: var(--pe-right-w);
+    z-index: 99999;
+    background: var(--pe-bg);
+    border-left: 1px solid var(--pe-border);
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    color: var(--pe-text);
+}
+#pe-right-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    padding: 0 0.7rem 0.5rem;
+    border-bottom: 1px solid var(--pe-border);
+}
+.pe-tab {
+    border: 1px solid var(--pe-border);
+    background: var(--pe-panel);
+    color: var(--pe-text-dim);
+    border-radius: 999px;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+}
+.pe-tab:hover { color: var(--pe-text); }
+.pe-tab.pe-tab-active { background: var(--pe-accent); border-color: var(--pe-accent); color: #fff; }
+#pe-right-body { padding: 0.9rem; overflow-y: auto; font-size: 0.85rem; }
+.pe-right-hint { color: var(--pe-text-dim); font-size: 0.82rem; padding: 1rem 0.4rem; text-align: center; }
+
+.pe-field { margin-bottom: 0.85rem; }
+.pe-field > label { display: block; font-weight: 600; margin-bottom: 0.3rem; font-size: 0.76rem; color: var(--pe-text-dim); }
+.pe-field input[type="text"], .pe-field input[type="number"], .pe-field textarea, .pe-field select {
+    width: 100%;
+    padding: 0.42rem 0.6rem;
+    border: 1px solid var(--pe-border);
+    border-radius: 7px;
+    font-size: 0.84rem;
+    font-family: inherit;
+    background: var(--pe-panel);
+    color: var(--pe-text);
+    box-sizing: border-box;
+}
+.pe-field input:focus, .pe-field textarea:focus, .pe-field select:focus { outline: none; border-color: var(--pe-accent); }
+.pe-field input[type="color"] { width: 44px; height: 32px; padding: 2px; border: 1px solid var(--pe-border); border-radius: 7px; background: var(--pe-panel); }
+.pe-field textarea { min-height: 80px; resize: vertical; }
+.pe-help { color: var(--pe-text-dim); font-size: 0.74rem; margin-top: 0.25rem; line-height: 1.45; }
+.pe-hex { width: 90px !important; margin-left: 6px; }
+.pe-colorrow { display: flex; align-items: center; }
+.pe-colorrow input[type="text"] { flex: 1; }
+.pe-fx-decor-head { font-weight: 700; font-size: 0.76rem; margin: 1rem 0 0.5rem; color: var(--pe-accent); text-transform: uppercase; letter-spacing: 0.03em; }
+.pe-btn-mini {
+    border: 1px solid var(--pe-border);
+    background: var(--pe-panel-2);
+    color: var(--pe-text);
+    border-radius: 7px;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.76rem;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+}
+.pe-btn-mini:hover { border-color: var(--pe-accent); }
+.pe-btn-action {
+    border: 0;
+    background: var(--pe-accent);
+    color: #fff;
+    border-radius: 7px;
+    padding: 0.45rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+}
+.pe-btn-action:hover { background: var(--pe-accent-dark); }
+.pe-imgrow { display: flex; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
+.pe-preview-img img { max-width: 100%; border: 1px solid var(--pe-border); border-radius: 7px; margin-top: 6px; }
+.pe-linkrow { display: flex; gap: 6px; }
+.pe-linkrow select { flex: 0 0 130px; }
+.pe-linkval { flex: 1; }
+
+/* Stepper / range / toggle */
+.pe-stepper { display: inline-flex; align-items: center; gap: 0; border: 1px solid var(--pe-border); border-radius: 7px; overflow: hidden; }
+.pe-stepper button {
+    border: 0;
+    background: var(--pe-panel-2);
+    color: var(--pe-text);
+    width: 34px;
+    height: 32px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+.pe-stepper button:hover { background: var(--pe-accent); color: #fff; }
+.pe-stepper-val { min-width: 76px; text-align: center; font-size: 0.82rem; font-weight: 600; }
+.pe-range { display: flex; align-items: center; gap: 8px; }
+.pe-range input[type="range"] { flex: 1; accent-color: var(--pe-accent); }
+.pe-range-val { min-width: 52px; text-align: right; font-size: 0.78rem; color: var(--pe-text-dim); }
+.pe-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--pe-border);
+    background: var(--pe-panel);
+    color: var(--pe-text-dim);
+    border-radius: 999px;
+    padding: 0.3rem 0.8rem 0.3rem 0.35rem;
+    font-size: 0.78rem;
+    cursor: pointer;
+    font-family: inherit;
+}
+.pe-toggle-dot {
+    width: 26px;
+    height: 16px;
+    border-radius: 999px;
+    background: var(--pe-panel-2);
+    border: 1px solid var(--pe-border);
+    position: relative;
+}
+.pe-toggle-dot::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--pe-text-dim);
+    transition: left 0.15s ease, background 0.15s ease;
+}
+.pe-toggle.pe-toggle-on { color: var(--pe-text); border-color: var(--pe-accent); }
+.pe-toggle.pe-toggle-on .pe-toggle-dot { background: var(--pe-accent); border-color: var(--pe-accent); }
+.pe-toggle.pe-toggle-on .pe-toggle-dot::after { left: 12px; background: #fff; }
+
+/* Палитра и сетка позиций фона */
+.pe-swatches { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.pe-swatch { width: 24px; height: 24px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); cursor: pointer; }
+.pe-swatch:hover { transform: scale(1.12); }
+.pe-posgrid { display: grid; grid-template-columns: repeat(3, 34px); gap: 4px; }
+.pe-posbtn {
+    height: 30px;
+    border: 1px solid var(--pe-border);
+    background: var(--pe-panel);
+    color: var(--pe-text-dim);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+.pe-posbtn.pe-posbtn-active { background: var(--pe-accent); color: #fff; border-color: var(--pe-accent); }
+
+/* Визуальный редактор списка пунктов */
+.pe-items { display: flex; flex-direction: column; gap: 0.55rem; }
+.pe-item { border: 1px solid var(--pe-border); border-radius: 9px; padding: 0.55rem; position: relative; background: var(--pe-panel); }
+.pe-item-field { margin-bottom: 0.4rem; }
+.pe-item-field:last-child { margin-bottom: 0; }
+.pe-item-field label { font-size: 0.7rem !important; }
+.pe-item-del {
+    position: absolute; top: 6px; right: 6px;
+    border: 0; background: transparent; cursor: pointer; font-size: 0.8rem; opacity: 0.55;
+}
+.pe-item-del:hover { opacity: 1; }
+.pe-item-add {
+    border: 1px dashed var(--pe-accent); background: transparent; color: var(--pe-accent);
+    border-radius: 9px; padding: 0.45rem; cursor: pointer; font-size: 0.8rem; font-weight: 600;
+    font-family: inherit;
+}
+.pe-item-add:hover { background: rgba(180, 157, 132, 0.12); }
+
+/* Типографика: превью */
+.pe-typo-preview {
+    border: 1px solid var(--pe-border);
+    border-radius: 7px;
+    padding: 0.6rem 0.8rem;
+    margin-bottom: 0.85rem;
+    background: var(--pe-panel);
+    color: var(--pe-text);
+    font-size: 1rem;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* ---------------- Плашки блоков (badge + мини-драг) ---------------- */
 .pe-badge {
     position: absolute;
     z-index: 99980;
@@ -67,11 +506,10 @@ body.pe-active { padding-top: var(--pe-topbar-h); }
     cursor: grab;
     user-select: none;
     white-space: nowrap;
-    max-width: 320px;
+    max-width: 300px;
     overflow: hidden;
     text-overflow: ellipsis;
-    box-shadow: 0 2px 8px rgba(41, 121, 255, 0.45);
-    transition: background 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 .pe-badge:hover { background: var(--pe-accent-dark); }
 .pe-badge .pe-badge-num {
@@ -83,63 +521,52 @@ body.pe-active { padding-top: var(--pe-topbar-h); }
     padding: 0 4px;
     border-radius: 9px;
     background: #fff;
-    color: var(--pe-accent);
+    color: var(--pe-accent-dark);
     font-size: 10.5px;
     font-weight: 700;
     flex: 0 0 auto;
 }
-.pe-badge.pe-badge-selected { background: #0d47a1; box-shadow: 0 3px 12px rgba(13, 71, 161, 0.6); }
-.pe-badge.pe-badge-dragging {
-    cursor: grabbing;
-    background: #0d47a1;
-    opacity: 0.85;
-    transform: rotate(-1deg) scale(1.03);
-    box-shadow: 0 8px 22px rgba(13, 71, 161, 0.5);
-}
+.pe-badge.pe-badge-selected { background: var(--pe-accent-dark); box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45); }
+.pe-badge.pe-badge-dragging { cursor: grabbing; opacity: 0.85; transform: rotate(-1deg) scale(1.03); }
 
-/* ---------------- Подсветка блока ---------------- */
+/* ---------------- Подсветка блока и тулбар ---------------- */
 .pe-highlight {
     position: absolute;
     z-index: 99970;
     pointer-events: none;
     outline: 2px solid var(--pe-accent);
     outline-offset: -1px;
-    background: rgba(41, 121, 255, 0.05);
+    background: rgba(180, 157, 132, 0.07);
     display: none;
     transition: top 0.08s linear, left 0.08s linear, width 0.08s linear, height 0.08s linear;
 }
-.pe-highlight.pe-selected {
-    outline: 3px solid var(--pe-accent);
-    background: rgba(41, 121, 255, 0.08);
-}
+.pe-highlight.pe-selected { outline: 3px solid var(--pe-accent); background: rgba(180, 157, 132, 0.1); }
 
-/* ---------------- Панель действий выбранного блока ---------------- */
 .pe-toolbar {
     position: absolute;
     top: -42px;
     left: -3px;
     display: none;
     align-items: stretch;
-    gap: 0;
     background: var(--pe-accent);
     border-radius: 8px 8px 0 0;
-    padding: 0;
     pointer-events: auto;
     white-space: nowrap;
-    box-shadow: 0 -3px 14px rgba(41, 121, 255, 0.4);
     overflow: hidden;
+    box-shadow: 0 -3px 14px rgba(0, 0, 0, 0.3);
 }
 .pe-toolbar .pe-tb-name {
     color: #fff;
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     font-weight: 700;
     padding: 0 10px;
     display: inline-flex;
     align-items: center;
     background: rgba(0, 0, 0, 0.18);
-    max-width: 220px;
+    max-width: 200px;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
 }
 .pe-toolbar button {
     border: 0;
@@ -151,7 +578,6 @@ body.pe-active { padding-top: var(--pe-topbar-h); }
     font-family: inherit;
     padding: 0 10px;
     height: 40px;
-    line-height: 1;
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -159,9 +585,9 @@ body.pe-active { padding-top: var(--pe-topbar-h); }
 }
 .pe-toolbar button:hover { background: rgba(255, 255, 255, 0.18); }
 .pe-toolbar button.pe-tb-drag { cursor: grab; }
-.pe-toolbar button.pe-tb-del:hover { background: #d32f2f; }
+.pe-toolbar button.pe-tb-del:hover { background: var(--pe-danger); }
 
-/* ---------------- Кнопка «+ Добавить блок» ---------------- */
+/* ---------------- Кнопка «+ Добавить блок» и мост ---------------- */
 .pe-addbtn {
     position: absolute;
     z-index: 99990;
@@ -173,26 +599,19 @@ body.pe-active { padding-top: var(--pe-topbar-h); }
     background: var(--pe-accent);
     color: #fff;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-weight: 700;
     padding: 7px 16px;
     cursor: pointer;
-    box-shadow: 0 4px 14px rgba(41, 121, 255, 0.5);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
     transform: translate(-50%, 50%);
     white-space: nowrap;
 }
-.pe-addbtn .plus { font-size: 1rem; line-height: 0.8; font-weight: 700; }
-.pe-addbtn:hover { background: var(--pe-accent-dark); transform: translate(-50%, 50%) scale(1.05); }
+.pe-addbtn .plus { font-size: 1rem; line-height: 0.8; }
+.pe-addbtn:hover { background: var(--pe-accent-dark); }
+#pe-addbtn-bridge { position: absolute; z-index: 99989; display: none; cursor: pointer; }
 
-/* Невидимый «мост» от блока к кнопке: держит hover на пути к курсора */
-#pe-addbtn-bridge {
-    position: absolute;
-    z-index: 99989;
-    display: none;
-    cursor: pointer;
-}
-
-/* ---------------- Линия вставки при перетаскивании ---------------- */
+/* Линия вставки при перетаскивании */
 .pe-drop-line {
     position: absolute;
     z-index: 99995;
@@ -201,10 +620,10 @@ body.pe-active { padding-top: var(--pe-topbar-h); }
     display: none;
     pointer-events: none;
     border-radius: 2px;
-    box-shadow: 0 0 10px rgba(41, 121, 255, 0.9);
+    box-shadow: 0 0 10px rgba(180, 157, 132, 0.9);
 }
 .pe-drop-line::after {
-    content: "Переместить сюда";
+    content: "Вставить сюда";
     position: absolute;
     right: 0;
     top: -24px;
@@ -218,248 +637,360 @@ body.pe-active { padding-top: var(--pe-topbar-h); }
     white-space: nowrap;
 }
 
-/* ---------------- Индикатор inline-редактирования текста ---------------- */
+/* ---------------- Инлайн-редактирование текста ---------------- */
 .pe-editable-on {
     outline: 2px dashed var(--pe-accent) !important;
     outline-offset: 2px;
     cursor: text !important;
     min-height: 1em;
 }
-
-/* ---------------- Левая панель «Структура страницы» ---------------- */
-#pe-structure {
+.pe-textbar {
     position: fixed;
-    top: var(--pe-topbar-h);
-    left: 0;
-    bottom: 0;
-    width: 290px;
-    z-index: 99999;
-    background: #fff;
-    box-shadow: 4px 0 18px rgba(0, 0, 0, 0.16);
-    transform: translateX(-105%);
-    transition: transform 0.22s ease;
+    z-index: 100003;
     display: flex;
-    flex-direction: column;
+    background: var(--pe-bg);
+    border: 1px solid var(--pe-border);
+    border-radius: 9px;
+    overflow: hidden;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    color: #333;
 }
-#pe-structure.open { transform: translateX(0); }
-#pe-structure .pe-structure-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem 1rem;
-    background: #f2f6ff;
-    border-bottom: 1px solid #dde6f5;
-    font-weight: 700;
-    font-size: 0.92rem;
-}
-#pe-structure .pe-structure-head button {
+.pe-textbar button {
     border: 0;
     background: transparent;
-    cursor: pointer;
-    font-size: 1rem;
-    color: #888;
-}
-#pe-structure .pe-structure-list { overflow-y: auto; flex: 1; padding: 0.5rem; }
-#pe-structure .pe-structure-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0.45rem 0.5rem;
-    border-radius: 8px;
+    color: var(--pe-text);
     cursor: pointer;
     font-size: 0.85rem;
-    border: 1px solid transparent;
+    padding: 8px 12px;
+    border-left: 1px solid var(--pe-border);
 }
-#pe-structure .pe-structure-item:hover { background: #f2f6ff; }
-#pe-structure .pe-structure-item.pe-structure-active {
-    background: #e3eeff;
-    border-color: var(--pe-accent);
-}
-#pe-structure .pe-structure-item .si-num {
-    display: inline-flex;
+.pe-textbar button:first-child { border-left: 0; }
+.pe-textbar button:hover { background: var(--pe-panel-2); }
+.pe-textbar .pe-textbar-ok { background: var(--pe-accent); color: #fff; font-weight: 700; }
+.pe-textbar .pe-textbar-ok:hover { background: var(--pe-accent-dark); }
+
+/* ---------------- Модалки ---------------- */
+.pe-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 10, 14, 0.65);
+    z-index: 100001;
+    display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 20px;
-    height: 20px;
-    padding: 0 5px;
-    border-radius: 10px;
-    background: var(--pe-accent);
-    color: #fff;
-    font-size: 0.72rem;
-    font-weight: 700;
-    flex: 0 0 auto;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
 }
-#pe-structure .pe-structure-item .si-name {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-#pe-structure .pe-structure-item .si-actions { display: flex; gap: 2px; }
-#pe-structure .pe-structure-item .si-actions button {
-    border: 0;
-    background: transparent;
-    cursor: pointer;
-    font-size: 0.85rem;
-    color: #667;
-    padding: 2px 5px;
-    border-radius: 5px;
-}
-#pe-structure .pe-structure-item .si-actions button:hover { background: #d7e5ff; color: var(--pe-accent-dark); }
-#pe-structure .pe-structure-add {
-    margin: 0.5rem;
-    border: 1px dashed var(--pe-accent);
-    background: #f6faff;
-    color: var(--pe-accent-dark);
-    border-radius: 9px;
-    padding: 0.55rem;
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 600;
-}
-#pe-structure .pe-structure-add:hover { background: #e8f1ff; }
-
-/* ---------------- Правая панель настроек блока ---------------- */
-#pe-drawer {
-    position: fixed;
-    top: var(--pe-topbar-h);
-    right: 0;
-    bottom: 0;
-    width: 360px;
-    z-index: 99999;
-    background: #fff;
-    box-shadow: -4px 0 18px rgba(0, 0, 0, 0.18);
-    transform: translateX(105%);
-    transition: transform 0.22s ease;
+.pe-modal {
+    background: var(--pe-bg);
+    color: var(--pe-text);
+    border: 1px solid var(--pe-border);
+    border-radius: 12px;
+    width: 640px;
+    max-width: 94vw;
+    max-height: 88vh;
     display: flex;
     flex-direction: column;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    color: #333;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.55);
 }
-#pe-drawer.open { transform: translateX(0); }
-#pe-drawer .pe-drawer-head {
+.pe-ps-modal { width: 560px; }
+.pe-media-modal { width: 720px; }
+.pe-modal-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0.7rem 1rem;
-    background: #f2f6ff;
-    border-bottom: 1px solid #dde6f5;
     font-weight: 700;
-    font-size: 0.92rem;
+    font-size: 0.95rem;
+    border-bottom: 1px solid var(--pe-border);
 }
-#pe-drawer .pe-drawer-head button {
+.pe-modal-close {
+    border: 0;
+    background: var(--pe-panel-2);
+    border-radius: 7px;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    color: var(--pe-text);
+    font-size: 0.9rem;
+}
+.pe-modal-close:hover { background: var(--pe-danger); color: #fff; }
+.pe-modal-body { padding: 0.9rem 1rem; overflow-y: auto; font-size: 0.85rem; }
+.pe-modal-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 0.7rem 1rem;
+    border-top: 1px solid var(--pe-border);
+}
+.pe-modal .pe-field input[type="text"], .pe-modal .pe-field textarea {
+    width: 100%;
+    padding: 0.42rem 0.6rem;
+    border: 1px solid var(--pe-border);
+    border-radius: 7px;
+    background: var(--pe-panel);
+    color: var(--pe-text);
+    font-size: 0.84rem;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+.pe-modal label { font-size: 0.78rem; font-weight: 600; color: var(--pe-text-dim); display: block; margin-bottom: 0.25rem; }
+.pe-modal .pe-field { margin-bottom: 0.8rem; }
+.pe-modal .pe-fx-decor-head { margin-top: 0.9rem; }
+.pe-modal input[type="color"] { width: 44px; height: 30px; padding: 2px; border: 1px solid var(--pe-border); border-radius: 7px; background: var(--pe-panel); vertical-align: middle; }
+.pe-modal .pe-help { color: var(--pe-text-dim); font-size: 0.74rem; }
+.pe-modal .pe-tab { margin-bottom: 4px; }
+
+/* Медиатека */
+.pe-media-tabs { display: flex; gap: 4px; padding: 0.6rem 1rem 0; }
+.pe-media-body { padding: 0.7rem 1rem; overflow-y: auto; }
+#pe-media-search {
+    width: 100%;
+    padding: 0.42rem 0.6rem;
+    border: 1px solid var(--pe-border);
+    border-radius: 7px;
+    background: var(--pe-panel);
+    color: var(--pe-text);
+    font-size: 0.84rem;
+    font-family: inherit;
+    box-sizing: border-box;
+    margin-bottom: 0.6rem;
+}
+.pe-media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+    min-height: 180px;
+    max-height: 44vh;
+    overflow-y: auto;
+}
+.pe-media-card {
+    border: 2px solid var(--pe-border);
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    background: var(--pe-panel);
+}
+.pe-media-card:hover { border-color: var(--pe-accent-dark); }
+.pe-media-card.pe-media-sel { border-color: var(--pe-accent); box-shadow: 0 0 0 2px rgba(180, 157, 132, 0.4); }
+.pe-media-card img { width: 100%; height: 78px; object-fit: cover; display: block; }
+.pe-media-name {
+    font-size: 0.66rem;
+    color: var(--pe-text-dim);
+    padding: 4px 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pe-upload-drop {
+    display: block;
+    border: 2px dashed var(--pe-border);
+    border-radius: 10px;
+    padding: 2.2rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    color: var(--pe-text-dim);
+    font-size: 0.9rem;
+}
+.pe-upload-drop:hover { border-color: var(--pe-accent); color: var(--pe-text); }
+.pe-upload-drop input { display: none; }
+
+/* Версии */
+.pe-ver-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--pe-border);
+    border-radius: 9px;
+    padding: 0.55rem 0.8rem;
+    margin-bottom: 0.5rem;
+    background: var(--pe-panel);
+}
+.pe-ver-info { flex: 1; min-width: 0; }
+.pe-ver-label { font-weight: 700; font-size: 0.85rem; }
+.pe-ver-meta { color: var(--pe-text-dim); font-size: 0.74rem; margin-top: 2px; }
+
+/* ---------------- Toasts ---------------- */
+#pe-toasts {
+    position: fixed;
+    bottom: 18px;
+    right: calc(var(--pe-right-w) + 14px);
+    z-index: 100004;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+.pe-toast {
+    background: var(--pe-bg);
+    color: var(--pe-text);
+    border: 1px solid var(--pe-border);
+    border-left: 3px solid var(--pe-accent);
+    border-radius: 9px;
+    padding: 0.6rem 0.9rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 0.82rem;
+    max-width: 340px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.pe-toast.pe-toast-show { opacity: 1; transform: translateY(0); }
+.pe-toast.pe-toast-error { border-left-color: var(--pe-danger); }
+
+/* ---------------- Zero-редактор (CN-T8 UI) ---------------- */
+.pe-zero-layer { position: absolute; inset: 0; z-index: 5000; pointer-events: none; }
+.pe-zero-float {
+    position: absolute;
+    pointer-events: auto;
+    top: 8px;
+    left: 8px;
+    width: 280px;
+    max-height: calc(100% - 16px);
+    overflow-y: auto;
+    background: var(--pe-bg);
+    border: 1px solid var(--pe-border);
+    border-radius: 10px;
+    color: var(--pe-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 0.78rem;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    z-index: 5002;
+    padding-bottom: 0.5rem;
+}
+.pe-zero-float-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.5rem 0.7rem;
+    border-bottom: 1px solid var(--pe-border);
+    font-weight: 700;
+}
+.pe-zero-float-head button {
+    margin-left: auto;
+    border: 0;
+    background: var(--pe-panel-2);
+    color: var(--pe-text);
+    border-radius: 6px;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+}
+.pe-zero-float-head button:hover { background: var(--pe-danger); color: #fff; }
+.pe-zero-dev { font-size: 0.66rem; font-weight: 700; background: var(--pe-accent); color: #fff; border-radius: 999px; padding: 0.1rem 0.5rem; }
+.pe-zero-add { display: flex; flex-wrap: wrap; gap: 4px; padding: 0.5rem 0.7rem 0.3rem; align-items: center; }
+.pe-zero-add-label { color: var(--pe-text-dim); font-size: 0.72rem; }
+.pe-zero-add button {
+    border: 1px solid var(--pe-border);
+    background: var(--pe-panel-2);
+    color: var(--pe-text);
+    border-radius: 999px;
+    padding: 0.15rem 0.55rem;
+    font-size: 0.68rem;
+    cursor: pointer;
+    font-family: inherit;
+}
+.pe-zero-add button:hover { border-color: var(--pe-accent); }
+.pe-zero-layers { padding: 0.3rem 0.7rem; }
+.pe-zero-layer-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.28rem 0.4rem;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+.pe-zero-layer-row:hover { background: var(--pe-panel); }
+.pe-zero-layer-row.pe-zero-layer-sel { background: var(--pe-panel-2); border-color: var(--pe-accent); }
+.pe-zero-layer-row.pe-zero-layer-hidden { opacity: 0.5; }
+.pe-zero-layer-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pe-zero-layer-name em { color: var(--pe-text-dim); font-style: normal; font-size: 0.68rem; }
+.pe-zero-layer-actions button {
     border: 0;
     background: transparent;
     cursor: pointer;
-    font-size: 1rem;
-    color: #888;
+    font-size: 0.68rem;
+    color: var(--pe-text-dim);
+    padding: 2px 3px;
+    border-radius: 4px;
 }
-#pe-drawer .pe-drawer-body { padding: 1rem; overflow-y: auto; flex: 1; font-size: 0.9rem; }
-#pe-drawer label { display: block; font-weight: 600; margin-bottom: 0.3rem; font-size: 0.83rem; }
-#pe-drawer .field { margin-bottom: 0.9rem; }
-#pe-drawer input[type="text"], #pe-drawer input[type="number"], #pe-drawer textarea, #pe-drawer select {
+.pe-zero-layer-actions button:hover { background: var(--pe-panel); color: var(--pe-text); }
+.pe-zero-props { border-top: 1px solid var(--pe-border); padding: 0.5rem 0.7rem 0.2rem; }
+.pe-zero-props .pe-field { margin-bottom: 0.55rem; }
+.pe-zero-props .pe-field > label { font-size: 0.68rem; }
+.pe-zero-props input[type="text"], .pe-zero-props textarea, .pe-zero-props select {
     width: 100%;
-    padding: 0.5rem 0.65rem;
-    border: 1px solid #ddd;
-    border-radius: 7px;
-    font-size: 0.9rem;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--pe-border);
+    border-radius: 6px;
+    background: var(--pe-panel);
+    color: var(--pe-text);
+    font-size: 0.76rem;
     font-family: inherit;
+    box-sizing: border-box;
 }
-#pe-drawer input[type="color"] { width: 56px; height: 36px; padding: 2px; border: 1px solid #ddd; border-radius: 7px; }
-#pe-drawer textarea { min-height: 90px; resize: vertical; }
-#pe-drawer .help { color: #888; font-size: 0.8rem; margin-top: 0.25rem; }
-#pe-drawer .preview-img img { max-width: 100%; border: 1px solid #ddd; border-radius: 6px; }
+.pe-zero-hint { padding: 0.4rem 0.7rem 0.3rem; color: var(--pe-text-dim); font-size: 0.66rem; line-height: 1.4; }
 
-/* Визуальный редактор списка пунктов (галерея, преимущества, таблица…) */
-.pe-items { display: flex; flex-direction: column; gap: 0.6rem; }
-.pe-item { border: 1px solid #dde6f5; border-radius: 9px; padding: 0.6rem; position: relative; background: #f6faff; }
-.pe-item-field { margin-bottom: 0.45rem; }
-.pe-item-field:last-child { margin-bottom: 0; }
-.pe-item-field label { font-size: 0.76rem !important; color: #667; }
-.pe-item-del {
-    position: absolute; top: 6px; right: 6px;
-    border: 0; background: transparent; cursor: pointer; font-size: 0.85rem; opacity: 0.55;
+.pe-zero-handles { position: absolute; inset: 0; z-index: 5001; pointer-events: none; }
+.pe-zero-frame {
+    position: absolute;
+    outline: 2px solid var(--pe-accent);
+    outline-offset: 1px;
+    pointer-events: none;
+    box-shadow: 0 0 0 4000px rgba(30, 31, 36, 0.12);
 }
-.pe-item-del:hover { opacity: 1; }
-.pe-item-add {
-    border: 1px dashed var(--pe-accent); background: #fff; color: var(--pe-accent-dark);
-    border-radius: 9px; padding: 0.5rem; cursor: pointer; font-size: 0.85rem; font-weight: 600;
-}
-.pe-item-add:hover { background: #e8f1ff; }
-
-/* ---------------- Поповер параметров страницы ---------------- */
-#pe-pageprops {
-    position: fixed;
-    top: 56px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 99999;
+.pe-zero-handle {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    margin: -7px 0 0 -7px;
     background: #fff;
-    border-radius: 10px;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
-    padding: 1rem;
-    width: 480px;
-    max-width: 92vw;
-    display: none;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    color: #333;
-    font-size: 0.9rem;
+    border: 2px solid var(--pe-accent);
+    border-radius: 50%;
+    pointer-events: auto;
+    cursor: nwse-resize;
+    z-index: 5003;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    line-height: 1;
 }
-#pe-pageprops.open { display: block; }
-#pe-pageprops label { display: block; font-weight: 600; margin-bottom: 0.25rem; font-size: 0.8rem; }
-#pe-pageprops .field { margin-bottom: 0.7rem; }
-#pe-pageprops input, #pe-pageprops textarea {
-    width: 100%;
-    padding: 0.5rem 0.65rem;
-    border: 1px solid #ddd;
-    border-radius: 7px;
-    font-size: 0.9rem;
-    font-family: inherit;
+.pe-zero-h-nw, .pe-zero-h-se { cursor: nwse-resize; }
+.pe-zero-h-ne, .pe-zero-h-sw { cursor: nesw-resize; }
+.pe-zero-h-rot {
+    margin-top: -24px;
+    cursor: grab;
+    border-radius: 50%;
+    color: var(--pe-accent-dark);
+    font-weight: 700;
+    width: 20px;
+    height: 20px;
+    margin-left: -10px;
 }
 
-/* ---------------- Галерея блоков ---------------- */
-#pe-gallery-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(20, 28, 45, 0.6);
-    z-index: 100001;
-    display: none;
-    overflow-y: auto;
-    padding: 3rem 1rem;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+/* ---------------- Скроллбары панелей ---------------- */
+#pe-left ::-webkit-scrollbar, #pe-right ::-webkit-scrollbar, .pe-modal-body::-webkit-scrollbar,
+.pe-media-grid::-webkit-scrollbar, .pe-zero-float::-webkit-scrollbar { width: 9px; }
+#pe-left ::-webkit-scrollbar-thumb, #pe-right ::-webkit-scrollbar-thumb, .pe-modal-body::-webkit-scrollbar-thumb,
+.pe-media-grid::-webkit-scrollbar-thumb, .pe-zero-float::-webkit-scrollbar-thumb {
+    background: var(--pe-panel-2);
+    border-radius: 5px;
 }
-#pe-gallery-overlay.open { display: block; }
-#pe-gallery {
-    max-width: 900px;
-    margin: 0 auto;
-    background: #fff;
-    border-radius: 14px;
-    padding: 1.3rem 1.5rem;
-    color: #333;
+#pe-left ::-webkit-scrollbar-thumb:hover, #pe-right ::-webkit-scrollbar-thumb:hover { background: var(--pe-accent-dark); }
+#pe-left ::-webkit-scrollbar-track, #pe-right ::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------------- Адаптив панелей ---------------- */
+@media (max-width: 1100px) {
+    #pe-left { transform: translateX(-100%); transition: transform 0.22s ease; }
+    body.pe-left-open #pe-left { transform: translateX(0); }
+    .pe-canvas-wrap { margin-left: 0; }
+    #pe-legacy-banner { left: 0; }
 }
-#pe-gallery .pe-gallery-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-#pe-gallery .pe-gallery-head h3 { margin: 0; }
-#pe-gallery .pe-gallery-close { border: 0; background: #f0f0f0; border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 1rem; }
-#pe-gallery .pe-gallery-close:hover { background: #c00; color: #fff; }
-#pe-gallery .pe-gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.9rem; }
-#pe-gallery .gcard { border: 2px solid #e2e2e2; border-radius: 10px; padding: 0.6rem; cursor: pointer; background: #fff; }
-#pe-gallery .gcard:hover { border-color: var(--pe-accent); background: #f6faff; }
-#pe-gallery .gmock {
-    height: 84px; border-radius: 7px; background: #f4f4f8;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 5px; padding: 10px; overflow: hidden;
+@media (max-width: 900px) {
+    :root { --pe-right-w: 300px; }
+    #pe-topbar .pe-title { display: none; }
+    .pe-save-indicator { display: none; }
 }
-#pe-gallery .gname { font-weight: 700; font-size: 0.86rem; margin-top: 0.45rem; text-align: center; }
-#pe-gallery .gdesc { color: #999; font-size: 0.74rem; margin-top: 0.12rem; text-align: center; }
-#pe-gallery .gm-bar { background: #cfcfcf; border-radius: 3px; }
-#pe-gallery .gm-img { width: 100%; height: 100%; background: #e2e2e8; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 1.3rem; }
-#pe-gallery .gm-btn { background: var(--pe-accent); color: #fff; border-radius: 20px; padding: 4px 18px; font-size: 0.7rem; font-weight: 700; }
-#pe-gallery .gm-video { width: 100%; height: 100%; background: #3a3a3a; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.25rem; }
-#pe-gallery .gm-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; width: 100%; }
-#pe-gallery .gm-card-mini { background: #fff; border: 1px solid #ddd; border-radius: 4px; height: 32px; padding: 3px; }
-#pe-gallery .gm-card-mini .im { background: #eee; height: 14px; border-radius: 2px; }
-#pe-gallery .gm-card-mini .tx { background: #ddd; height: 5px; border-radius: 2px; margin-top: 4px; }
-#pe-gallery .gm-line { width: 80%; height: 2px; background: #cfcfcf; }
-#pe-gallery .gm-code { color: #999; font-family: monospace; font-size: 1rem; }
