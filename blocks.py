@@ -16,10 +16,21 @@
     banner    — промо-баннер (title, subtitle, button, url, bg)
     divider   — разделитель
     html      — произвольный HTML (для перенесённого дизайна, редактирование по желанию)
+    zero      — zero-блок (CN-T8): абсолютно позиционированные элементы
+                (text/button/image/shape/video/icon) + адаптив tablet/mobile
+
+Общие поля блока (цикл 2, CN-T4): фон (bg_type/bg_image/bg_gradient_*/bg_video/
+bg_opacity), отступы (padding_top/padding_bottom), container theme|full,
+min_height, content_align, эффекты (effects: anim/sticky/decor/hide_on),
+css_class, custom_css (только суперадмин), hidden. Старые поля bg/padding/
+text_color работают как раньше. Типографика элементов — block['typography']
+{title, subtitle, text, caption, button, item_title, item_text}, кнопки —
+block['button_style']. Всё валидируется, невалидное игнорируется.
 
 Страница с ключом 'blocks' рендерится из блоков; content_html генерируется
 автоматически при сохранении в админке (app.py /admin/api/save).
 """
+import hashlib
 import html
 import json
 import re
@@ -55,6 +66,9 @@ def _sanitize_url(value):
         return ''
     low = value.lower()
     if low.startswith(('javascript:', 'data:', 'vbscript:')):
+        return ''
+    # кавычки/скобки/пробелы могут вырваться из атрибута — отсекаем целиком
+    if any(c in value for c in '<>"\'\t\n\r '):
         return ''
     if low.startswith(('http://', 'https://', '/', '#', 'mailto:', 'tel:')):
         return value
@@ -165,6 +179,23 @@ def _vimeo_id(url):
     return m.group(1) if m else ''
 
 
+def _video_embed_url(url):
+    """Безопасный embed-URL для фонового/zero-видео: YouTube/Vimeo/RuTube."""
+    url = (url or '').strip()
+    if not url.lower().startswith(('http://', 'https://')):
+        return ''
+    yt = _youtube_id(url)
+    if yt:
+        return f'https://www.youtube.com/embed/{yt}'
+    vm = _vimeo_id(url)
+    if vm:
+        return f'https://player.vimeo.com/video/{vm}'
+    m = re.search(r'rutube\.ru/(?:video/|play/embed/)([a-zA-Z0-9]+)', url)
+    if m:
+        return f'https://rutube.ru/play/embed/{m.group(1)}'
+    return ''
+
+
 def _parse_items(raw):
     """Нормализовать список элементов блока: список словарей или JSON-строка."""
     if isinstance(raw, str):
@@ -190,8 +221,29 @@ def _color(value, default=''):
     return value if re.fullmatch(r'#[0-9a-fA-F]{3,8}', value) else default
 
 
+def _px(value, lo, hi):
+    """Целое число в диапазоне [lo, hi]; иначе None (невалидное игнорируем)."""
+    try:
+        n = int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return n if lo <= n <= hi else None
+
+
+def _pct(value):
+    """Процент 0-100 (до 2 знаков после точки) строкой; иначе None."""
+    value = str(value or '').strip()
+    if not re.fullmatch(r'\d{1,3}(\.\d{1,2})?', value):
+        return None
+    return value if 0 <= float(value) <= 100 else None
+
+
 def _style_attr(block):
-    """Инлайн-стили контейнера блока: фон, вертикальные отступы, цвет текста."""
+    """Инлайн-стили контейнера блока: фон, вертикальные отступы, цвет текста.
+
+    Оставлено для совместимости (блок «Секция»); остальные типы проходят
+    через _block_wrapper, который покрывает те же поля без двойного применения.
+    """
     styles = []
     bg = _color(block.get('bg'))
     if bg:
@@ -204,6 +256,281 @@ def _style_attr(block):
     if color:
         styles.append(f'color:{color}')
     return f' style="{";".join(styles)}"' if styles else ''
+
+
+# Допустимые Google Fonts (кириллические семейства, CN-T4 типографика).
+_GOOGLE_FONTS = (
+    'Roboto', 'Open Sans', 'Montserrat', 'Ubuntu', 'PT Sans', 'PT Serif',
+    'Lora', 'Playfair Display', 'Inter', 'Fira Sans', 'Oswald', 'Rubik',
+    'Nunito', 'Noto Sans', 'Manrope', 'Bebas Neue', 'Comfortaa', 'Jost',
+    'Mulish', 'Source Sans 3', 'Source Serif 4', 'IBM Plex Sans',
+    'IBM Plex Serif', 'Golos Text', 'Exo 2', 'Tinos', 'Cormorant Garamond',
+    'Lobster', 'Pacifico', 'Neucha',
+)
+_GOOGLE_FONTS_SET = frozenset(_GOOGLE_FONTS)
+
+
+def _typo_styles(cfg):
+    """Строка инлайн-стилей из конфига типографики; пусто -> дефолты темы."""
+    if not isinstance(cfg, dict):
+        return ''
+    styles = []
+    fam = str(cfg.get('font') or '').strip()
+    if fam and re.fullmatch(r'[^{}<>;]{1,100}', fam):
+        styles.append(f'font-family:{fam}')
+    gf = str(cfg.get('font_google') or '').strip()
+    if gf in _GOOGLE_FONTS_SET:
+        # Семейство из белого списка — безопасно подставлять без esc
+        styles.append(f"font-family:'{gf}',sans-serif")
+    size = str(cfg.get('size') or '').strip()
+    m = re.fullmatch(r'(\d{1,3})(px|rem)', size)
+    if m and 8 <= int(m.group(1)) <= 120:
+        styles.append(f'font-size:{size}')
+    color = _color(cfg.get('color'))
+    if color:
+        styles.append(f'color:{color}')
+    lh = str(cfg.get('line_height') or '').strip()
+    if re.fullmatch(r'\d{1,2}(\.\d{1,2})?', lh) and 0.8 <= float(lh) <= 3:
+        styles.append(f'line-height:{lh}')
+    ls = str(cfg.get('letter_spacing') or '').strip()
+    m = re.fullmatch(r'(-?\d{1,2}(\.\d{1,2})?)(px|em)', ls)
+    if m and -5 <= float(m.group(1)) <= 20:
+        styles.append(f'letter-spacing:{ls}')
+    weight = str(cfg.get('weight') or '').strip().lower()
+    if weight in ('normal', 'medium', 'bold'):
+        styles.append(f"font-weight:{'normal' if weight == 'normal' else '500' if weight == 'medium' else '700'}")
+    else:
+        wn = _px(cfg.get('weight'), 100, 900)
+        if wn is not None:
+            styles.append(f'font-weight:{wn}')
+    if cfg.get('italic') is True:
+        styles.append('font-style:italic')
+    if cfg.get('uppercase') is True:
+        styles.append('text-transform:uppercase')
+    align = str(cfg.get('align') or '').strip()
+    if align in ('left', 'center', 'right', 'justify'):
+        styles.append(f'text-align:{align}')
+    return ';'.join(styles)
+
+
+def _typo(block, element):
+    """Типографика элемента блока: block['typography'][element] -> стили."""
+    typo = block.get('typography')
+    if not isinstance(typo, dict):
+        return ''
+    return _typo_styles(typo.get(element))
+
+
+def _div(style, content):
+    """Обернуть контент в div со стилем, если стиль непустой."""
+    return f'<div style="{style}">{content}</div>' if style else content
+
+
+# Стили кнопок (CN-T4): варианты fill/outline/none, тени, ховер, размеры.
+_BTN_SIZES = {
+    's': ('0.4rem 1rem', '0.85rem'),
+    'm': ('0.7rem 1.6rem', '1rem'),
+    'l': ('0.9rem 2.2rem', '1.15rem'),
+}
+_BTN_SHADOWS = {
+    0: '',
+    1: 'box-shadow:0 2px 6px rgba(0,0,0,0.18)',
+    2: 'box-shadow:0 6px 18px rgba(0,0,0,0.28)',
+}
+
+
+def _button_style(block, key='button_style'):
+    """Inline-стили и data-атрибуты кнопки из block['button_style'].
+
+    Возвращает (style, extra_attrs); если настройки нет — ('', '').
+    """
+    cfg = block.get(key)
+    if not isinstance(cfg, dict):
+        return '', ''
+    variant = str(cfg.get('variant') or 'fill')
+    if variant not in ('fill', 'outline', 'none'):
+        variant = 'fill'
+    bg = _color(cfg.get('bg'), '#b49d84')
+    color = _color(cfg.get('color'), '#ffffff')
+    border = _color(cfg.get('border_color'), bg)
+    radius = _px(cfg.get('radius'), 0, 60)
+    radius = 6 if radius is None else radius
+    shadow = _px(cfg.get('shadow'), 0, 2)
+    shadow = 0 if shadow is None else shadow
+    size = str(cfg.get('size') or 'm')
+    if size not in _BTN_SIZES:
+        size = 'm'
+    pad, fsize = _BTN_SIZES[size]
+    styles = [
+        f'border-radius:{radius}px', f'padding:{pad}', f'font-size:{fsize}',
+        'display:inline-block', 'text-decoration:none', 'cursor:pointer',
+        'font-weight:600', 'text-align:center',
+    ]
+    if variant == 'fill':
+        styles += [f'background:{bg}', f'color:{color}', f'border:2px solid {border}']
+    elif variant == 'outline':
+        styles += ['background:transparent', f'color:{border}', f'border:2px solid {border}']
+    else:
+        styles += ['background:transparent', f'color:{bg}', 'border:0',
+                   'padding-left:0', 'padding-right:0']
+    if _BTN_SHADOWS[shadow]:
+        styles.append(_BTN_SHADOWS[shadow])
+    hover = str(cfg.get('hover') or 'none')
+    if hover not in ('darken', 'lift', 'none'):
+        hover = 'none'
+    attrs = f' data-cb-btn-hover="{hover}"' if hover != 'none' else ''
+    return ';'.join(styles), attrs
+
+
+_BG_POSITIONS = {'left top', 'center top', 'right top',
+                 'left center', 'center', 'right center',
+                 'left bottom', 'center bottom', 'right bottom'}
+_ANIMS = ('fade', 'slide-up', 'slide-left', 'slide-right', 'zoom')
+
+
+def _block_uid(btype, inner_html):
+    """Стабильный безопасный uid [a-z0-9] для scoped custom_css."""
+    digest = hashlib.md5(f'{btype}|{inner_html}'.encode('utf-8')).hexdigest()
+    return 'u' + digest[:10]
+
+
+def _decor_line(cfg, cls):
+    """Декоративная линия сверху/снизу блока; пусто при невалидных данных."""
+    if not isinstance(cfg, dict):
+        return ''
+    color = _color(cfg.get('color'))
+    thickness = _px(cfg.get('thickness'), 1, 20)
+    if not color or thickness is None:
+        return ''
+    width = _px(cfg.get('width'), 1, 100)
+    width = 100 if width is None else width
+    return (f'<div class="{cls}" style="background:{color};height:{thickness}px;'
+            f'width:{width}%;margin:0 auto;"></div>')
+
+
+def _block_wrapper(block, inner_html, uid=None, extra_style='', extra_attrs='', legacy=True):
+    """Общая обёртка блока (CN-T4): фон, отступы, расположение, эффекты.
+
+    legacy=True — старые поля bg/padding/text_color читаются как раньше
+    (bg -> фон-цвет). Без новых полей разметка совпадает с прежней.
+    """
+    btype = re.sub(r'[^a-z0-9\-]', '', str(block.get('type') or 'text'))[:40] or 'text'
+    if not uid:
+        uid = _block_uid(btype, inner_html)
+    classes = [f'cb-{btype}']
+    styles = []
+    attrs = extra_attrs
+
+    # --- фон ---
+    bg_type = str(block.get('bg_type') or '').strip()
+    if bg_type not in ('', 'color', 'image', 'gradient', 'video', 'none'):
+        bg_type = ''
+    bg_html = ''
+    if bg_type == 'image':
+        img = _sanitize_url(block.get('bg_image'))
+        if img:
+            pos = str(block.get('bg_image_position') or 'center')
+            pos = pos if pos in _BG_POSITIONS else 'center'
+            size = str(block.get('bg_image_size') or 'cover')
+            size = size if size in ('cover', 'contain', 'auto') else 'cover'
+            repeat = str(block.get('bg_image_repeat') or 'no-repeat')
+            repeat = repeat if repeat in ('repeat', 'no-repeat') else 'no-repeat'
+            styles.append(f'background:url("{esc(img)}") {pos}/{size} {repeat}')
+            if block.get('bg_parallax') is True:
+                classes.append('cb-bg-parallax')
+    elif bg_type == 'gradient':
+        c1 = _color(block.get('bg_gradient_from'))
+        c2 = _color(block.get('bg_gradient_to'))
+        if c1 and c2:
+            angle = _px(block.get('bg_gradient_angle'), 0, 360)
+            angle = 180 if angle is None else angle
+            styles.append(f'background:linear-gradient({angle}deg,{c1},{c2})')
+    elif bg_type == 'video':
+        embed = _video_embed_url(block.get('bg_video'))
+        if embed:
+            overlay = _px(block.get('bg_opacity'), 0, 100)
+            overlay = 40 if overlay is None else overlay
+            bg_html = (
+                '<div class="cb-bg-video" style="position:absolute;inset:0;overflow:hidden;z-index:0;">'
+                f'<iframe src="{embed}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;"'
+                ' allowfullscreen loading="lazy" tabindex="-1" title="Фоновое видео"></iframe>'
+                f'<div style="position:absolute;inset:0;background:rgba(0,0,0,{overlay / 100:g});"></div></div>')
+            styles.append('position:relative')
+            inner_html = f'<div style="position:relative;z-index:1;">{inner_html}</div>'
+    elif bg_type in ('', 'color'):
+        col = _color(block.get('bg'))
+        if col and legacy:
+            styles.append(f'background:{col}')
+
+    # --- расположение ---
+    pt = _px(block.get('padding_top'), 0, 200)
+    pb = _px(block.get('padding_bottom'), 0, 200)
+    if pt is None and pb is None:
+        pad = _px(block.get('padding'), 0, 999)
+        if pad is not None:
+            styles.append(f'padding-top:{pad}px')
+            styles.append(f'padding-bottom:{pad}px')
+    else:
+        if pt is not None:
+            styles.append(f'padding-top:{pt}px')
+        if pb is not None:
+            styles.append(f'padding-bottom:{pb}px')
+    if legacy:
+        tc = _color(block.get('text_color'))
+        if tc:
+            styles.append(f'color:{tc}')
+    min_h = _px(block.get('min_height'), 0, 1200)
+    if min_h is not None:
+        styles.append(f'min-height:{min_h}px')
+    if 'align' not in block:
+        ca = str(block.get('content_align') or '').strip()
+        if ca in ('left', 'center', 'right'):
+            styles.append(f'text-align:{ca}')
+    if str(block.get('container') or 'theme') == 'full':
+        classes.append('cb-container-full')
+
+    # --- эффекты ---
+    fx = block.get('effects')
+    fx = fx if isinstance(fx, dict) else {}
+    anim = str(fx.get('anim') or 'none')
+    if anim in _ANIMS:
+        classes.append(f'cb-anim-{anim}')
+        dur = _px(fx.get('anim_duration'), 200, 2000)
+        dly = _px(fx.get('anim_delay'), 0, 2000)
+        attrs += (f' data-cb-anim="{anim}"'
+                  f' data-cb-anim-duration="{600 if dur is None else dur}"'
+                  f' data-cb-anim-delay="{0 if dly is None else dly}"')
+    if fx.get('sticky') is True:
+        classes.append('cb-sticky')
+    hide_on = str(fx.get('hide_on') or 'none')
+    if hide_on == 'mobile':
+        classes.append('cb-hide-mobile')
+    elif hide_on == 'desktop':
+        classes.append('cb-hide-desktop')
+    decor_top = _decor_line(fx.get('decor_top'), 'cb-decor cb-decor-top')
+    decor_bottom = _decor_line(fx.get('decor_bottom'), 'cb-decor cb-decor-bottom')
+    if block.get('hidden') is True:
+        classes.append('cb-hidden')
+
+    # --- дополнительно ---
+    css_class = str(block.get('css_class') or '').strip()
+    if css_class and re.fullmatch(r'[a-zA-Z0-9_\- ]{0,60}', css_class):
+        classes.append(css_class)
+    custom_css_html = ''
+    raw_css = block.get('custom_css')
+    if isinstance(raw_css, str) and _is_superadmin():
+        css = raw_css.strip()[:2000]
+        low = css.lower()
+        forbidden = ('@import', 'url(', 'expression(', 'behavior', '<', '>')
+        if css and not any(t in low for t in forbidden):
+            custom_css_html = f'<style>.cb-{uid}{{{css}}}</style>'
+
+    if extra_style:
+        styles.insert(0, extra_style.rstrip(';'))
+    style_attr = f' style="{";".join(styles)}"' if styles else ''
+    body = f'{decor_top}{bg_html}{inner_html}{decor_bottom}'
+    return (f'<div class="cb {" ".join(classes)}"{attrs}{style_attr}>'
+            f'{body}</div>{custom_css_html}')
 
 
 def _load_products():
@@ -258,6 +585,120 @@ def _product_cards_html(products):
     return ''.join(out)
 
 
+def _zero_element_html(el, index):
+    """Один элемент zero-блока: абсолютное позиционирование в процентах."""
+    if not isinstance(el, dict):
+        return ''
+    etype = str(el.get('type') or '')
+    if etype not in ('text', 'button', 'image', 'shape', 'video', 'icon'):
+        return ''
+    if el.get('hidden') is True:
+        return ''
+    eid = str(el.get('id') or f'el{index}')
+    if not re.fullmatch(r'[a-z0-9\-]{1,40}', eid):
+        eid = f'el{index}'
+    x = _pct(el.get('x'))
+    y = _pct(el.get('y'))
+    w = _pct(el.get('w'))
+    h = _pct(el.get('h'))
+    styles = [f'left:{x or 0}%', f'top:{y or 0}%',
+              f'width:{w or 20}%', f'height:{h or 10}%']
+    rotate = _px(el.get('rotate'), -180, 180)
+    if rotate:
+        styles.append(f'transform:rotate({rotate}deg)')
+    z = _px(el.get('z'), 0, 100)
+    if z is not None:
+        styles.append(f'z-index:{z}')
+    opacity = _px(el.get('opacity'), 1, 100)
+    if opacity is not None and opacity != 100:
+        styles.append(f'opacity:{opacity / 100:g}')
+    props = el.get('props')
+    props = props if isinstance(props, dict) else {}
+
+    if etype == 'text':
+        content = esc(props.get('text') or '')
+        content = _div('width:100%;height:100%;overflow:hidden;' +
+                       _typo_styles(props.get('text_style')), content)
+    elif etype == 'button':
+        text = (props.get('text') or '').strip() or 'Подробнее'
+        url = _sanitize_url(props.get('url')) or '#'
+        bstyle, battrs = _button_style({'button_style': props.get('button_style')})
+        if not bstyle:
+            bstyle = ('display:inline-block;background:#b49d84;color:#fff;'
+                      'padding:0.6rem 1.4rem;border-radius:6px;text-decoration:none;'
+                      'font-weight:600;border:2px solid #b49d84')
+        content = f'<a href="{esc(url)}"{battrs} style="{bstyle}">{esc(text)}</a>'
+    elif etype == 'image':
+        src = _sanitize_url(props.get('src'))
+        if not src:
+            return ''
+        radius = _px(props.get('radius'), 0, 60)
+        radius_css = f'border-radius:{radius}px;' if radius is not None else ''
+        content = (f'<img src="{esc(src)}" alt="{esc(props.get("alt") or "")}" loading="lazy" '
+                   f'style="width:100%;height:100%;object-fit:cover;display:block;{radius_css}">')
+    elif etype == 'shape':
+        color = _color(props.get('color'), '#b49d84')
+        shape = str(props.get('shape') or 'rect')
+        if shape == 'circle':
+            css = f'width:100%;height:100%;background:{color};border-radius:50%;'
+        elif shape == 'line':
+            css = f'width:100%;height:100%;min-height:2px;background:{color};'
+        else:
+            css = f'width:100%;height:100%;background:{color};'
+        content = f'<div style="{css}"></div>'
+    elif etype == 'video':
+        embed = _video_embed_url(props.get('url'))
+        if not embed:
+            return ''
+        content = (f'<iframe src="{embed}" style="width:100%;height:100%;border:0;" '
+                   f'allowfullscreen loading="lazy" title="Видео"></iframe>')
+    else:  # icon
+        icon = str(props.get('icon') or '').strip()
+        if not icon or len(icon) > 4 or '<' in icon or '>' in icon:
+            return ''
+        color = _color(props.get('color'), '#333333')
+        size = _px(props.get('size'), 4, 200)
+        size = 32 if size is None else size
+        content = (f'<div style="width:100%;height:100%;display:flex;align-items:center;'
+                   f'justify-content:center;color:{color};font-size:{size}px;line-height:1;">'
+                   f'{esc(icon)}</div>')
+
+    link = _sanitize_url(el.get('link'))
+    if link and etype != 'button':
+        content = f'<a href="{esc(link)}" style="display:block;width:100%;height:100%;">{content}</a>'
+    return f'<div data-el="{eid}" style="position:absolute;{";".join(styles)}">{content}</div>'
+
+
+def _zero_responsive_css(block, uid):
+    """Адаптив zero-блока: @media 1024px (tablet) и 640px (mobile)."""
+    resp = block.get('responsive')
+    if not isinstance(resp, dict):
+        return ''
+    axis = {'x': 'left', 'y': 'top', 'w': 'width', 'h': 'height'}
+    chunks = []
+    for media, maxw in (('tablet', 1024), ('mobile', 640)):
+        rules = resp.get(media)
+        if not isinstance(rules, dict):
+            continue
+        body = []
+        for eid, cfg in rules.items():
+            eid = str(eid)
+            if not re.fullmatch(r'[a-z0-9\-]{1,40}', eid) or not isinstance(cfg, dict):
+                continue
+            props = []
+            for k in ('x', 'y', 'w', 'h'):
+                v = _pct(cfg.get(k))
+                if v is not None:
+                    props.append(f'{axis[k]}:{v}%')
+            if cfg.get('hide') is True:
+                props.append('display:none')
+            if props:
+                body.append(f'.cb-zero-{uid} [data-el="{eid}"]{{{";".join(props)}}}')
+        if body:
+            chunks.append(f'@media (max-width:{maxw}px){{' + ''.join(body) + '}')
+    return ''.join(chunks)
+
+
 def render_block(block):
     btype = block.get('type', 'text')
     if btype == 'heading':
@@ -265,20 +706,19 @@ def render_block(block):
         if level not in ('h1', 'h2', 'h3'):
             level = 'h2'
         align = {'left': 'left', 'center': 'center', 'right': 'right'}.get(block.get('align'), 'left')
-        color = (block.get('text_color') or '').strip()
-        color_css = f'color:{color};' if re.fullmatch(r'#[0-9a-fA-F]{3,8}', color) else ''
-        return (f'<div class="cb cb-heading" style="text-align:{align};{color_css}"><{level}>'
-                f'{esc(block.get("text"))}</{level}></div>')
+        typo = _typo(block, 'title')
+        h_style = f' style="{typo}"' if typo else ''
+        inner = f'<{level}{h_style}>{esc(block.get("text"))}</{level}>'
+        return _block_wrapper(block, inner, extra_style=f'text-align:{align}')
 
     if btype == 'text':
         paragraphs = [p.strip() for p in re.split(r'\n\s*\n', block.get('text', '')) if p.strip()]
         if not paragraphs:
             return ''
         inner = ''.join(f'<p>{esc(p).replace(chr(10), "<br>")}</p>' for p in paragraphs)
+        inner = _div(_typo(block, 'text'), inner)
         align = {'left': 'left', 'center': 'center', 'right': 'right'}.get(block.get('align'), 'left')
-        color = (block.get('text_color') or '').strip()
-        color_css = f'color:{color};' if re.fullmatch(r'#[0-9a-fA-F]{3,8}', color) else ''
-        return f'<div class="cb cb-text" style="text-align:{align};{color_css}">{inner}</div>'
+        return _block_wrapper(block, inner, extra_style=f'text-align:{align}')
 
     if btype == 'image':
         src = (block.get('src') or '').strip()
@@ -286,26 +726,29 @@ def render_block(block):
             return ''
         alt = esc(block.get('alt', ''))
         caption = (block.get('caption') or '').strip()
-        cap_html = f'<figcaption style="font-size:0.85rem;color:#888;text-align:center;margin-top:0.5rem;">{esc(caption)}</figcaption>' if caption else ''
+        cap_typo = _typo(block, 'caption')
+        cap_css = 'font-size:0.85rem;color:#888;text-align:center;margin-top:0.5rem;' + cap_typo
+        cap_html = f'<figcaption style="{cap_css}">{esc(caption)}</figcaption>' if caption else ''
         align = {'left': 'left', 'center': 'center', 'right': 'right'}.get(block.get('align'), 'center')
         width = (str(block.get('width') or '').strip())
         width_css = f'width:{width};max-width:100%;' if re.fullmatch(r'\d{1,4}(\.\d+)?(px|%|rem|em)', width) else 'max-width:100%;'
-        return (f'<div class="cb cb-image" style="margin:1.5rem 0;text-align:{align};">'
-                f'<figure style="margin:0;display:inline-block;{width_css}">'
-                f'<img src="{esc(src)}" alt="{alt}" loading="lazy" style="width:100%;height:auto;border-radius:8px;">'
-                f'{cap_html}</figure></div>')
+        inner = (f'<figure style="margin:0;display:inline-block;{width_css}">'
+                 f'<img src="{esc(src)}" alt="{alt}" loading="lazy" style="width:100%;height:auto;border-radius:8px;">'
+                 f'{cap_html}</figure>')
+        return _block_wrapper(block, inner, extra_style=f'margin:1.5rem 0;text-align:{align}')
 
     if btype == 'button':
         text = (block.get('text') or '').strip() or 'Подробнее'
-        url = (block.get('url') or '#').strip() or '#'
-        color = (block.get('color') or '#b49d84').strip() or '#b49d84'
+        url = _sanitize_url(block.get('url')) or '#'
         align = block.get('align', 'left')
         align_css = {'left': 'left', 'center': 'center', 'right': 'right'}.get(align, 'left')
-        return (f'<div class="cb cb-button" style="text-align:{align_css};margin:1.5rem 0;">'
-                f'<a href="{esc(url)}" class="btn btn-default btn-lg"'
-                f' style="display:inline-block;background:{esc(color)};color:#fff;'
-                f'padding:0.8rem 2rem;border-radius:6px;text-decoration:none;font-weight:600;">'
-                f'{esc(text)}</a></div>')
+        bstyle, battrs = _button_style(block)
+        if not bstyle:
+            color = (block.get('color') or '#b49d84').strip() or '#b49d84'
+            bstyle = (f'display:inline-block;background:{esc(color)};color:#fff;'
+                      f'padding:0.8rem 2rem;border-radius:6px;text-decoration:none;font-weight:600;')
+        inner = f'<a href="{esc(url)}" class="btn btn-default btn-lg"{battrs} style="{bstyle}">{esc(text)}</a>'
+        return _block_wrapper(block, inner, extra_style=f'text-align:{align_css};margin:1.5rem 0')
 
     if btype == 'video':
         url = (block.get('url') or '').strip()
@@ -317,10 +760,10 @@ def render_block(block):
             embed = f'https://player.vimeo.com/video/{vm}'
         else:
             return ''
-        return (f'<div class="cb cb-video" style="margin:1.5rem 0;">'
-                f'<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:8px;">'
-                f'<iframe src="{embed}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;"'
-                f' allowfullscreen loading="lazy"></iframe></div></div>')
+        inner = (f'<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:8px;">'
+                 f'<iframe src="{embed}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;"'
+                 f' allowfullscreen loading="lazy"></iframe></div>')
+        return _block_wrapper(block, inner, extra_style='margin:1.5rem 0')
 
     if btype == 'products':
         # Блок «Товары» (CN-2): режимы all/wb/ozon по источнику, фильтр по
@@ -334,7 +777,8 @@ def render_block(block):
         except (TypeError, ValueError):
             limit = 8
         title = (block.get('title') or '').strip()
-        title_html = f'<h2 style="font-size:1.6rem;margin-bottom:1.5rem;">{esc(title)}</h2>' if title else ''
+        title_typo = _typo(block, 'title')
+        title_html = f'<h2 style="font-size:1.6rem;margin-bottom:1.5rem;{title_typo}">{esc(title)}</h2>' if title else ''
 
         products = []
         try:
@@ -353,32 +797,37 @@ def render_block(block):
             products = []
 
         cards = _product_cards_html(products)
-        return (f'<div class="cb cb-products" style="padding:2rem 0;">'
-                f'<div class="maxwidth-theme">{title_html}'
-                f'<div class="wb-products-grid" style="display:grid;'
-                f'grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1.5rem;">'
-                f'{cards}</div></div></div>')
+        inner = (f'<div class="maxwidth-theme">{title_html}'
+                 f'<div class="wb-products-grid" style="display:grid;'
+                 f'grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1.5rem;">'
+                 f'{cards}</div></div>')
+        return _block_wrapper(block, inner, extra_style='padding:2rem 0')
 
     if btype == 'divider':
-        return '<div class="cb cb-divider"><hr style="border:0;border-top:1px solid #e0e0e0;margin:2rem 0;"></div>'
+        inner = '<hr style="border:0;border-top:1px solid #e0e0e0;margin:2rem 0;">'
+        return _block_wrapper(block, inner)
 
     if btype == 'reviews':
         cards = []
+        item_typo = _typo(block, 'item_text')
         for it in _parse_items(block.get('items')):
             text = str(it.get('text') or '').strip()
             if not text:
                 continue
+            text_html = f'<p style="{item_typo}">{esc(text)}</p>' if item_typo else f'<p>{esc(text)}</p>'
             cards.append(
                 '<div class="cb-review-card">'
                 f'<div class="cb-review-head"><span class="cb-review-name">{esc(it.get("name") or "Покупатель")}</span>'
                 f'<span class="cb-review-stars">{_stars(it.get("rating", 5))}</span></div>'
-                f'<p>{esc(text)}</p></div>')
+                f'{text_html}</div>')
         if not cards:
             return ''
         title = (block.get('title') or '').strip()
-        title_html = f'<h2>{esc(title)}</h2>' if title else ''
-        return (f'<div class="cb cb-reviews"><div class="maxwidth-theme">{title_html}'
-                f'<div class="cb-reviews-grid">{"".join(cards)}</div></div></div>')
+        title_typo = _typo(block, 'title')
+        title_html = f'<h2 style="{title_typo}">{esc(title)}</h2>' if title else ''
+        inner = f'<div class="maxwidth-theme">{title_html}' \
+                f'<div class="cb-reviews-grid">{"".join(cards)}</div></div>'
+        return _block_wrapper(block, inner)
 
     if btype == 'form':
         title = (block.get('title') or '').strip()
@@ -387,32 +836,41 @@ def render_block(block):
         note = f'Форма: {title}' if title else 'Форма обратной связи'
         if recipient:
             note += f' (для: {recipient})'
-        heading = f'<h2>{esc(title)}</h2>' if title else ''
+        title_typo = _typo(block, 'title')
+        heading = f'<h2 style="{title_typo}">{esc(title)}</h2>' if title else ''
+        bstyle, battrs = _button_style(block)
+        if bstyle:
+            submit = f'<button type="submit"{battrs} style="{bstyle}">{esc(button)}</button>'
+        else:
+            submit = f'<button type="submit">{esc(button)}</button>'
         # Обычный POST без JS: /api/order сам перенаправит обратно на страницу
-        return (f'<div class="cb cb-form"><div class="maxwidth-theme">{heading}'
-                f'<form action="/api/order" method="post" class="cb-form-fields">'
-                f'<input type="hidden" name="redirect" value="1">'
-                f'<input type="hidden" name="product_name" value="{esc(note)}">'
-                '<input type="text" name="name" placeholder="Ваше имя" required>'
-                '<input type="tel" name="phone" placeholder="Телефон" required>'
-                '<input type="email" name="email" placeholder="Email (необязательно)">'
-                '<label style="display:flex;align-items:flex-start;gap:.4rem;font-size:.8rem;color:#666;cursor:pointer;">'
-                '<input type="checkbox" name="consent_pd" value="1" required style="margin-top:.15rem;">'
-                '<span>Соглашаюсь с обработкой персональных данных</span></label>'
-                f'<button type="submit">{esc(button)}</button>'
-                '</form></div></div>')
+        inner = (f'<div class="maxwidth-theme">{heading}'
+                 f'<form action="/api/order" method="post" class="cb-form-fields">'
+                 f'<input type="hidden" name="redirect" value="1">'
+                 f'<input type="hidden" name="product_name" value="{esc(note)}">'
+                 '<input type="text" name="name" placeholder="Ваше имя" required>'
+                 '<input type="tel" name="phone" placeholder="Телефон" required>'
+                 '<input type="email" name="email" placeholder="Email (необязательно)">'
+                 '<label style="display:flex;align-items:flex-start;gap:.4rem;font-size:.8rem;color:#666;cursor:pointer;">'
+                 '<input type="checkbox" name="consent_pd" value="1" required style="margin-top:.15rem;">'
+                 '<span>Соглашаюсь с обработкой персональных данных</span></label>'
+                 f'{submit}'
+                 '</form></div>')
+        return _block_wrapper(block, inner)
 
     if btype == 'map':
         address = (block.get('address') or '').strip()
         if not address:
             return ''
         title = (block.get('title') or '').strip()
-        heading = f'<h2>{esc(title)}</h2>' if title else ''
+        title_typo = _typo(block, 'title')
+        heading = f'<h2 style="{title_typo}">{esc(title)}</h2>' if title else ''
         zoom = str(block.get('zoom') or '16')
         zoom = zoom if re.fullmatch(r'\d{1,2}', zoom) and 9 <= int(zoom) <= 18 else '16'
         src = f'https://yandex.ru/map-widget/v1/?text={quote(address)}&z={zoom}'
-        return (f'<div class="cb cb-map"><div class="maxwidth-theme">{heading}'
-                f'<iframe src="{src}" loading="lazy" title="Карта"></iframe></div></div>')
+        inner = (f'<div class="maxwidth-theme">{heading}'
+                 f'<iframe src="{src}" loading="lazy" title="Карта"></iframe></div>')
+        return _block_wrapper(block, inner)
 
     if btype == 'faq':
         items = []
@@ -425,9 +883,10 @@ def render_block(block):
         if not items:
             return ''
         title = (block.get('title') or '').strip()
-        title_html = f'<h2>{esc(title)}</h2>' if title else ''
-        return (f'<div class="cb cb-faq"><div class="maxwidth-theme">{title_html}'
-                f'{"".join(items)}</div></div>')
+        title_typo = _typo(block, 'title')
+        title_html = f'<h2 style="{title_typo}">{esc(title)}</h2>' if title else ''
+        inner = f'<div class="maxwidth-theme">{title_html}{"".join(items)}</div>'
+        return _block_wrapper(block, inner)
 
     if btype == 'banner':
         title = (block.get('title') or '').strip()
@@ -435,7 +894,7 @@ def render_block(block):
             return ''
         subtitle = (block.get('subtitle') or '').strip()
         button = (block.get('button') or '').strip()
-        url = (block.get('url') or '#').strip() or '#'
+        url = _sanitize_url(block.get('url')) or '#'
         bg = (block.get('bg') or '#b49d84').strip() or '#b49d84'
         if not re.fullmatch(r'#[0-9a-fA-F]{3,8}', bg):
             bg = '#b49d84'
@@ -450,13 +909,22 @@ def render_block(block):
                       f'url("{esc(image)}") center/cover no-repeat {bg};')
         else:
             bg_css = f'background:{bg};'
-        sub_html = f'<p class="cb-banner-sub">{esc(subtitle)}</p>' if subtitle else ''
-        btn_html = (f'<a class="cb-banner-btn" href="{esc(url)}">{esc(button)}</a>'
-                    if button else '')
-        return (f'<div class="cb cb-banner"><div class="maxwidth-theme">'
-                f'<div class="cb-banner-inner" style="{bg_css}{height_css}color:{text_color};">'
-                f'<h2 class="cb-banner-title" style="color:{text_color};">{esc(title)}</h2>{sub_html}{btn_html}'
-                '</div></div></div>')
+        sub_html = f'<p class="cb-banner-sub" style="{_typo(block, "subtitle")}">{esc(subtitle)}</p>' if subtitle else ''
+        if button:
+            bstyle, battrs = _button_style(block)
+            if bstyle:
+                btn_html = f'<a class="cb-banner-btn"{battrs} href="{esc(url)}" style="{bstyle}">{esc(button)}</a>'
+            else:
+                btn_html = f'<a class="cb-banner-btn" href="{esc(url)}">{esc(button)}</a>'
+        else:
+            btn_html = ''
+        title_typo = _typo(block, 'title')
+        inner = (f'<div class="maxwidth-theme">'
+                 f'<div class="cb-banner-inner" style="{bg_css}{height_css}color:{text_color};">'
+                 f'<h2 class="cb-banner-title" style="color:{text_color};{title_typo}">{esc(title)}</h2>{sub_html}{btn_html}'
+                 '</div></div>')
+        # legacy=False: bg/padding/text_color баннера обрабатываются внутри
+        return _block_wrapper(block, inner, legacy=False)
 
     if btype == 'html':
         # Блок «HTML-код» (CN-2): рендерится без эскейпинга ТОЛЬКО для
@@ -464,6 +932,7 @@ def render_block(block):
         # блоков не-суперадмином отсекает ещё и сервер, app.py page-save).
         # Этап 6.1 (defense in depth): даже суперадминский HTML проходит
         # через санитайзер — script/iframe/on* не доходят до страницы.
+        # Без обёртки: тест на точное равенство заглушки, raw HTML целиком.
         if _is_superadmin():
             return _sanitize_html(block.get('html', '') or '')
         return '<!-- html block: restricted -->'
@@ -475,20 +944,27 @@ def render_block(block):
         date = (block.get('date') or '').strip()
         try:
             from datetime import datetime
-            deadline = datetime.fromisoformat(date)
+            datetime.fromisoformat(date)
             valid = True
         except (ValueError, TypeError):
             valid = False
         button_text = (block.get('button_text') or '').strip()
-        button_link = (block.get('button_link') or '').strip()
-        heading = f'<h2>{esc(title)}</h2>' if title else ''
-        btn_html = (f'<a class="cb-timer-btn" href="{esc(button_link or "#")}">{esc(button_text)}</a>'
-                    if button_text else '')
+        button_link = _sanitize_url(block.get('button_link')) or ''
+        title_typo = _typo(block, 'title')
+        heading = f'<h2 style="{title_typo}">{esc(title)}</h2>' if title else ''
+        if button_text:
+            bstyle, battrs = _button_style(block)
+            if bstyle:
+                btn_html = f'<a class="cb-timer-btn"{battrs} href="{esc(button_link or "#")}" style="{bstyle}">{esc(button_text)}</a>'
+            else:
+                btn_html = f'<a class="cb-timer-btn" href="{esc(button_link or "#")}">{esc(button_text)}</a>'
+        else:
+            btn_html = ''
         date_attr = esc(date) if valid else ''
-        return (f'<div class="cb cb-timer" data-cb-timer-date="{date_attr}"{_style_attr(block)}>'
-                f'<div class="maxwidth-theme">{heading}'
-                f'<div class="cb-timer-widget"><span class="cb-timer-countdown">…</span></div>'
-                f'{btn_html}</div></div>')
+        inner = (f'<div class="maxwidth-theme">{heading}'
+                 f'<div class="cb-timer-widget"><span class="cb-timer-countdown">…</span></div>'
+                 f'{btn_html}</div>')
+        return _block_wrapper(block, inner, extra_attrs=f' data-cb-timer-date="{date_attr}"')
 
     if btype == 'section':
         # Секция перенесённого дизайна: готовый HTML целиком (миграция со
@@ -507,16 +983,18 @@ def render_block(block):
         image_pos = 'right' if block.get('image_pos') == 'right' else 'left'
         if not text and not src:
             return ''
-        heading = f'<h2>{esc(title)}</h2>' if title else ''
+        title_typo = _typo(block, 'title')
+        heading = f'<h2 style="{title_typo}">{esc(title)}</h2>' if title else ''
         paragraphs = ''.join(f'<p>{esc(p).replace(chr(10), "<br>")}</p>'
                              for p in re.split(r'\n\s*\n', text) if p.strip())
+        paragraphs = _div(_typo(block, 'text'), paragraphs)
         img_html = (f'<img src="{esc(src)}" alt="{esc(block.get("alt") or title)}" loading="lazy" '
                     f'style="width:100%;height:auto;border-radius:10px;display:block;">') if src else ''
         col_img = f'<div class="cb-ti-img">{img_html}</div>' if img_html else ''
         col_text = f'<div class="cb-ti-text">{heading}{paragraphs}</div>'
         cols = col_img + col_text if image_pos == 'left' else col_text + col_img
-        return (f'<div class="cb cb-text-image"{_style_attr(block)}><div class="maxwidth-theme">'
-                f'<div class="cb-ti-grid">{cols}</div></div></div>')
+        inner = f'<div class="maxwidth-theme"><div class="cb-ti-grid">{cols}</div></div>'
+        return _block_wrapper(block, inner)
 
     if btype == 'gallery':
         imgs = []
@@ -529,13 +1007,16 @@ def render_block(block):
         cols = str(block.get('cols', 3))
         cols = cols if cols in ('2', '3', '4') else '3'
         title = (block.get('title') or '').strip()
-        heading = f'<h2>{esc(title)}</h2>' if title else ''
-        return (f'<div class="cb cb-gallery cb-gallery-c{cols}"{_style_attr(block)}>'
-                f'<div class="maxwidth-theme">{heading}'
-                f'<div class="cb-gallery-grid">{"".join(imgs)}</div></div></div>')
+        title_typo = _typo(block, 'title')
+        heading = f'<h2 style="{title_typo}">{esc(title)}</h2>' if title else ''
+        inner = (f'<div class="maxwidth-theme">{heading}'
+                 f'<div class="cb-gallery-grid">{"".join(imgs)}</div></div>')
+        return _block_wrapper(block, inner)
 
     if btype == 'features':
         items = []
+        t_title = _typo(block, 'item_title')
+        t_text = _typo(block, 'item_text')
         for it in _parse_items(block.get('items')):
             title = str(it.get('title') or '').strip()
             text = str(it.get('text') or '').strip()
@@ -552,17 +1033,18 @@ def render_block(block):
                 icon_html = ''
             items.append(
                 '<div class="cb-feature-card">'
-                f'{icon_html}<div class="cb-feature-title">{esc(title)}</div>'
-                f'<div class="cb-feature-text">{esc(text)}</div></div>')
+                f'{icon_html}<div class="cb-feature-title" style="{t_title}">{esc(title)}</div>'
+                f'<div class="cb-feature-text" style="{t_text}">{esc(text)}</div></div>')
         if not items:
             return ''
         cols = str(block.get('cols', 4))
         cols = cols if cols in ('2', '3', '4', '5') else '4'
         title = (block.get('title') or '').strip()
-        heading = f'<h2>{esc(title)}</h2>' if title else ''
-        return (f'<div class="cb cb-features cb-features-c{cols}"{_style_attr(block)}>'
-                f'<div class="maxwidth-theme">{heading}'
-                f'<div class="cb-features-grid">{"".join(items)}</div></div></div>')
+        title_typo = _typo(block, 'title')
+        heading = f'<h2 style="{title_typo}">{esc(title)}</h2>' if title else ''
+        inner = (f'<div class="maxwidth-theme">{heading}'
+                 f'<div class="cb-features-grid">{"".join(items)}</div></div>')
+        return _block_wrapper(block, inner)
 
     if btype == 'table':
         rows = []
@@ -582,17 +1064,20 @@ def render_block(block):
         if not rows:
             return ''
         title = (block.get('title') or '').strip()
-        heading = f'<h2>{esc(title)}</h2>' if title else ''
-        return (f'<div class="cb cb-table"{_style_attr(block)}><div class="maxwidth-theme">'
-                f'{heading}<div class="cb-table-wrap"><table>{"".join(rows)}</table></div></div></div>')
+        title_typo = _typo(block, 'title')
+        heading = f'<h2 style="{title_typo}">{esc(title)}</h2>' if title else ''
+        inner = (f'<div class="maxwidth-theme">'
+                 f'{heading}<div class="cb-table-wrap"><table>{"".join(rows)}</table></div></div>')
+        return _block_wrapper(block, inner)
 
     if btype == 'spacer':
         h = str(block.get('height', '40')).strip()
         h = h if re.fullmatch(r'\d{1,3}', h) else '40'
-        return f'<div class="cb cb-spacer" style="height:{h}px;"></div>'
+        return _block_wrapper(block, '', extra_style=f'height:{h}px')
 
     if btype == 'text_columns':
         cols_raw = _parse_items(block.get('items'))
+        t_text = _typo(block, 'text')
         cols = []
         for it in cols_raw:
             t = str(it.get('text') or '').strip()
@@ -600,18 +1085,21 @@ def render_block(block):
                 continue
             paragraphs = ''.join(f'<p>{esc(p).replace(chr(10), "<br>")}</p>'
                                  for p in re.split(r'\n\s*\n', t) if p.strip())
-            cols.append(f'<div class="cb-col">{paragraphs}</div>')
+            cols.append(f'<div class="cb-col">{_div(t_text, paragraphs)}</div>')
         if not cols:
             return ''
         n = str(min(4, max(2, len(cols))))
         title = (block.get('title') or '').strip()
-        heading = f'<h2>{esc(title)}</h2>' if title else ''
-        return (f'<div class="cb cb-text-columns cb-cols-{n}"{_style_attr(block)}>'
-                f'<div class="maxwidth-theme">{heading}<div class="cb-cols-grid">{"".join(cols)}</div></div></div>')
+        title_typo = _typo(block, 'title')
+        heading = f'<h2 style="{title_typo}">{esc(title)}</h2>' if title else ''
+        inner = (f'<div class="maxwidth-theme">{heading}'
+                 f'<div class="cb-cols-grid">{"".join(cols)}</div></div>')
+        return _block_wrapper(block, inner)
 
     if btype == 'contacts':
         title = (block.get('title') or '').strip()
-        heading = f'<h2>{esc(title)}</h2>' if title else ''
+        title_typo = _typo(block, 'title')
+        heading = f'<h2 style="{title_typo}">{esc(title)}</h2>' if title else ''
         phone = (block.get('phone') or '').strip()
         email = (block.get('email') or '').strip()
         address = (block.get('address') or '').strip()
@@ -625,8 +1113,25 @@ def render_block(block):
             rows += f'<div class="cb-contact-row"><span>Адрес</span><span>{esc(address)}</span></div>'
         if worktime:
             rows += f'<div class="cb-contact-row"><span>Режим работы</span><span>{esc(worktime)}</span></div>'
-        return (f'<div class="cb cb-contacts"{_style_attr(block)}><div class="maxwidth-theme">'
-                f'{heading}<div class="cb-contacts-card">{rows}</div></div></div>')
+        inner = (f'<div class="maxwidth-theme">'
+                 f'{heading}<div class="cb-contacts-card">{rows}</div></div>')
+        return _block_wrapper(block, inner)
+
+    if btype == 'zero':
+        # Zero-блок (CN-T8): элементы в процентах контейнера + адаптив.
+        height = _px(block.get('height'), 100, 2000)
+        height = 500 if height is None else height
+        elements = block.get('elements')
+        if not isinstance(elements, list):
+            elements = _parse_items(elements)
+        uid = _block_uid('zero', json.dumps(elements, sort_keys=True, ensure_ascii=False, default=str))
+        els_html = ''.join(_zero_element_html(el, i) for i, el in enumerate(elements))
+        resp_css = _zero_responsive_css(block, uid)
+        inner = (f'<div class="cb-zero cb-zero-{uid}" style="position:relative;'
+                 f'height:{height}px;">{els_html}</div>')
+        if resp_css:
+            inner += f'<style>{resp_css}</style>'
+        return _block_wrapper(block, inner, uid=uid)
 
     return ''
 
@@ -657,6 +1162,52 @@ TIMER_HYDRATOR = """<script>
         tick(el);
         setInterval(function(){ tick(el); }, 1000);
     });
+})();
+</script>"""
+
+
+# Анимации появления и общие эффекты блоков (цикл 2, CN-T4): CSS-классы
+# начального/конечного состояния + IntersectionObserver. Подключается в
+# render_blocks только если какой-то блок реально использует эффекты.
+ANIMATIONS_ASSETS = """<style>
+.cb-anim-fade,.cb-anim-slide-up,.cb-anim-slide-left,.cb-anim-slide-right,.cb-anim-zoom{opacity:0;transition-property:opacity,transform;transition-timing-function:ease;}
+.cb-anim-slide-up{transform:translateY(40px);}
+.cb-anim-slide-left{transform:translateX(-40px);}
+.cb-anim-slide-right{transform:translateX(40px);}
+.cb-anim-zoom{transform:scale(0.92);}
+.cb-anim-in{opacity:1;transform:none;}
+.cb-sticky{position:sticky;top:0;z-index:50;}
+.cb-hidden{display:none;}
+.cb-bg-parallax{background-attachment:fixed;}
+@media (max-width:640px){.cb-hide-mobile{display:none;}}
+@media (min-width:641px){.cb-hide-desktop{display:none;}}
+.cb-container-full .maxwidth-theme{max-width:100%;}
+[data-cb-btn-hover="darken"]{transition:filter .2s ease;}
+[data-cb-btn-hover="darken"]:hover{filter:brightness(0.85);}
+[data-cb-btn-hover="lift"]{transition:transform .2s ease,box-shadow .2s ease;}
+[data-cb-btn-hover="lift"]:hover{transform:translateY(-2px);}
+</style>
+<script>
+(function(){
+    var els = document.querySelectorAll('[data-cb-anim]');
+    if (!els.length) return;
+    function show(el){
+        var d = parseInt(el.getAttribute('data-cb-anim-duration'), 10) || 600;
+        var dl = parseInt(el.getAttribute('data-cb-anim-delay'), 10) || 0;
+        el.style.transitionDuration = d + 'ms';
+        el.style.transitionDelay = dl + 'ms';
+        el.classList.add('cb-anim-in');
+    }
+    if (!('IntersectionObserver' in window)) {
+        els.forEach(function(el){ show(el); });
+        return;
+    }
+    var io = new IntersectionObserver(function(entries){
+        entries.forEach(function(en){
+            if (en.isIntersecting) { show(en.target); io.unobserve(en.target); }
+        });
+    }, {threshold: 0.12});
+    els.forEach(function(el){ io.observe(el); });
 })();
 </script>"""
 
@@ -728,17 +1279,78 @@ PRODUCTS_HYDRATOR = """<script>
 </script>"""
 
 
+def _needs_assets(block):
+    """Нужны ли странице анимационные ассеты (классы из ANIMATIONS_ASSETS)."""
+    if not isinstance(block, dict):
+        return False
+    if block.get('hidden') is True:
+        return True
+    if block.get('container') == 'full' or block.get('bg_parallax') is True:
+        return True
+    fx = block.get('effects')
+    if isinstance(fx, dict):
+        if str(fx.get('anim') or 'none') in _ANIMS:
+            return True
+        if fx.get('sticky') is True or str(fx.get('hide_on') or 'none') in ('mobile', 'desktop'):
+            return True
+        if isinstance(fx.get('decor_top'), dict) or isinstance(fx.get('decor_bottom'), dict):
+            return True
+    cfg = block.get('button_style')
+    if isinstance(cfg, dict) and str(cfg.get('hover') or 'none') in ('darken', 'lift'):
+        return True
+    if block.get('type') == 'zero':
+        for el in _parse_items(block.get('elements')):
+            props = el.get('props')
+            if isinstance(props, dict):
+                cfg = props.get('button_style')
+                if isinstance(cfg, dict) and str(cfg.get('hover') or 'none') in ('darken', 'lift'):
+                    return True
+    return False
+
+
+def _collect_google_fonts(blocks):
+    """Уникальные font_google семейства всех блоков страницы (белый список)."""
+    found = set()
+
+    def walk(node):
+        if isinstance(node, dict):
+            fg = node.get('font_google')
+            if isinstance(fg, str) and fg.strip() in _GOOGLE_FONTS_SET:
+                found.add(fg.strip())
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(blocks)
+    return sorted(found)
+
+
+def _page_extras(blocks):
+    """Гидраторы, анимационные ассеты и Google Fonts для набора блоков."""
+    out = ''
+    if any(isinstance(b, dict) and b.get('type') == 'products' for b in blocks):
+        out += '\n' + PRODUCTS_HYDRATOR
+    if any(isinstance(b, dict) and b.get('type') == 'timer' for b in blocks):
+        out += '\n' + TIMER_HYDRATOR
+    if any(_needs_assets(b) for b in blocks):
+        out += '\n' + ANIMATIONS_ASSETS
+    families = _collect_google_fonts(blocks)
+    if families:
+        fam = '&family='.join(quote(f, safe='') for f in families)
+        out += (f'\n<link rel="stylesheet" href="https://fonts.googleapis.com/'
+                f'css2?family={fam}" data-cb-fonts="1">')
+    return out
+
+
 def render_blocks(blocks):
     """Превратить массив блоков в HTML для page.content_html."""
     if not isinstance(blocks, list):
         return ''
     parts = [render_block(b) for b in blocks if isinstance(b, dict)]
     html_out = '\n'.join(p for p in parts if p)
-    if any(isinstance(b, dict) and b.get('type') == 'products' for b in blocks):
-        html_out += '\n' + PRODUCTS_HYDRATOR
-    if any(isinstance(b, dict) and b.get('type') == 'timer' for b in blocks):
-        html_out += '\n' + TIMER_HYDRATOR
-    return html_out
+    return html_out + _page_extras(blocks)
 
 
 def render_blocks_marked(blocks):
@@ -757,8 +1369,4 @@ def render_blocks_marked(blocks):
         if html:
             parts.append(f'<!--blk:{i}-->\n{html}\n<!--/blk-->')
     out = '\n'.join(parts)
-    if any(isinstance(b, dict) and b.get('type') == 'products' for b in blocks):
-        out += '\n' + PRODUCTS_HYDRATOR
-    if any(isinstance(b, dict) and b.get('type') == 'timer' for b in blocks):
-        out += '\n' + TIMER_HYDRATOR
-    return out
+    return out + _page_extras(blocks)
