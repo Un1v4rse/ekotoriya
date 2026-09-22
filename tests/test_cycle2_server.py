@@ -469,3 +469,35 @@ def test_fonts_endpoint(admin_client):
     fonts = admin_client.get('/admin/api/fonts?q=rob').get_json()['fonts']
     assert any(f['family'] == 'Roboto' for f in fonts)
     assert all('rob' in f['family'].lower() for f in fonts)
+
+
+def test_delete_page_cleans_db_rows_and_versions(admin_client):
+    """delete-page удаляет БД-запись страницы и её версии: recreate того же
+    slug не должен подхватывать старые draft/published_blocks (регрессия
+    найдена при живой приёмке цикла 2)."""
+    r = admin_client.post('/admin/api/page-templates/create',
+                          json={'template_id': 'landing', 'slug': 'test-del', 'title': 'D'},
+                          headers=csrf())
+    assert r.get_json()['success']
+    admin_client.post('/admin/api/page-publish', json={'slug': 'test-del'}, headers=csrf())
+    with app_module.app.app_context():
+        assert db.session.query(Page).filter_by(slug='test-del').first() is not None
+        assert db.session.query(PageVersion).filter_by(page_slug='test-del').count() >= 1
+
+    r = admin_client.post('/admin/api/delete-page',
+                          json={'slug': 'test-del', 'remove_template': True}, headers=csrf())
+    assert r.get_json()['success']
+    with app_module.app.app_context():
+        assert db.session.query(Page).filter_by(slug='test-del').first() is None
+        assert db.session.query(PageVersion).filter_by(page_slug='test-del').count() == 0
+
+    # recreate с тем же slug — чистый лист
+    r = admin_client.post('/admin/api/page-templates/create',
+                          json={'template_id': 'showcase', 'slug': 'test-del', 'title': 'D2'},
+                          headers=csrf())
+    assert r.get_json()['success']
+    d = admin_client.get('/admin/api/page-blocks?slug=test-del').get_json()
+    assert not d.get('legacy')
+    assert all('VERSION2' not in str(b) for b in d['blocks'])
+    admin_client.post('/admin/api/delete-page',
+                      json={'slug': 'test-del', 'remove_template': True}, headers=csrf())

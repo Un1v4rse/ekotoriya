@@ -2174,6 +2174,15 @@ def admin_delete_page():
         return jsonify({'success': False, 'error': 'Страница не найдена'}), 404
     content['pages'] = [p for p in content['pages'] if p['slug'] != slug]
     save_content(content)
+    # Чистим и БД-запись страницы: иначе recreate того же slug подхватывает
+    # старые draft_blocks/published_blocks и версии (приёмка цикла 2).
+    from models import Page, PageVersion
+    try:
+        db.session.query(PageVersion).filter_by(page_slug=slug).delete()
+        db.session.query(Page).filter_by(slug=slug).delete()
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
     invalidate_site_cache()
     template_path = BASE_DIR / 'templates' / page.get('template', '')
     try:
