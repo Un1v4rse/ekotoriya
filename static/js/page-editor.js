@@ -311,12 +311,22 @@
     let selectedIdx = -1;
     let dirty = false;
     let contentEl = null;
-    let canvasWrap = null;
+    let workspaceEl = null;          // #pe-workspace — flex-строка: панели + холст
+    let canvasArea = null;           // #pe-canvas-area — прокручиваемый холст
+    let scaleViewport = null;        // #pe-scale-viewport — обрезает масштабированную страницу
+    let scaleBox = null;             // #pe-scale-box — обёртка страницы под transform: scale()
     let serverUpdatedAt = '';        // защита от конфликтов (409)
     let draftSavedAt = '';           // saved_at последнего черновика
     let publishedAt = '';            // published_at/updated_at опубликованной версии
     const openedAt = Date.now();
     let device = 'desktop';          // desktop 1200 / tablet 768 / mobile 360
+    const DEVICE_WIDTHS = {desktop: 1200, tablet: 768, mobile: 360};
+    let pageWidth = DEVICE_WIDTHS[device];   // ширина страницы в обёртке (px)
+    let scaleCurrent = 1;            // применённый масштаб холста
+    let zoomMode = 'fit';            // 'fit' (по ширине) | число 0.5–1 (ручной zoom)
+    let fullwidth = false;           // режим «Во всю ширину» (без масштаба)
+    let leftCollapsed = false;       // свёрнута левая панель
+    let rightCollapsed = false;      // свёрнута правая панель (на <1440px — оверлей закрыт)
     let pendingInsert = null;        // индекс вставки после клика «+ Добавить блок»
     let fontsCache = null;           // кэш /admin/api/fonts
     let activeTab = 'content';
@@ -340,11 +350,13 @@
         '<button type="button" id="pe-btn-redo" class="pe-tb-icon" title="Повторить (Ctrl+Shift+Z)" disabled>↷</button>' +
         '</span>' +
         '<span class="pe-save-indicator" id="pe-save-indicator" title="Состояние сохранения">Сохранено</span>' +
-        '<span class="pe-device-switch" id="pe-device-switch" title="Ширина холста (на рендер не влияет)">' +
+        '<span class="pe-device-switch" id="pe-device-switch" title="Ширина страницы (на рендер не влияет)">' +
         '<button type="button" data-dev="desktop" class="pe-dev-active" title="Desktop 1200px">🖥 Desktop</button>' +
         '<button type="button" data-dev="tablet" title="Tablet 768px">📱 Tablet</button>' +
         '<button type="button" data-dev="mobile" title="Mobile 360px">📱 Mobile</button>' +
         '</span>' +
+        '<button type="button" id="pe-btn-zoom" class="pe-tb-icon" title="Масштаб холста (Ctrl + колесо — зум 50–100%). Клик — по ширине">100%</button>' +
+        '<button type="button" id="pe-btn-fullwidth" title="Во всю ширину: растянуть страницу на весь холст без масштаба">⇤⇥</button>' +
         '<span class="pe-top-spacer"></span>' +
         '<button type="button" id="pe-btn-pagesettings" title="SEO и настройки страницы">Настройки страницы</button>' +
         '<button type="button" id="pe-btn-versions" title="Версии и снапшоты страницы">Версии</button>' +
@@ -357,6 +369,8 @@
     // Левая панель: библиотека блоков + структура страницы
     const leftPanel = el('div', '', {id: 'pe-left'});
     leftPanel.innerHTML =
+        '<div class="pe-panel-topbar"><span class="pe-panel-caption">Блоки и структура</span>' +
+        '<button type="button" id="pe-left-toggle" class="pe-panel-toggle" title="Свернуть панель — холст станет шире">◀</button></div>' +
         '<div class="pe-panel-section">' +
         '<div class="pe-panel-head">Библиотека блоков</div>' +
         '<input type="text" id="pe-lib-search" placeholder="Поиск блока…" title="Поиск по названию блока">' +
@@ -367,12 +381,36 @@
         '<div id="pe-structure-list"></div>' +
         '</div>';
 
+    // Узкая полоса-«рейка» для разворачивания левой панели, когда она свёрнута
+    const leftRail = el('div', '', {id: 'pe-left-rail'});
+    leftRail.innerHTML = '<button type="button" id="pe-left-open" class="pe-rail-btn" title="Показать панель блоков">▶</button>';
+
     // Правая панель: настройки выбранного блока
     const rightPanel = el('div', '', {id: 'pe-right'});
     rightPanel.innerHTML =
-        '<div class="pe-panel-head" id="pe-right-title">Настройки блока</div>' +
+        '<div class="pe-panel-topbar"><span class="pe-panel-caption" id="pe-right-title">Настройки блока</span>' +
+        '<button type="button" id="pe-right-toggle" class="pe-panel-toggle" title="Свернуть панель — холст станет шире">▶</button></div>' +
         '<div id="pe-right-tabs"></div>' +
         '<div id="pe-right-body" class="pe-panel-grow"></div>';
+
+    // Узкая полоса-«рейка» для разворачивания правой панели, когда она свёрнута
+    const rightRail = el('div', '', {id: 'pe-right-rail'});
+    rightRail.innerHTML = '<button type="button" id="pe-right-open" class="pe-rail-btn" title="Показать настройки блока">◀</button>';
+
+    // Каркас холста: workspace (flex-строка) → canvasArea (прокрутка) → viewport → scaleBox (страница)
+    workspaceEl = el('div', '', {id: 'pe-workspace'});
+    canvasArea = el('div', '', {id: 'pe-canvas-area'});
+    scaleViewport = el('div', '', {id: 'pe-scale-viewport'});
+    scaleBox = el('div', '', {id: 'pe-scale-box'});
+    scaleViewport.appendChild(scaleBox);
+
+    // Подложка правой панели-оверлея (узкие окна <1440px): клик/Esc закрывает панель
+    const rightBackdrop = el('div', '', {id: 'pe-right-backdrop'});
+
+    // Подсказка, когда холст уже 360px
+    const canvasHint = el('div', '', {id: 'pe-canvas-hint'});
+    canvasHint.textContent = 'Холст слишком узкий — сверните панели, чтобы редактировать страницу.';
+    canvasHint.style.display = 'none';
 
     // Оверлеи холста (механика перенесена из редактора цикла 1)
     const highlight = el('div', 'pe-highlight');
@@ -413,8 +451,19 @@
         if (editorBooted) return;
         editorBooted = true;
         document.body.classList.add('pe-active');
-        document.body.append(topbar, leftPanel, rightPanel, highlight, dropLine, addBtn, addBtnBridge,
-            badgesLayer, emptyState, legacyBanner, toastBox, mediaOverlay, versionsOverlay, pageSettingsOverlay);
+        // Переносим весь контент body (реальная страница сайта: шапка, #content,
+        // подвал, скрипты) в масштабируемую обёртку — до добавления нод редактора.
+        [...document.body.childNodes].forEach(n => scaleBox.appendChild(n));
+        scaleBox.appendChild(emptyState);
+        workspaceEl.append(leftRail, leftPanel, canvasArea, rightRail, rightPanel);
+        canvasArea.append(legacyBanner, scaleViewport, badgesLayer, highlight, dropLine,
+            addBtn, addBtnBridge, rightBackdrop, canvasHint);
+        document.body.append(topbar, workspaceEl, mediaOverlay, versionsOverlay,
+            pageSettingsOverlay, toastBox);
+        restoreLayoutState();
+        bindPanelControls();
+        bindZoomControls();
+        observeCanvas();
         $('pe-lib-search').addEventListener('input', debounce(renderLibrary, 200));
         bindTopbar();
         bindCanvasEvents();
@@ -454,7 +503,7 @@
 
         topbar.querySelector('.pe-title').textContent = '🛠 ' + (pageMeta.h1 || pageMeta.title || pageMeta.url || SLUG);
         legacyBanner.style.display = hasLegacy ? 'block' : 'none';
-        setupCanvasWrap();
+        setupCanvas();
         buildMap();
         renderLibrary();
         renderStructure();
@@ -462,23 +511,148 @@
         setSaveState('saved');
     }
 
-    // Обёртка холста: центрированная колонка заданной ширины (переключатель устройств)
-    function setupCanvasWrap() {
+    // Холст: контент уже перенесён в #pe-scale-box на boot(); здесь — DnD-библиотеки
+    // и применение ширины устройства (пересчёт масштаба).
+    function setupCanvas() {
         contentEl = document.getElementById('content');
         if (!contentEl) return;
-        if (!canvasWrap) {
-            canvasWrap = el('div', 'pe-canvas-wrap');
-            contentEl.parentNode.insertBefore(canvasWrap, contentEl);
-            canvasWrap.appendChild(emptyState);
-            canvasWrap.appendChild(contentEl);
-            bindLibraryDnD();
-        }
+        bindLibraryDnD();
         applyDevice();
     }
     function applyDevice() {
-        if (!canvasWrap) return;
-        canvasWrap.className = 'pe-canvas-wrap pe-dev-' + device;
+        pageWidth = DEVICE_WIDTHS[device] || DEVICE_WIDTHS.desktop;
         if (zero.active) rebuildZeroOverlay();
+        scheduleScaleUpdate();
+    }
+
+    /* ==================== Панели: сворачивание и оверлей (CN-L 1.1/1.5) ==================== */
+    // Ширина окна < 1440px — «узкий режим»: правая панель открывается оверлеем
+    // поверх холста, левая по умолчанию свёрнута (если пользователь сам не менял).
+    function narrowMode() { return window.innerWidth < 1440; }
+
+    function applyPanelState() {
+        document.body.classList.toggle('pe-left-collapsed', leftCollapsed);
+        document.body.classList.toggle('pe-right-collapsed', rightCollapsed);
+        document.body.classList.toggle('pe-right-overlay', narrowMode() && !rightCollapsed);
+    }
+
+    function setLeftCollapsed(v, user) {
+        leftCollapsed = !!v;
+        if (user) localStorage.setItem('pe_left_collapsed', leftCollapsed ? '1' : '0');
+        applyPanelState();
+        scheduleScaleUpdate();
+    }
+    function setRightCollapsed(v, user) {
+        rightCollapsed = !!v;
+        if (user) localStorage.setItem('pe_right_collapsed', rightCollapsed ? '1' : '0');
+        applyPanelState();
+        scheduleScaleUpdate();
+    }
+
+    function restoreLayoutState() {
+        const narrow = narrowMode();
+        const leftSet = localStorage.getItem('pe_left_collapsed') !== null;
+        const rightSet = localStorage.getItem('pe_right_collapsed') !== null;
+        leftCollapsed = leftSet ? localStorage.getItem('pe_left_collapsed') === '1' : narrow;
+        rightCollapsed = rightSet ? localStorage.getItem('pe_right_collapsed') === '1' : narrow;
+        const z = parseFloat(localStorage.getItem('pe_zoom'));
+        zoomMode = z >= 0.5 && z <= 1 ? z : 'fit';
+        fullwidth = localStorage.getItem('pe_fullwidth') === '1';
+        applyPanelState();
+        updateFullwidthButton();
+    }
+
+    function bindPanelControls() {
+        $('pe-left-toggle').addEventListener('click', () => setLeftCollapsed(true, true));
+        $('pe-left-open').addEventListener('click', () => setLeftCollapsed(false, true));
+        $('pe-right-toggle').addEventListener('click', () => setRightCollapsed(true, true));
+        $('pe-right-open').addEventListener('click', () => setRightCollapsed(false, true));
+        rightBackdrop.addEventListener('click', () => setRightCollapsed(true));
+    }
+
+    /* ==================== Масштаб холста: scale-to-fit, zoom, «во всю ширину» (CN-L 1.2–1.4) ==================== */
+    function computeScale() {
+        const cw = canvasArea ? Math.max(canvasArea.clientWidth, 1) : window.innerWidth;
+        if (fullwidth) return {s: 1, w: cw};
+        const fit = Math.min(1, cw / pageWidth);
+        const s = zoomMode === 'fit' ? fit : Math.min(1, Math.max(0.5, zoomMode));
+        return {s, w: pageWidth};
+    }
+
+    function applyScale() {
+        if (!canvasArea || !scaleBox) return;
+        const cs = computeScale();
+        scaleCurrent = cs.s;
+        scaleBox.style.width = cs.w + 'px';
+        // Центрирование: CSS держит left:50%, компенсируем половиной ширины.
+        // Работает и когда страница шире холста (масштаб < 100%).
+        scaleBox.style.marginLeft = (-cs.w / 2) + 'px';
+        scaleBox.style.transform = cs.s >= 0.999 ? 'none' : 'scale(' + cs.s + ')';
+        // Компенсация высоты: layout-высота контента (transform на offsetHeight
+        // не влияет) × масштаб = визуальная высота страницы на холсте.
+        const h = scaleBox.offsetHeight;
+        scaleViewport.style.height = Math.max(1, Math.round(h * cs.s)) + 'px';
+        updateZoomButton();
+        checkCanvasWidth();
+        updateOverlayPositions();
+    }
+    const scheduleScaleUpdate = debounce(applyScale, 100);
+
+    function checkCanvasWidth() {
+        if (!canvasArea || !canvasHint) return;
+        canvasHint.style.display = canvasArea.clientWidth < 360 ? 'block' : 'none';
+    }
+
+    function updateZoomButton() {
+        const b = $('pe-btn-zoom');
+        if (b) b.textContent = Math.round(scaleCurrent * 100) + '%';
+    }
+    function setZoom(z) {
+        zoomMode = Math.min(1, Math.max(0.5, Math.round(z * 10) / 10));
+        localStorage.setItem('pe_zoom', String(zoomMode));
+        fullwidth = false;
+        updateFullwidthButton();
+        applyScale();
+    }
+    function resetZoom() {
+        zoomMode = 'fit';
+        localStorage.removeItem('pe_zoom');
+        fullwidth = false;
+        updateFullwidthButton();
+        applyScale();
+    }
+    function updateFullwidthButton() {
+        const b = $('pe-btn-fullwidth');
+        if (b) b.classList.toggle('pe-on', fullwidth);
+    }
+    function setFullwidth(v) {
+        fullwidth = !!v;
+        localStorage.setItem('pe_fullwidth', fullwidth ? '1' : '');
+        if (fullwidth) { zoomMode = 'fit'; localStorage.removeItem('pe_zoom'); }
+        updateFullwidthButton();
+        applyScale();
+    }
+
+    function bindZoomControls() {
+        $('pe-btn-zoom').addEventListener('click', resetZoom);
+        $('pe-btn-fullwidth').addEventListener('click', () => setFullwidth(!fullwidth));
+    }
+
+    // Пересчёт масштаба при ресайзе окна/панелей и изменении высоты контента страницы.
+    function observeCanvas() {
+        if (window.ResizeObserver) {
+            const roArea = new ResizeObserver(() => scheduleScaleUpdate());
+            roArea.observe(canvasArea);
+            const roBox = new ResizeObserver(() => {
+                // Высота контента изменилась (рендер блоков, загрузка картинок) —
+                // обновляем компенсированную высоту вьюпорта без полного пересчёта.
+                if (!scaleBox) return;
+                const h = scaleBox.offsetHeight;
+                scaleViewport.style.height = Math.max(1, Math.round(h * scaleCurrent)) + 'px';
+            });
+            roBox.observe(scaleBox);
+        }
+        window.addEventListener('resize', () => { applyPanelState(); scheduleScaleUpdate(); });
     }
 
     /* ============================ Топбар: события ============================ */
@@ -488,7 +662,7 @@
         $('pe-btn-exit').addEventListener('click', exitEditor);
         $('pe-btn-undo').addEventListener('click', undo);
         $('pe-btn-redo').addEventListener('click', redo);
-        $('pe-btn-menu').addEventListener('click', () => document.body.classList.toggle('pe-left-open'));
+        $('pe-btn-menu').addEventListener('click', () => setLeftCollapsed(!leftCollapsed, true));
         $('pe-btn-pagesettings').addEventListener('click', openPageSettings);
         $('pe-btn-versions').addEventListener('click', openVersions);
         $('pe-btn-preview').addEventListener('click', openPreview);
@@ -627,17 +801,26 @@
 
     function entryAt(idx) { return blockMap.find(e => e.i === idx); }
 
+    // Координаты в «документно-визуальной» системе холста: getBoundingClientRect
+    // даёт визуальные координаты (с учётом transform: scale), мы переводим их
+    // в систему оверлеев #pe-canvas-area (absolute-элементы скроллятся вместе
+    // с содержимым: +scrollTop по вертикали, сдвиг на areaRect по горизонтали).
+    // clientX/clientY мыши сравниваются с этими же визуальными координатами
+    // через canvasArea.getBoundingClientRect() — обе системы визуальные,
+    // поэтому scale делить НЕ нужно (сокращается).
     function entryRect(idx) {
         const entry = entryAt(idx);
-        if (!entry || !entry.elements.length) return null;
+        if (!entry || !entry.elements.length || !canvasArea) return null;
         const first = entry.elements[0].getBoundingClientRect();
         const last = entry.elements[entry.elements.length - 1].getBoundingClientRect();
-        const cr = contentEl ? contentEl.getBoundingClientRect() : {left: 0, right: window.innerWidth};
+        const ar = canvasArea.getBoundingClientRect();
+        const st = canvasArea.scrollTop;
+        const cr = contentEl ? contentEl.getBoundingClientRect() : {left: ar.left, right: ar.right};
         return {
-            top: first.top + window.scrollY,
-            bottom: last.bottom + window.scrollY,
-            left: Math.min(first.left, cr.left) + window.scrollX,
-            right: Math.max(first.right, cr.right) + window.scrollX,
+            top: first.top - ar.top + st,
+            bottom: last.bottom - ar.top + st,
+            left: Math.min(first.left, cr.left) - ar.left,
+            right: Math.max(first.right, cr.right) - ar.left,
         };
     }
 
@@ -698,13 +881,23 @@
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('scroll', updateOverlayPositions, {passive: true});
         window.addEventListener('resize', updateOverlayPositions);
+        // Скролл теперь живёт внутри холста (#pe-canvas-area), а не в окне.
+        canvasArea.addEventListener('scroll', updateOverlayPositions, {passive: true});
+        // Ctrl + колесо над холстом — ручной зум 50–100% (шаг 10).
+        canvasArea.addEventListener('wheel', e => {
+            if (!e.ctrlKey) return;
+            e.preventDefault();
+            const cur = zoomMode === 'fit' ? computeScale().s : zoomMode;
+            setZoom(cur + (e.deltaY < 0 ? 0.1 : -0.1));
+        }, {passive: false});
     }
 
     function onMouseMove(e) {
         if (dragState.active || textEdit.active || zero.active) return;
         if (addBtnHover) return;
         if (e.target && e.target.closest && e.target.closest(
-            '#pe-topbar,#pe-left,#pe-right,.pe-toolbar,.pe-addbtn,#pe-addbtn-bridge,.pe-modal-overlay,.pe-zero-layer')) return;
+            '#pe-topbar,#pe-left,#pe-right,#pe-left-rail,#pe-right-rail,#pe-canvas-hint,#pe-right-backdrop,' +
+            '.pe-toolbar,.pe-addbtn,#pe-addbtn-bridge,.pe-modal-overlay,.pe-zero-layer')) return;
         const idx = blockIndexFromPoint(e.clientX, e.clientY);
         if (idx !== hoverIdx) {
             hoverIdx = idx;
@@ -810,13 +1003,15 @@
         document.addEventListener('mouseup', onDragEnd);
     }
 
-    function dropIndexForY(y) {
+    // clientY (визуальная система окна) → «документно-визуальная» система холста.
+    function dropIndexForY(clientY) {
+        if (!canvasArea) return {index: 0, before: true};
+        const ar = canvasArea.getBoundingClientRect();
+        const y = clientY - ar.top + canvasArea.scrollTop;
         for (const entry of blockMap) {
             const r = entryRect(entry.i);
             if (!r) continue;
-            const topView = r.top - window.scrollY;
-            const bottomView = r.bottom - window.scrollY;
-            if (y < bottomView) return {index: entry.i, before: y < (topView + bottomView) / 2};
+            if (y < r.bottom) return {index: entry.i, before: y < (r.top + r.bottom) / 2};
         }
         const last = blockMap[blockMap.length - 1];
         return last ? {index: last.i, before: false} : {index: 0, before: true};
@@ -830,9 +1025,10 @@
         if (!r) return;
         const y = target.before ? r.top : r.bottom;
         const cr = contentEl ? contentEl.getBoundingClientRect() : {left: 0, width: window.innerWidth};
+        const ar = canvasArea ? canvasArea.getBoundingClientRect() : {left: 0};
         dropLine.style.display = 'block';
         dropLine.style.top = y + 'px';
-        dropLine.style.left = (cr.left + window.scrollX) + 'px';
+        dropLine.style.left = (cr.left - ar.left) + 'px';
         dropLine.style.width = cr.width + 'px';
         dragState.target = target;
     }
@@ -1076,7 +1272,8 @@
     // Кнопка «+ Добавить блок»: не модалка, а подсветка левой панели + фокус в поиск.
     function armInsert(targetIdx) {
         pendingInsert = insertIndexAfter(targetIdx);
-        document.body.classList.add('pe-left-open', 'pe-lib-armed');
+        setLeftCollapsed(false);
+        document.body.classList.add('pe-lib-armed');
         const search = $('pe-lib-search');
         if (search) { search.focus(); search.select(); }
         toast('Выберите блок в библиотеке слева — он будет добавлен на это место');
@@ -1097,10 +1294,12 @@
             if (!target) { dropLine.style.display = 'none'; return; }
             const r = entryRect(target.index);
             const cr = contentEl.getBoundingClientRect();
-            const y = r ? (target.before ? r.top : r.bottom) : (cr.top + cr.height / 2 + window.scrollY);
+            const ar = canvasArea ? canvasArea.getBoundingClientRect() : {left: 0, top: 0};
+            const y = r ? (target.before ? r.top : r.bottom)
+                        : (cr.top - ar.top + (canvasArea ? canvasArea.scrollTop : 0) + cr.height / 2);
             dropLine.style.display = 'block';
             dropLine.style.top = y + 'px';
-            dropLine.style.left = (cr.left + window.scrollX) + 'px';
+            dropLine.style.left = (cr.left - ar.left) + 'px';
             dropLine.style.width = cr.width + 'px';
             contentEl.dataset.dropAt = JSON.stringify(target);
         });
@@ -1164,9 +1363,10 @@
                 if (act === 'hide') { toggleHidden(idx); return; }
                 select(idx);
                 const entry = entryAt(idx);
-                if (entry && entry.elements.length) {
-                    const top = entry.elements[0].getBoundingClientRect().top + window.scrollY - 70;
-                    window.scrollTo({top, behavior: 'smooth'});
+                if (entry && entry.elements.length && canvasArea) {
+                    const ar = canvasArea.getBoundingClientRect();
+                    const top = entry.elements[0].getBoundingClientRect().top - ar.top + canvasArea.scrollTop - 70;
+                    canvasArea.scrollTo({top, behavior: 'smooth'});
                 }
             });
             item.addEventListener('dblclick', e => {
@@ -2417,7 +2617,8 @@
     document.addEventListener('click', onDocClick, true);
     function onDocClick(e) {
         const inEditorUI = e.target.closest &&
-            e.target.closest('#pe-topbar,#pe-left,#pe-right,.pe-toolbar,.pe-addbtn,#pe-addbtn-bridge,' +
+            e.target.closest('#pe-topbar,#pe-left,#pe-right,#pe-left-rail,#pe-right-rail,#pe-canvas-hint,#pe-right-backdrop,' +
+                '.pe-toolbar,.pe-addbtn,#pe-addbtn-bridge,' +
                 '.pe-modal-overlay,.pe-textbar,#pe-legacy-banner,.pe-toasts,.pe-zero-float,.pe-zero-handles');
         if (inEditorUI) return;
         if (zero.active) return;   // Zero-оверлей обрабатывает клики сам
@@ -2746,6 +2947,7 @@
         if (e.key === 'Escape') {
             if (textEdit.active) { finishTextEdit(true); return; }
             if (zero.active) { closeZero(); return; }
+            if (document.body.classList.contains('pe-right-overlay')) { setRightCollapsed(true); return; }
             if (mediaOverlay.style.display !== 'none') { mediaOverlay.style.display = 'none'; if (mediaResolve) { mediaResolve(null); mediaResolve = null; } return; }
             if (versionsOverlay.style.display !== 'none') { versionsOverlay.style.display = 'none'; return; }
             if (pageSettingsOverlay.style.display !== 'none') { pageSettingsOverlay.style.display = 'none'; return; }

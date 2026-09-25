@@ -17,19 +17,29 @@
     --pe-danger: #d9534f;
     --pe-ok: #5cb85c;
     --pe-topbar-h: 48px;
-    --pe-left-w: 300px;
+    --pe-left-w: 280px;
     --pe-right-w: 340px;
+    --pe-rail-w: 26px;
 }
 
 /* ---------------- Базовые состояния body ---------------- */
-body.pe-active { padding-top: var(--pe-topbar-h); }
+/* body реальной страницы превращаем в flex-колонку редактора:
+   сверху топбар, ниже — workspace с панелями и холстом. */
+body.pe-active {
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
 #pe-badges { position: absolute; top: 0; left: 0; pointer-events: none; }
 #pe-badges .pe-badge { pointer-events: auto; }
 
 /* ---------------- Верхняя панель ---------------- */
 #pe-topbar {
-    position: fixed;
-    top: 0; left: 0; right: 0;
+    position: relative;
+    flex: 0 0 auto;
     height: var(--pe-topbar-h);
     z-index: 100000;
     background: var(--pe-bg);
@@ -68,6 +78,7 @@ body.pe-active { padding-top: var(--pe-topbar-h); }
 #pe-topbar button.pe-tb-icon { padding: 0.32rem 0.55rem; }
 #pe-topbar button:disabled { opacity: 0.4; cursor: default; }
 #pe-topbar button:disabled:hover { background: var(--pe-panel-2); }
+#pe-topbar button.pe-on { background: var(--pe-accent); border-color: var(--pe-accent); color: #fff; }
 .pe-top-group { display: inline-flex; gap: 2px; }
 .pe-top-spacer { flex: 1; }
 .pe-save-indicator { color: var(--pe-text-dim); font-size: 0.78rem; min-width: 110px; text-align: center; }
@@ -100,21 +111,57 @@ body.pe-active { padding-top: var(--pe-topbar-h); }
 .pe-badge-status.pe-badge-draft { background: #7a5c00; color: #ffe9ad; }
 .pe-badge-status.pe-badge-published { background: #1f5426; color: #b6e6bd; }
 
-/* ---------------- Обёртка холста (переключатель устройств) ---------------- */
-.pe-canvas-wrap {
-    margin-left: var(--pe-left-w);
-    margin-right: var(--pe-right-w);
-    transition: margin 0.2s ease;
-    min-height: 60vh;
+/* ---------------- Workspace: панели + холст (flex-строка, CN-L 1.1) ---------------- */
+#pe-workspace {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    position: relative;
 }
-.pe-canvas-wrap #content {
-    margin: 0 auto;
-    transition: max-width 0.2s ease;
+
+/* Холст: центральная колонка, прокрутка строго вертикальная */
+#pe-canvas-area {
+    flex: 1 1 auto;
+    min-width: 0;
+    position: relative;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: #e9e6e0;
+}
+/* Вьюпорт обрезает масштабированную страницу по визуальной высоте (компенсация
+   transform: scale в JS) — без него холст получил бы лишнюю прокрутку. */
+#pe-scale-viewport {
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+}
+/* Обёртка страницы сайта. JS задаёт width (1200/768/360 или ширину холста),
+   margin-left = -width/2 (CSS держит left:50%), transform: scale(). */
+#pe-scale-box {
+    position: relative;
+    left: 50%;
+    top: 0;
+    transform-origin: top center;
     background: #fff;
+    min-height: 100px;
 }
-.pe-canvas-wrap.pe-dev-desktop #content { max-width: 1200px; }
-.pe-canvas-wrap.pe-dev-tablet #content { max-width: 768px; }
-.pe-canvas-wrap.pe-dev-mobile #content { max-width: 360px; }
+
+#pe-canvas-hint {
+    position: absolute;
+    inset: 0;
+    z-index: 99996;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+    background: #e9e6e0;
+    color: #555;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 0.95rem;
+}
 
 .pe-empty-state {
     margin: 2rem auto;
@@ -130,10 +177,7 @@ body.pe-active { padding-top: var(--pe-topbar-h); }
 .pe-empty-state .pe-empty-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: #333; }
 
 #pe-legacy-banner {
-    position: fixed;
-    top: var(--pe-topbar-h);
-    left: var(--pe-left-w);
-    right: var(--pe-right-w);
+    position: relative;
     z-index: 99990;
     background: #7a5c00;
     color: #ffe9ad;
@@ -145,11 +189,9 @@ body.pe-active { padding-top: var(--pe-topbar-h); }
 
 /* ---------------- Левая панель ---------------- */
 #pe-left {
-    position: fixed;
-    top: var(--pe-topbar-h);
-    left: 0;
-    bottom: 0;
+    flex: 0 0 auto;
     width: var(--pe-left-w);
+    min-height: 0;
     z-index: 99999;
     background: var(--pe-bg);
     border-right: 1px solid var(--pe-border);
@@ -157,6 +199,91 @@ body.pe-active { padding-top: var(--pe-topbar-h); }
     flex-direction: column;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     color: var(--pe-text);
+}
+/* Шапка панели с кнопкой-шевроном сворачивания */
+.pe-panel-topbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 0.4rem 0.5rem 0.4rem 0.9rem;
+    border-bottom: 1px solid var(--pe-border);
+}
+.pe-panel-caption {
+    font-weight: 700;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--pe-text-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.pe-panel-toggle {
+    flex: 0 0 auto;
+    border: 1px solid var(--pe-border);
+    background: var(--pe-panel-2);
+    color: var(--pe-text-dim);
+    border-radius: 6px;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    font-size: 0.7rem;
+    line-height: 1;
+}
+.pe-panel-toggle:hover { border-color: var(--pe-accent); color: var(--pe-text); }
+
+/* Узкие рейки-«вкладки» для разворота свёрнутых панелей */
+#pe-left-rail, #pe-right-rail {
+    flex: 0 0 auto;
+    width: var(--pe-rail-w);
+    min-height: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 8px;
+    background: var(--pe-bg);
+    z-index: 99998;
+}
+#pe-left-rail { border-right: 1px solid var(--pe-border); }
+#pe-right-rail { border-left: 1px solid var(--pe-border); }
+body.pe-left-collapsed #pe-left-rail { display: flex; }
+body.pe-right-collapsed #pe-right-rail { display: flex; }
+.pe-rail-btn {
+    border: 1px solid var(--pe-border);
+    background: var(--pe-panel-2);
+    color: var(--pe-text-dim);
+    border-radius: 6px;
+    width: 20px;
+    height: 28px;
+    cursor: pointer;
+    font-size: 0.65rem;
+    line-height: 1;
+    padding: 0;
+}
+.pe-rail-btn:hover { border-color: var(--pe-accent); color: var(--pe-text); }
+
+/* Свёрнутые панели убираются из flex-потока — холст занимает всю ширину */
+body.pe-left-collapsed #pe-left { display: none; }
+body.pe-right-collapsed #pe-right { display: none; }
+
+/* Подложка правой панели-оверлея (узкие окна <1440px) */
+#pe-right-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 99985;
+    display: none;
+    background: rgba(10, 10, 14, 0.45);
+}
+body.pe-right-overlay #pe-right-backdrop { display: block; }
+/* На <1440px открытая правая панель — оверлей поверх холста (не сжимает его) */
+body.pe-right-overlay #pe-right {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    box-shadow: -8px 0 30px rgba(0, 0, 0, 0.45);
 }
 .pe-panel-section { display: flex; flex-direction: column; min-height: 0; }
 .pe-panel-grow { flex: 1; overflow-y: auto; }
@@ -303,11 +430,9 @@ body.pe-lib-armed #pe-left { box-shadow: 0 0 0 2px var(--pe-accent), 0 0 28px rg
 
 /* ---------------- Правая панель ---------------- */
 #pe-right {
-    position: fixed;
-    top: var(--pe-topbar-h);
-    right: 0;
-    bottom: 0;
+    flex: 0 0 auto;
     width: var(--pe-right-w);
+    min-height: 0;
     z-index: 99999;
     background: var(--pe-bg);
     border-left: 1px solid var(--pe-border);
@@ -820,6 +945,8 @@ body.pe-lib-armed #pe-left { box-shadow: 0 0 0 2px var(--pe-accent), 0 0 28px rg
     gap: 8px;
     pointer-events: none;
 }
+body.pe-right-collapsed #pe-toasts,
+body.pe-right-overlay #pe-toasts { right: calc(var(--pe-rail-w) + 14px); }
 .pe-toast {
     background: var(--pe-bg);
     color: var(--pe-text);
@@ -982,15 +1109,13 @@ body.pe-lib-armed #pe-left { box-shadow: 0 0 0 2px var(--pe-accent), 0 0 28px rg
 #pe-left ::-webkit-scrollbar-thumb:hover, #pe-right ::-webkit-scrollbar-thumb:hover { background: var(--pe-accent-dark); }
 #pe-left ::-webkit-scrollbar-track, #pe-right ::-webkit-scrollbar-track { background: transparent; }
 
-/* ---------------- Адаптив панелей ---------------- */
-@media (max-width: 1100px) {
-    #pe-left { transform: translateX(-100%); transition: transform 0.22s ease; }
-    body.pe-left-open #pe-left { transform: translateX(0); }
-    .pe-canvas-wrap { margin-left: 0; }
-    #pe-legacy-banner { left: 0; }
+/* ---------------- Адаптив панелей (CN-L 1.5) ---------------- */
+/* Поведение оверлея на <1440px управляется классом body.pe-right-overlay
+   (ставит JS по ширине окна). Здесь — только мелкие поджимки узких окон. */
+@media (max-width: 1440px) {
+    #pe-topbar .pe-title { max-width: 180px; }
 }
-@media (max-width: 900px) {
-    :root { --pe-right-w: 300px; }
+@media (max-width: 1100px) {
     #pe-topbar .pe-title { display: none; }
     .pe-save-indicator { display: none; }
 }
