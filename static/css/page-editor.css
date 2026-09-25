@@ -1119,3 +1119,32 @@ body.pe-right-overlay #pe-toasts { right: calc(var(--pe-rail-w) + 14px); }
     #pe-topbar .pe-title { display: none; }
     .pe-save-indicator { display: none; }
 }
+
+/* ---------------- Подсказка горячих клавиш (CN-P 3.3) ---------------- */
+#pe-hotkeys {
+    position: fixed; inset: 0; z-index: 6000;
+    background: rgba(20, 21, 25, 0.45);
+    display: flex; align-items: center; justify-content: center;
+}
+.pe-hotkeys-panel {
+    background: #fff; border-radius: 12px; width: 480px; max-width: 92vw;
+    max-height: 80vh; overflow-y: auto; box-shadow: 0 18px 50px rgba(0,0,0,.35);
+    padding: 1rem 1.2rem 1.2rem;
+}
+.pe-hotkeys-head {
+    display: flex; align-items: center; justify-content: space-between;
+    font-weight: 700; font-size: 1rem; margin-bottom: .6rem;
+}
+.pe-hotkeys-close {
+    border: 0; background: var(--pe-panel-2, #eee); border-radius: 8px;
+    width: 28px; height: 28px; cursor: pointer; font-size: .9rem;
+}
+.pe-hotkeys-close:hover { background: var(--pe-danger, #c0392b); color: #fff; }
+.pe-hotkeys-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.pe-hotkeys-table td { padding: .38rem .25rem; border-bottom: 1px solid #eee; vertical-align: top; }
+.pe-hotkeys-table td:first-child { white-space: nowrap; width: 45%; }
+.pe-hotkeys-table kbd {
+    display: inline-block; padding: .1rem .38rem; border: 1px solid #ccc;
+    border-bottom-width: 2px; border-radius: 5px; background: #f6f6f6;
+    font-family: inherit; font-size: .78rem; margin: 0 1px;
+}

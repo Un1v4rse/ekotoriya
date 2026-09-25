@@ -357,6 +357,7 @@
         '</span>' +
         '<button type="button" id="pe-btn-zoom" class="pe-tb-icon" title="Масштаб холста (Ctrl + колесо — зум 50–100%). Клик — по ширине">100%</button>' +
         '<button type="button" id="pe-btn-fullwidth" title="Во всю ширину: растянуть страницу на весь холст без масштаба">⇤⇥</button>' +
+        '<button type="button" id="pe-btn-hotkeys" class="pe-tb-icon" title="Горячие клавиши (?)">?</button>' +
         '<span class="pe-top-spacer"></span>' +
         '<button type="button" id="pe-btn-pagesettings" title="SEO и настройки страницы">Настройки страницы</button>' +
         '<button type="button" id="pe-btn-versions" title="Версии и снапшоты страницы">Версии</button>' +
@@ -469,6 +470,12 @@
         bindCanvasEvents();
         closeRightPanel();
         document.addEventListener('keydown', onKeyDown);
+        // Предупреждение при закрытии вкладки с несохранёнными изменениями (CN-P 3.5)
+        window.addEventListener('beforeunload', e => {
+            if (!dirty) return;
+            e.preventDefault();
+            e.returnValue = '';
+        });
         loadInitial().catch(e => {
             setSaveState('error');
             toast('Ошибка загрузки: ' + e.message, 'error');
@@ -636,6 +643,40 @@
     function bindZoomControls() {
         $('pe-btn-zoom').addEventListener('click', resetZoom);
         $('pe-btn-fullwidth').addEventListener('click', () => setFullwidth(!fullwidth));
+        $('pe-btn-hotkeys').addEventListener('click', toggleHotkeysHelp);
+        // Ctrl + колесо мыши — зум холста 50–100% (CN-L 1.3)
+        document.addEventListener('wheel', e => {
+            if (!e.ctrlKey && !e.metaKey) return;
+            e.preventDefault();
+            setZoom(scaleCurrent + (e.deltaY < 0 ? 0.1 : -0.1));
+        }, {passive: false});
+    }
+
+    /* ==================== Подсказка горячих клавиш (CN-P 3.3) ==================== */
+    let hotkeysHelp = null;
+    function toggleHotkeysHelp() {
+        if (hotkeysHelp) { hotkeysHelp.remove(); hotkeysHelp = null; return; }
+        const wrap = el('div', '', {id: 'pe-hotkeys'});
+        wrap.innerHTML =
+            '<div class="pe-hotkeys-panel"><div class="pe-hotkeys-head">Горячие клавиши' +
+            '<button type="button" class="pe-hotkeys-close" title="Закрыть (Esc)">✕</button></div>' +
+            '<table class="pe-hotkeys-table">' +
+            '<tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Отменить действие</td></tr>' +
+            '<tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Повторить действие</td></tr>' +
+            '<tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Удалить выбранный блок</td></tr>' +
+            '<tr><td><kbd>Esc</kbd></td><td>Снять выделение, закрыть панели</td></tr>' +
+            '<tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Сохранить черновик</td></tr>' +
+            '<tr><td><kbd>Ctrl</kbd>+<kbd>колесо</kbd></td><td>Масштаб холста 50–100%</td></tr>' +
+            '<tr><td><kbd>←↑→↓</kbd></td><td>Двигать элемент в Zero-блоке</td></tr>' +
+            '<tr><td><kbd>Shift</kbd>+<kbd>←↑→↓</kbd></td><td>Изменить размер элемента в Zero-блоке</td></tr>' +
+            '</table></div>';
+        wrap.addEventListener('click', e => { if (e.target === wrap) toggleHotkeysHelp(); });
+        wrap.querySelector('.pe-hotkeys-close').addEventListener('click', () => toggleHotkeysHelp());
+        document.body.appendChild(wrap);
+        hotkeysHelp = wrap;
+    }
+    function closeHotkeysHelp() {
+        if (hotkeysHelp) { hotkeysHelp.remove(); hotkeysHelp = null; }
     }
 
     // Пересчёт масштаба при ресайзе окна/панелей и изменении высоты контента страницы.
@@ -2947,6 +2988,7 @@
         if (e.key === 'Escape') {
             if (textEdit.active) { finishTextEdit(true); return; }
             if (zero.active) { closeZero(); return; }
+            if (hotkeysHelp) { closeHotkeysHelp(); return; }
             if (document.body.classList.contains('pe-right-overlay')) { setRightCollapsed(true); return; }
             if (mediaOverlay.style.display !== 'none') { mediaOverlay.style.display = 'none'; if (mediaResolve) { mediaResolve(null); mediaResolve = null; } return; }
             if (versionsOverlay.style.display !== 'none') { versionsOverlay.style.display = 'none'; return; }
