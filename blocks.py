@@ -723,7 +723,14 @@ def render_block(block):
     if btype == 'image':
         src = (block.get('src') or '').strip()
         if not src:
-            return ''
+            # Заглушка noimage: без неё блок пропадает с холста редактора
+            # (маркер не эмитится) и его невозможно выбрать, чтобы назначить картинку.
+            alt0 = esc(block.get('alt', ''))
+            inner0 = ('<figure style="margin:0;display:inline-block;max-width:100%;">'
+                      '<img src="/static/noimage.png" alt="' + alt0 + '" loading="lazy" '
+                      'style="width:100%;height:auto;border-radius:8px;opacity:.7;"></figure>')
+            align0 = {'left': 'left', 'center': 'center', 'right': 'right'}.get(block.get('align'), 'center')
+            return _block_wrapper(block, inner0, extra_style='margin:1.5rem 0;text-align:' + align0)
         alt = esc(block.get('alt', ''))
         caption = (block.get('caption') or '').strip()
         cap_typo = _typo(block, 'caption')
@@ -1003,7 +1010,13 @@ def render_block(block):
             if src:
                 imgs.append(f'<div class="cb-gallery-item"><img src="{esc(src)}" alt="{esc(it.get("alt") or "")}" loading="lazy"></div>')
         if not imgs:
-            return ''
+            # Заглушка noimage: пустая галерея иначе исчезает с холста редактора.
+            inner = ('<div class="maxwidth-theme"><div class="cb-gallery-grid">'
+                     '<div class="cb-gallery-item"><img src="/static/noimage.png" alt="" loading="lazy" style="opacity:.7"></div>'
+                     '<div class="cb-gallery-item"><img src="/static/noimage.png" alt="" loading="lazy" style="opacity:.7"></div>'
+                     '<div class="cb-gallery-item"><img src="/static/noimage.png" alt="" loading="lazy" style="opacity:.7"></div>'
+                     '</div></div>')
+            return _block_wrapper(block, inner)
         cols = str(block.get('cols', 3))
         cols = cols if cols in ('2', '3', '4') else '3'
         title = (block.get('title') or '').strip()

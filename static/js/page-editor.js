@@ -1165,6 +1165,7 @@
 
     /* ==================== Обновление холста (debounce 400 мс) ==================== */
     let refreshTimer = null;
+    let refreshSeq = 0;
     function scheduleRefresh() {
         clearTimeout(refreshTimer);
         refreshTimer = setTimeout(refreshPage, 400);
@@ -1173,11 +1174,16 @@
     async function refreshPage() {
         if (hasLegacy) { updateOverlayPositions(); return; }
         if (!contentEl) return;
+        // Защита от гонки: при быстрой серии вставок/правок параллельно летит
+        // несколько запросов — DOM обновляет только ответ ПОСЛЕДНЕГО вызова.
+        const seq = ++refreshSeq;
         try {
             const result = await apiPost('/preview-marked', {blocks}).then(r => r.json());
+            if (seq !== refreshSeq) return;
             if (!result.success) { setSaveState('error'); toast('Ошибка рендера: ' + (result.error || ''), 'error'); return; }
             replaceContentFromHtml(result.content_html);
         } catch (e) {
+            if (seq !== refreshSeq) return;
             setSaveState('error');
             toast('Ошибка сети: ' + e.message, 'error');
         }
