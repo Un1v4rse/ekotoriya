@@ -512,6 +512,7 @@
         legacyBanner.style.display = hasLegacy ? 'block' : 'none';
         setupCanvas();
         buildMap();
+        await loadMyBlocks();
         renderLibrary();
         renderStructure();
         startDraftAutosave();
@@ -996,6 +997,7 @@
             '<button type="button" data-act="up" title="Переместить выше">↑</button>' +
             '<button type="button" data-act="down" title="Переместить ниже">↓</button>' +
             (b.legacy ? '' : '<button type="button" data-act="dup" title="Дублировать блок">⧉</button>') +
+            (!b.legacy ? '<button type="button" data-act="save" title="Сохранить в «Мои блоки» — потом можно вставить на любой странице">💾</button>' : '') +
             (!b.legacy && b.type === 'zero' ? '<button type="button" data-act="zero" title="Открыть Zero-редактор">🎯</button>' : '') +
             (!b.legacy ? '<button type="button" data-act="hide" title="Скрыть/показать блок на странице">' + (b.hidden ? '👁' : '🚫') + '</button>' : '') +
             '<button type="button" data-act="del" class="pe-tb-del" title="Удалить блок">🗑</button>';
@@ -1010,6 +1012,7 @@
                 if (act === 'del') removeBlock(idx);
                 if (act === 'hide') toggleHidden(idx);
                 if (act === 'zero') openZero(idx);
+                if (act === 'save') saveToMyBlocks(idx);
             });
         });
         toolbar.querySelector('[data-act="drag"]').addEventListener('mousedown', e => startDrag(idx, e));
@@ -1247,6 +1250,15 @@
         if (!lib) return;
         lib.innerHTML = '';
         const q = ($('pe-lib-search').value || '').trim().toLowerCase();
+        // «Мои блоки» — всегда первой секцией (CN-T9.1)
+        const visibleMy = myBlocks.filter(t => !q || (t.name + ' ' + (t.category || '')).toLowerCase().includes(q));
+        if (visibleMy.length) {
+            const myDet = el('details', 'pe-lib-cat pe-lib-my');
+            myDet.open = true;
+            myDet.innerHTML = '<summary>⭐ Мои блоки<span class="pe-lib-count">' + visibleMy.length + '</span></summary>';
+            visibleMy.forEach(t => myDet.appendChild(renderMyBlockCard(t)));
+            lib.appendChild(myDet);
+        }
         CATEGORIES.forEach(cat => {
             const visible = cat.types.filter(t => {
                 const cfg = BLOCK_TYPES[t];
@@ -1310,6 +1322,57 @@
         insertBlock(block, at);
     }
 
+    /* ==================== «Мои блоки» (CN-T9.1): сохранение и вставка ==================== */
+    let myBlocks = [];
+    async function loadMyBlocks() {
+        try {
+            const d = await apiGet('/block-templates');
+            if (d && d.success && Array.isArray(d.templates)) myBlocks = d.templates;
+        } catch (e) { /* секция просто не покажется */ }
+    }
+    async function saveToMyBlocks(idx) {
+        const b = blocks[idx];
+        if (!b) return;
+        const name = prompt('Название блока в «Мои блоки»:', (b.name || blockLabel(b)).replace(/^[^\s]+\s/, '').slice(0, 100));
+        if (name == null) return;
+        const trimmed = name.trim();
+        if (!trimmed) { toast('Название не может быть пустым', 'error'); return; }
+        try {
+            const resp = await apiPost('/block-templates', {name: trimmed, category: b.type || '', block: b});
+            const r = await resp.json();
+            if (r.success) {
+                toast('Блок сохранён в «Мои блоки» ✓');
+                await loadMyBlocks();
+                renderLibrary();
+            } else {
+                toast('Ошибка: ' + (r.error || 'не удалось сохранить'), 'error');
+            }
+        } catch (e) { toast('Ошибка сети: ' + e.message, 'error'); }
+    }
+    function addSavedBlock(t) {
+        if (!t || typeof t.block !== 'object' || !t.block) { toast('В сохранённом блоке нет данных', 'error'); return; }
+        let at;
+        if (pendingInsert != null) at = pendingInsert;
+        else if (selectedIdx >= 0) at = selectedIdx + 1;
+        else at = blocks.length;
+        disarmInsert();
+        insertBlock(JSON.parse(JSON.stringify(t.block)), at);
+    }
+    function renderMyBlockCard(t) {
+        const card = el('div', 'pe-lib-card pe-lib-my-card');
+        card.draggable = true;
+        card.title = '«' + (t.name || 'Блок') + '» — нажмите, чтобы добавить после выбранного блока; или перетащите на холст';
+        card.innerHTML =
+            '<div class="pe-lib-mock"><div class="gm-bar"></div><div class="gm-bar gm-bar-s"></div></div>' +
+            '<div class="pe-lib-name">⭐ ' + esc(t.name || 'Блок') + '</div>';
+        card.addEventListener('click', () => addSavedBlock(t));
+        card.addEventListener('dragstart', e => {
+            e.dataTransfer.setData('text/pe-block', JSON.stringify({saved: true, block: t.block}));
+            e.dataTransfer.effectAllowed = 'copy';
+        });
+        return card;
+    }
+
     // Кнопка «+ Добавить блок»: не модалка, а подсветка левой панели + фокус в поиск.
     function armInsert(targetIdx) {
         pendingInsert = insertIndexAfter(targetIdx);
@@ -1358,10 +1421,14 @@
             let block;
             try {
                 const spec = JSON.parse(raw);
-                const cfg = BLOCK_TYPES[spec.type];
-                if (!cfg) return;
-                const preset = (cfg.presets || [])[spec.preset || 0];
-                block = preset ? preset.make() : cfg.make();
+                if (spec.saved) {
+                    block = JSON.parse(JSON.stringify(spec.block || {}));
+                } else {
+                    const cfg = BLOCK_TYPES[spec.type];
+                    if (!cfg) return;
+                    const preset = (cfg.presets || [])[spec.preset || 0];
+                    block = preset ? preset.make() : cfg.make();
+                }
             } catch (err) { return; }
             let at;
             if (target) at = target.before ? target.index : target.index + 1;

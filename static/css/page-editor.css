@@ -1148,3 +1148,7 @@ body.pe-right-overlay #pe-toasts { right: calc(var(--pe-rail-w) + 14px); }
     border-bottom-width: 2px; border-radius: 5px; background: #f6f6f6;
     font-family: inherit; font-size: .78rem; margin: 0 1px;
 }
+
+/* ---------------- «Мои блоки» (CN-T9.1) ---------------- */
+.pe-lib-my > summary { color: var(--pe-accent-dark, #7a5c3e); font-weight: 700; }
+.pe-lib-my-card { border-left: 3px solid var(--pe-accent, #a98a63); }
