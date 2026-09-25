@@ -814,7 +814,8 @@ def index():
     page = get_page_by_slug(content, 'index') or get_page_by_url(content, '/')
     if not page:
         return 'Index page not found', 404
-    return render_template(page['template'], **make_context(content, page))
+    html = render_template(page['template'], **make_context(content, page))
+    return Response(_inject_admin_edit_button(html, f"/admin/page/{page['slug']}"))
 
 
 # Fallback routes for legacy /bitrix/... and /upload/... URLs that some
@@ -948,6 +949,8 @@ def basket_page():
                            blocks_html=_system_page_blocks_html('basket', marked=edit_mode))
     if edit_mode:
         html = _inject_editor(html, 'basket')
+    else:
+        html = _inject_admin_edit_button(html, request.path + '?edit=1')
     return Response(html)
 
 
@@ -1067,6 +1070,8 @@ def personal_page():
                            blocks_html=_system_page_blocks_html('personal', marked=edit_mode))
     if edit_mode:
         html = _inject_editor(html, 'personal')
+    else:
+        html = _inject_admin_edit_button(html, request.path + '?edit=1')
     return Response(html)
 
 
@@ -1094,6 +1099,8 @@ def auth_page():
                            blocks_html=_system_page_blocks_html('auth', marked=edit_mode))
     if edit_mode:
         html = _inject_editor(html, 'auth')
+    else:
+        html = _inject_admin_edit_button(html, request.path + '?edit=1')
     return Response(html)
 
 
@@ -1642,12 +1649,14 @@ def page_route(path):
     url = '/' + path + '/'
     page = get_page_by_url(content, url)
     if page and page.get('slug') not in SYSTEM_PAGE_SLUGS:
-        return render_template(page['template'], **make_context(content, page))
+        html = render_template(page['template'], **make_context(content, page))
+        return Response(_inject_admin_edit_button(html, f"/admin/page/{page['slug']}"))
     # Try slug match (double underscores represent slashes)
     slug = path.replace('/', '__').replace('-', '_')
     page = get_page_by_slug(content, slug)
     if page and page.get('slug') not in SYSTEM_PAGE_SLUGS:
-        return render_template(page['template'], **make_context(content, page))
+        html = render_template(page['template'], **make_context(content, page))
+        return Response(_inject_admin_edit_button(html, f"/admin/page/{page['slug']}"))
     # Fallback: if a parent path exists (e.g. product detail link under /catalog/namatrasniki/),
     # redirect to the nearest parent page to avoid 404s from original product cards.
     parts = path.split('/')
@@ -1669,6 +1678,8 @@ def page_not_found(e):
                            blocks_html=_system_page_blocks_html('404', marked=edit_mode))
     if edit_mode:
         html = _inject_editor(html, '404')
+    else:
+        html = _inject_admin_edit_button(html, request.path + '?edit=1')
     return html
 
 
@@ -1706,6 +1717,33 @@ def admin_page_html():
 def admin_full_content():
     """Полный content.json (включая content_html всех страниц) — для бэкапа."""
     return jsonify(load_content())
+
+
+def _inject_admin_edit_button(html, edit_url):
+    """Плавающая кнопка «Редактировать страницу» для залогиненного админа.
+
+    Вставляется только когда админ авторизован (сессионная кука), поэтому
+    обычные посетители получают исходный HTML. HTML-страницы сайта отдаются
+    с Cache-Control: no-store (add_cache_headers), так что закэшированной
+    «без-кнопочной» версии админу не достанется.
+    """
+    if not session.get('admin_user'):
+        return html
+    if not _role_allows(_admin_role(), 'pages'):
+        return html
+    button = (
+        '<style>'
+        '#admin-edit-fab{position:fixed;right:18px;bottom:18px;z-index:99999;'
+        'display:inline-flex;align-items:center;background:#b49d84;color:#fff;'
+        'padding:0.65rem 1.15rem;border-radius:24px;font:600 14px/1 sans-serif;'
+        'text-decoration:none;box-shadow:0 4px 14px rgba(0,0,0,.25);}'
+        '#admin-edit-fab:hover{background:#9a8269;}'
+        '</style>'
+        f'<a id="admin-edit-fab" href="{edit_url}">✏ Редактировать страницу</a>'
+    )
+    if '</body>' in html:
+        return html.replace('</body>', button + '\n</body>', 1)
+    return html + button
 
 
 def _inject_editor(html, slug):

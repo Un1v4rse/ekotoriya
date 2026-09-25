@@ -138,104 +138,12 @@
         .msg { padding: 0.6rem 1rem; border-radius: 7px; display: none; font-size: 0.9rem; }
         .msg.success { background: #e6f4ea; color: var(--ok); border: 1px solid #b7e1c4; }
         .msg.error { background: #fce8e8; color: #a50e0e; border: 1px solid #f5c6c6; }
-        .page-meta { color: #999; font-size: 0.83rem; }
         .preview-img { margin-top: 0.4rem; max-width: 180px; }
         .preview-img img { max-width: 100%; height: auto; border: 1px solid var(--border); border-radius: 6px; }
 
-        /* ================= Редактор страницы (как в Tilda) ================= */
-        .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.8rem; }
-        .page-head h2 { margin: 0 0 0.2rem; border-bottom: 2px solid var(--accent); padding-bottom: 0.4rem; }
-        details.page-params { border: 1px solid var(--border); border-radius: 8px; padding: 0.55rem 0.9rem; margin-bottom: 1rem; background: #fbfbfb; }
-        details.page-params summary { cursor: pointer; font-weight: 600; font-size: 0.88rem; color: #666; }
-        details.page-params .inner { padding-top: 0.8rem; }
+        /* ================= Служебные стили админки ================= */
         details.dev { margin-top: 1rem; border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.9rem; }
         details.dev summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; color: #777; }
-
-        .editor-split { display: grid; grid-template-columns: 430px minmax(0, 1fr); gap: 1.1rem; align-items: start; }
-        .editor-left { min-width: 0; }
-        .editor-right { position: sticky; top: 76px; }
-        .add-block-btn {
-            width: 100%;
-            padding: 0.85rem;
-            border: 2px dashed var(--accent);
-            background: #fbf8f4;
-            color: var(--accent-dark);
-            border-radius: 10px;
-            font-size: 1rem;
-            font-weight: 700;
-            cursor: pointer;
-            margin-bottom: 0.8rem;
-            font-family: inherit;
-        }
-        .add-block-btn:hover { background: var(--accent); color: #fff; border-style: solid; }
-        .preview-bar { display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: #999; padding: 0 0.2rem 0.4rem; }
-        #preview-iframe { width: 100%; height: calc(100vh - 250px); min-height: 500px; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
-
-        .blk-item { border: 1px solid var(--border); border-radius: 9px; margin-bottom: 0.5rem; background: #fff; }
-        .blk-item.dragging { opacity: 0.35; }
-        .blk-item.drop-before { box-shadow: 0 -3px 0 0 var(--accent); }
-        .blk-item.drop-after { box-shadow: 0 3px 0 0 var(--accent); }
-        .blk-row { display: flex; align-items: center; gap: 0.45rem; padding: 0.5rem 0.6rem; cursor: pointer; user-select: none; }
-        .blk-row:hover { background: #fafafa; }
-        .blk-item.open .blk-row { background: #f7f3ee; }
-        .blk-drag { cursor: grab; color: #c0c0c0; font-size: 0.75rem; letter-spacing: -2px; }
-        .blk-num { color: #bbb; font-size: 0.72rem; width: 1.6em; font-weight: 700; }
-        .blk-badge { font-weight: 600; font-size: 0.85rem; white-space: nowrap; }
-        .blk-snippet { flex: 1; color: #a0a0a0; font-size: 0.76rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; min-width: 0; }
-        .blk-actions { display: flex; gap: 0.2rem; flex: none; }
-        .blk-actions button {
-            border: 1px solid var(--border);
-            background: #fff;
-            border-radius: 6px;
-            width: 26px;
-            height: 26px;
-            cursor: pointer;
-            font-size: 0.72rem;
-            color: #555;
-            line-height: 1;
-        }
-        .blk-actions button:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
-        .blk-actions button.a-del:hover { background: var(--danger); border-color: var(--danger); }
-        .blk-settings { padding: 0.8rem 0.9rem; border-top: 1px solid var(--border); display: none; }
-        .blk-item.open .blk-settings { display: block; }
-        .blk-item.legacy .blk-row { background: #fff8e6; }
-        .blk-empty { border: 2px dashed var(--border); border-radius: 10px; text-align: center; color: #999; padding: 1.6rem 1rem; font-size: 0.9rem; }
-
-        /* Галерея блоков (модальное окно) */
-        .gallery-overlay { position: fixed; inset: 0; background: rgba(30, 25, 20, 0.5); display: none; z-index: 100; overflow-y: auto; padding: 2.5rem 1rem; }
-        .gallery-overlay.open { display: block; }
-        .gallery { max-width: 880px; margin: 0 auto; background: #fff; border-radius: 14px; padding: 1.4rem 1.5rem; }
-        .gallery-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-        .gallery-head h3 { margin: 0; font-size: 1.1rem; }
-        .gallery-close { border: 0; background: #f0f0f0; border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 1rem; }
-        .gallery-close:hover { background: var(--danger); color: #fff; }
-        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.9rem; }
-        .gcard { border: 2px solid var(--border); border-radius: 10px; padding: 0.6rem; cursor: pointer; background: #fff; }
-        .gcard:hover { border-color: var(--accent); background: #fbf8f4; }
-        .gmock {
-            height: 88px;
-            border-radius: 7px;
-            background: #f4f4f8;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
-            padding: 10px;
-            overflow: hidden;
-        }
-        .gname { font-weight: 700; font-size: 0.88rem; margin-top: 0.5rem; text-align: center; }
-        .gdesc { color: #999; font-size: 0.75rem; margin-top: 0.15rem; text-align: center; }
-        .gm-bar { background: #cfcfcf; border-radius: 3px; }
-        .gm-img { width: 100%; height: 100%; background: #e2e2e8; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 1.4rem; }
-        .gm-btn { background: var(--accent); color: #fff; border-radius: 20px; padding: 4px 18px; font-size: 0.7rem; font-weight: 700; }
-        .gm-video { width: 100%; height: 100%; background: #3a3a3a; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.3rem; }
-        .gm-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; width: 100%; }
-        .gm-card-mini { background: #fff; border: 1px solid #ddd; border-radius: 4px; height: 34px; padding: 3px; }
-        .gm-card-mini .im { background: #eee; height: 16px; border-radius: 2px; }
-        .gm-card-mini .tx { background: #ddd; height: 5px; border-radius: 2px; margin-top: 4px; }
-        .gm-line { width: 80%; height: 2px; background: #cfcfcf; }
-        .gm-code { color: #999; font-family: monospace; font-size: 1rem; }
 
         /* Меню-редактор */
         .mnode { border-left: 2px solid var(--border); margin-left: 0.4rem; padding-left: 0.7rem; }
@@ -275,9 +183,6 @@
         @media (max-width: 1100px) {
             .grid { grid-template-columns: 1fr; }
             nav { position: static; max-height: none; }
-            .editor-split { grid-template-columns: 1fr; }
-            .editor-right { position: static; }
-            #preview-iframe { height: 480px; }
         }
         @media (max-width: 700px) {
             .row, .row3 { grid-template-columns: 1fr; }
@@ -381,51 +286,6 @@
                         <button type="button" class="secondary" onclick="loadAudit()">🔄 Обновить</button>
                     </div>
                     <div id="audit-list" class="table-wrap"></div>
-                </section>
-
-                <section id="tab-page" class="active">
-                    <div class="page-head">
-                        <div>
-                            <h2>Редактор страницы</h2>
-                            <div class="page-meta" id="page-meta"></div>
-                        </div>
-                        <a href="#" id="page-open-link" target="_blank" class="secondary" style="text-decoration:none;display:inline-block;">Открыть на сайте ↗</a>
-                        <a href="#" id="page-edit-link" target="_blank" class="secondary" style="text-decoration:none;display:inline-block;background:var(--accent);color:#fff;border-color:var(--accent);padding:0.6rem 1.1rem;border-radius:7px;font-size:0.9rem;">✏ Редактировать на странице</a>
-                    </div>
-
-                    <details class="page-params">
-                        <summary>Параметры страницы: название вкладки, заголовок, описание для поисковиков</summary>
-                        <div class="inner">
-                            <div class="row">
-                                <div class="field">
-                                    <label>Название вкладки браузера (title)</label>
-                                    <input type="text" id="page-title" data-page-path="title">
-                                </div>
-                                <div class="field">
-                                    <label>Заголовок страницы (H1)</label>
-                                    <input type="text" id="page-h1" data-page-path="h1">
-                                </div>
-                            </div>
-                            <div class="field" style="margin-bottom:0;">
-                                <label>Описание для поисковиков (meta description)</label>
-                                <textarea id="page-meta-description" data-page-path="meta_description" rows="2"></textarea>
-                            </div>
-                        </div>
-                    </details>
-
-                    <div class="editor-split">
-                        <div class="editor-left">
-                            <button type="button" class="add-block-btn" onclick="openGallery()">+ Добавить блок</button>
-                            <div id="blocks-list"><p class="help">Загрузка…</p></div>
-                        </div>
-                        <div class="editor-right">
-                            <div class="preview-bar">
-                                <span>Предпросмотр — страница выглядит так для посетителей</span>
-                                <span id="preview-status"></span>
-                            </div>
-                            <iframe id="preview-iframe" title="Предпросмотр страницы"></iframe>
-                        </div>
-                    </div>
                 </section>
 
                 <section id="tab-site">
@@ -1086,112 +946,9 @@
         </div>
     </div>
 
-    <!-- Галерея блоков (как в Tilda) -->
-    <div class="gallery-overlay" id="gallery-overlay">
-        <div class="gallery">
-            <div class="gallery-head">
-                <h3>Добавить блок</h3>
-                <button type="button" class="gallery-close" onclick="closeGallery()" title="Закрыть">✕</button>
-            </div>
-            <div class="gallery-grid" id="gallery-grid"></div>
-        </div>
-    </div>
-
     <script>
         let data = {{ content | tojson | safe }};
         let currentPageIndex = 0;
-        const pageHtmlCache = {};   // slug -> исходный content_html (для блока «дизайн исходной страницы»)
-        let openIndexes = new Set();
-        let dragIndex = null;
-        let previewTimer = null;
-        let previewSeq = 0;
-
-        const BLOCK_TYPES = {
-            heading: {
-                icon: '𝐇', label: 'Заголовок',
-                desc: 'Крупный заголовок раздела',
-                mock: '<div class="gm-bar" style="width:70%;height:10px;background:#9a8269;"></div>',
-                make: () => ({type: 'heading', level: 'h2', text: 'Новый заголовок'}),
-            },
-            text: {
-                icon: '📝', label: 'Текст',
-                desc: 'Абзацы текста. Пустая строка — новый абзац',
-                mock: '<div class="gm-bar" style="width:95%;height:6px;"></div><div class="gm-bar" style="width:90%;height:6px;"></div><div class="gm-bar" style="width:60%;height:6px;"></div>',
-                make: () => ({type: 'text', text: 'Новый текст. Напишите здесь о вашем товаре, услуге или акции. Пустая строка между предложениями создаст новый абзац.'}),
-            },
-            image: {
-                icon: '🖼', label: 'Картинка',
-                desc: 'Фото: загрузка с компьютера или по ссылке',
-                mock: '<div class="gm-img">🖼</div>',
-                make: () => ({type: 'image', src: '', alt: '', caption: ''}),
-            },
-            button: {
-                icon: '🔘', label: 'Кнопка',
-                desc: 'Кнопка с ссылкой: «Купить», «Позвонить»…',
-                mock: '<div class="gm-btn">КНОПКА</div>',
-                make: () => ({type: 'button', text: 'Подробнее', url: '/', color: '#b49d84', align: 'center'}),
-            },
-            video: {
-                icon: '🎬', label: 'Видео',
-                desc: 'Вставьте ссылку на YouTube или Vimeo',
-                mock: '<div class="gm-video">▶</div>',
-                make: () => ({type: 'video', url: ''}),
-            },
-            products: {
-                icon: '🛒', label: 'Товары',
-                desc: 'Карточки WB с ценами и кнопкой «Купить»',
-                mock: '<div class="gm-grid"><div class="gm-card-mini"><div class="im"></div><div class="tx"></div></div><div class="gm-card-mini"><div class="im"></div><div class="tx"></div></div><div class="gm-card-mini"><div class="im"></div><div class="tx"></div></div><div class="gm-card-mini"><div class="im"></div><div class="tx"></div></div></div>',
-                make: () => ({type: 'products', source: 'all', limit: 8, title: 'Товары'}),
-            },
-            divider: {
-                icon: '—', label: 'Разделитель',
-                desc: 'Горизонтальная линия между блоками',
-                mock: '<div class="gm-line"></div>',
-                make: () => ({type: 'divider'}),
-            },
-            reviews: {
-                icon: '💬', label: 'Отзывы',
-                desc: 'Карточки отзывов покупателей с оценкой',
-                mock: '<div class="gm-bar" style="width:60%;height:8px;background:#9a8269;"></div><div class="gm-bar" style="width:95%;height:5px;"></div><div class="gm-bar" style="width:90%;height:5px;"></div><div class="gm-bar" style="width:40%;height:8px;background:#e8a33d;"></div>',
-                make: () => ({type: 'reviews', title: 'Отзывы покупателей', items: [{name: 'Анна', text: 'Отличное качество, быстрая доставка!', rating: 5}]}),
-            },
-            form: {
-                icon: '📩', label: 'Форма связи',
-                desc: 'Форма обратной связи (заявка в админку)',
-                mock: '<div class="gm-bar" style="width:95%;height:10px;border:1px solid #ccc;background:#fff;"></div><div class="gm-bar" style="width:95%;height:10px;border:1px solid #ccc;background:#fff;"></div><div class="gm-btn">ОТПРАВИТЬ</div>',
-                make: () => ({type: 'form', title: 'Остались вопросы?', button: 'Отправить', recipient: ''}),
-            },
-            map: {
-                icon: '📍', label: 'Карта',
-                desc: 'Яндекс.Карта по адресу',
-                mock: '<div class="gm-img" style="background:#dfe8ee;">📍</div>',
-                make: () => ({type: 'map', title: 'Как нас найти', address: 'Москва, Красная площадь, 1'}),
-            },
-            faq: {
-                icon: '❓', label: 'FAQ',
-                desc: 'Вопросы и ответы (аккордеон)',
-                mock: '<div class="gm-bar" style="width:95%;height:8px;"></div><div class="gm-bar" style="width:95%;height:8px;"></div><div class="gm-bar" style="width:95%;height:8px;"></div>',
-                make: () => ({type: 'faq', title: 'Частые вопросы', items: [{q: 'Как сделать заказ?', a: 'Нажмите «Купить в 1 клик» на карточке товара и оставьте контакты — мы перезвоним.'}]}),
-            },
-            banner: {
-                icon: '📢', label: 'Баннер',
-                desc: 'Промо-блок: заголовок, текст и кнопка',
-                mock: '<div style="width:100%;height:100%;background:#b49d84;border-radius:5px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.7rem;font-weight:700;">БАННЕР</div>',
-                make: () => ({type: 'banner', title: 'Скидка 10% на первый заказ', subtitle: 'Успейте до конца месяца', button: 'Выбрать товар', url: '/catalog/', bg: '#b49d84'}),
-            },
-            html: {
-                icon: '⚙', label: 'HTML',
-                desc: 'Свой код (только для специалистов)',
-                mock: '<div class="gm-code">&lt;/&gt;</div>',
-                make: () => ({type: 'html', html: ''}),
-            },
-            timer: {
-                icon: '⏳', label: 'Таймер акции',
-                desc: 'Обратный отсчёт до конца акции с кнопкой',
-                mock: '<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;"><div class="gm-bar" style="width:60%;height:8px;background:#9a8269;"></div><div class="gm-bar" style="width:80%;height:10px;background:#c00;"></div><div class="gm-btn" style="font-size:0.6rem;padding:2px 8px;">КНОПКА</div></div>',
-                make: () => ({type: 'timer', title: 'До конца акции', date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), button_text: 'Успеть купить', button_link: '/catalog/'}),
-            },
-        };
 
         const FONTS = [
             ['-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', 'Стандартный (современный)'],
@@ -1243,310 +1000,30 @@
                 const sysBadge = SYSTEM_PAGE_SLUGS.includes(p.slug)
                     ? ' <small style="color:#999;">· системная</small>' : '';
                 btn.innerHTML = `<span style="display:block;padding-left:${indent * 14}px;">${indent ? '└ ' : ''}${escapeHtml(p.h1 || p.title)}${sysBadge}</span><small style="display:block;padding-left:${indent * 14}px;">${p.url}</small>`;
+                // Клик по странице — переход в единый редактор «на странице» (как в Tilda)
                 btn.addEventListener('click', () => selectPage(i));
-                const edit = document.createElement('span');
-                edit.textContent = '✎';
-                edit.title = 'Редактировать прямо на странице';
-                edit.style.cssText = 'float:right;color:#b49d84;font-weight:700;cursor:pointer;margin-left:0.3rem;';
-                edit.addEventListener('click', e => {
+                const open = document.createElement('span');
+                open.textContent = '↗';
+                open.title = 'Открыть на сайте';
+                open.style.cssText = 'float:right;color:#999;cursor:pointer;margin-left:0.3rem;';
+                open.addEventListener('click', e => {
                     e.stopPropagation();
-                    window.open(`${location.origin}/admin/page/${p.slug}`, '_blank');
+                    window.open(p.url, '_blank');
                 });
-                btn.appendChild(edit);
+                btn.appendChild(open);
                 container.appendChild(btn);
             });
         }
 
         function currentPage() { return data.pages[currentPageIndex]; }
 
-        async function selectPage(index) {
+        function selectPage(index) {
             currentPageIndex = index;
-            openIndexes = new Set();
             renderPagesList();
-            document.querySelectorAll('nav button[data-tab]').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('main section').forEach(s => s.classList.remove('active'));
-            $('tab-page').classList.add('active');
             const page = currentPage();
-            $('page-open-link').href = page.url;
-            $('page-edit-link').href = `/admin/page/${page.slug}`;
-            bindPageFields();
-            await ensureBlocksLoaded();
-            renderBlocks();
-            schedulePreview();
+            if (page) window.location.href = '/admin/page/' + encodeURIComponent(page.slug);
         }
 
-        function bindPageFields() {
-            const page = currentPage();
-            $('page-meta').textContent = `Адрес страницы: ${page.url}`;
-            document.querySelectorAll('[data-page-path]').forEach(el => {
-                el.value = page[el.dataset.pagePath] || '';
-                el.oninput = () => { page[el.dataset.pagePath] = el.value; schedulePreview(); };
-            });
-        }
-
-        /* ================= Живой предпросмотр (WYSIWYG) ================= */
-        function schedulePreview() {
-            clearTimeout(previewTimer);
-            previewTimer = setTimeout(updatePreview, 700);
-        }
-
-        async function updatePreview() {
-            const page = currentPage();
-            if (!page || !Array.isArray(page.blocks)) return;
-            const seq = ++previewSeq;
-            $('preview-status').textContent = 'обновление…';
-            try {
-                const resp = await fetch(location.origin + '/admin/api/preview', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
-                    body: JSON.stringify({
-                        slug: page.slug,
-                        page: {
-                            title: page.title,
-                            h1: page.h1,
-                            meta_description: page.meta_description,
-                            url: page.url,
-                        },
-                        blocks: page.blocks,
-                    }),
-                });
-                const result = await resp.json();
-                if (seq !== previewSeq) return;
-                if (result.success) {
-                    $('preview-iframe').srcdoc = result.html;
-                    $('preview-status').textContent = 'обновлено ' + new Date().toLocaleTimeString('ru-RU');
-                } else {
-                    $('preview-status').textContent = 'ошибка: ' + (result.error || '');
-                }
-            } catch (e) {
-                if (seq === previewSeq) $('preview-status').textContent = 'ошибка сети';
-            }
-        }
-
-        /* ================= Конструктор блоков ================= */
-        async function ensureBlocksLoaded() {
-            const page = currentPage();
-            if (Array.isArray(page.blocks)) return;
-            // Страница перенесена с оригинального сайта — показываем её как один
-            // особый блок; исходный HTML подгружаем, чтобы не потерять его при сохранении.
-            let html = pageHtmlCache[page.slug];
-            if (html === undefined) {
-                try {
-                    const resp = await fetch(`${location.origin}/admin/api/page-html?slug=${encodeURIComponent(page.slug)}`);
-                    const result = await resp.json();
-                    html = result.success ? result.content_html : '';
-                } catch (e) { html = ''; }
-                pageHtmlCache[page.slug] = html;
-            }
-            page.blocks = [{type: 'html', legacy: true, html}];
-        }
-
-        function blockSnippet(b) {
-            if (b.legacy) return 'дизайн, перенесённый с оригинального сайта';
-            switch (b.type) {
-                case 'heading': return b.text || '';
-                case 'text': return (b.text || '').replace(/\s+/g, ' ').trim().slice(0, 80);
-                case 'image': return (b.src || '').split('/').pop() || b.alt || 'картинка';
-                case 'button': return `${b.text || 'Кнопка'} → ${b.url || ''}`;
-                case 'video': return b.url || 'ссылка на видео';
-                case 'products': {
-                    const src = {all: 'Wildberries', wb: 'Wildberries'}[b.source || 'all'];
-                    return `${src}, ${b.limit || 8} карточек${b.title ? ' · ' + b.title : ''}`;
-                }
-                case 'divider': return 'линия-разделитель';
-                case 'reviews': return `${(b.items || []).length} отзывов${b.title ? ' · ' + b.title : ''}`;
-                case 'form': return b.title || 'форма обратной связи';
-                case 'map': return b.address || 'карта';
-                case 'faq': return `${(b.items || []).length} вопросов${b.title ? ' · ' + b.title : ''}`;
-                case 'banner': return b.title || 'баннер';
-                case 'html': return 'произвольный HTML';
-                default: return '';
-            }
-        }
-
-        function renderBlocks() {
-            const page = currentPage();
-            const container = $('blocks-list');
-            container.innerHTML = '';
-            if (!page.blocks.length) {
-                const empty = document.createElement('div');
-                empty.className = 'blk-empty';
-                empty.textContent = 'Страница пустая. Нажмите «+ Добавить блок» и выберите первый блок.';
-                container.appendChild(empty);
-                return;
-            }
-            page.blocks.forEach((block, i) => {
-                container.appendChild(renderBlockItem(block, i));
-            });
-        }
-
-        function renderBlockItem(block, i) {
-            const type = block.legacy ? 'html' : (block.type || 'text');
-            const cfg = BLOCK_TYPES[type] || BLOCK_TYPES.text;
-            const item = document.createElement('div');
-            item.className = 'blk-item' + (block.legacy ? ' legacy' : '') + (openIndexes.has(i) ? ' open' : '');
-            item.dataset.i = i;
-            item.draggable = true;
-
-            const row = document.createElement('div');
-            row.className = 'blk-row';
-            row.innerHTML =
-                `<span class="blk-drag" title="Перетащите, чтобы изменить порядок">⋮⋮</span>` +
-                `<span class="blk-num">${String(i + 1).padStart(2, '0')}</span>` +
-                `<span class="blk-badge">${cfg.icon} ${block.legacy ? 'Дизайн страницы' : cfg.label}</span>` +
-                `<span class="blk-snippet">${escapeHtml(blockSnippet(block))}</span>`;
-
-            const actions = document.createElement('span');
-            actions.className = 'blk-actions';
-            const mkAct = (txt, title, cls, fn) => {
-                const b = document.createElement('button');
-                b.type = 'button';
-                b.textContent = txt;
-                b.title = title;
-                if (cls) b.className = cls;
-                b.addEventListener('click', e => { e.stopPropagation(); fn(); });
-                actions.appendChild(b);
-            };
-            mkAct('⚙', 'Настройки блока', '', () => {
-                openIndexes.has(i) ? openIndexes.delete(i) : openIndexes.add(i);
-                item.classList.toggle('open');
-            });
-            if (!block.legacy) {
-                mkAct('⧉', 'Дублировать блок', '', () => duplicateBlock(i));
-            }
-            mkAct('✕', 'Удалить блок', 'a-del', () => deleteBlock(i));
-            row.appendChild(actions);
-            row.addEventListener('click', () => {
-                openIndexes.has(i) ? openIndexes.delete(i) : openIndexes.add(i);
-                item.classList.toggle('open');
-            });
-
-            // Drag & drop (как в Tilda)
-            item.addEventListener('dragstart', e => {
-                dragIndex = i;
-                item.classList.add('dragging');
-                e.dataTransfer.effectAllowed = 'move';
-                try { e.dataTransfer.setData('text/plain', String(i)); } catch (err) {}
-            });
-            item.addEventListener('dragend', () => {
-                dragIndex = null;
-                item.classList.remove('dragging');
-                document.querySelectorAll('.blk-item').forEach(el => el.classList.remove('drop-before', 'drop-after'));
-            });
-            item.addEventListener('dragover', e => {
-                if (dragIndex === null || dragIndex === i) return;
-                e.preventDefault();
-                const rect = item.getBoundingClientRect();
-                const before = (e.clientY - rect.top) < rect.height / 2;
-                item.classList.toggle('drop-before', before);
-                item.classList.toggle('drop-after', !before);
-            });
-            item.addEventListener('dragleave', () => {
-                item.classList.remove('drop-before', 'drop-after');
-            });
-            item.addEventListener('drop', e => {
-                if (dragIndex === null || dragIndex === i) return;
-                e.preventDefault();
-                const rect = item.getBoundingClientRect();
-                const before = (e.clientY - rect.top) < rect.height / 2;
-                moveBlockTo(dragIndex, i, before);
-            });
-
-            item.appendChild(row);
-
-            const settings = document.createElement('div');
-            settings.className = 'blk-settings';
-            renderBlockSettings(block, i, settings);
-            item.appendChild(settings);
-            return item;
-        }
-
-        function moveBlockTo(from, targetIndex, insertBefore) {
-            const blocks = currentPage().blocks;
-            if (from === targetIndex) return;
-            const [moved] = blocks.splice(from, 1);
-            let pos;
-            if (from < targetIndex) {
-                pos = insertBefore ? targetIndex - 1 : targetIndex;
-            } else {
-                pos = insertBefore ? targetIndex : targetIndex + 1;
-            }
-            blocks.splice(pos, 0, moved);
-            openIndexes = new Set();
-            renderBlocks();
-            schedulePreview();
-        }
-
-        function duplicateBlock(i) {
-            const blocks = currentPage().blocks;
-            const copy = JSON.parse(JSON.stringify(blocks[i]));
-            delete copy.legacy;
-            blocks.splice(i + 1, 0, copy);
-            openIndexes = new Set([i + 1]);
-            renderBlocks();
-            schedulePreview();
-        }
-
-        function deleteBlock(i) {
-            const blocks = currentPage().blocks;
-            const b = blocks[i];
-            if (b.legacy) {
-                if (!confirm('Это дизайн, перенесённый с оригинального сайта. Удалить его и собрать страницу заново из блоков?')) return;
-            } else if (!confirm(`Удалить блок «${BLOCK_TYPES[b.type].label}»?`)) {
-                return;
-            }
-            blocks.splice(i, 1);
-            openIndexes = new Set();
-            renderBlocks();
-            schedulePreview();
-        }
-
-        /* ---------- Галерея блоков ---------- */
-        function openGallery() {
-            const grid = $('gallery-grid');
-            grid.innerHTML = '';
-            Object.entries(BLOCK_TYPES).forEach(([type, cfg]) => {
-                const card = document.createElement('div');
-                card.className = 'gcard';
-                card.innerHTML =
-                    `<div class="gmock">${cfg.mock}</div>` +
-                    `<div class="gname">${cfg.icon} ${cfg.label}</div>` +
-                    `<div class="gdesc">${cfg.desc}</div>`;
-                card.addEventListener('click', () => { closeGallery(); addBlock(type); });
-                grid.appendChild(card);
-            });
-            $('gallery-overlay').classList.add('open');
-        }
-        function closeGallery() { $('gallery-overlay').classList.remove('open'); }
-        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeGallery(); });
-
-        function addBlock(type) {
-            const page = currentPage();
-            page.blocks.push(BLOCK_TYPES[type].make());
-            openIndexes = new Set([page.blocks.length - 1]);
-            renderBlocks();
-            schedulePreview();
-            const items = $('blocks-list').querySelectorAll('.blk-item');
-            const last = items[items.length - 1];
-            if (last) last.scrollIntoView({behavior: 'smooth', block: 'nearest'});
-        }
-
-        /* ---------- Поля настроек блока ---------- */
-        function field(labelText, inputEl) {
-            const f = document.createElement('div');
-            f.className = 'field';
-            const l = document.createElement('label');
-            l.textContent = labelText;
-            f.appendChild(l);
-            f.appendChild(inputEl);
-            return f;
-        }
-        function helpEl(text) {
-            const d = document.createElement('div');
-            d.className = 'help';
-            d.textContent = text;
-            return d;
-        }
         function textInput(value, onchange, placeholder) {
             const inp = document.createElement('input');
             inp.type = 'text';
@@ -1554,165 +1031,6 @@
             if (placeholder) inp.placeholder = placeholder;
             inp.addEventListener('input', () => onchange(inp.value));
             return inp;
-        }
-        function textareaInput(value, onchange, rows) {
-            const t = document.createElement('textarea');
-            t.rows = rows || 4;
-            t.value = value || '';
-            t.addEventListener('input', () => onchange(t.value));
-            return t;
-        }
-        function selectInput(options, value, onchange) {
-            const s = document.createElement('select');
-            options.forEach(([val, label]) => {
-                const o = document.createElement('option');
-                o.value = val;
-                o.textContent = label;
-                s.appendChild(o);
-            });
-            s.value = value;
-            s.addEventListener('change', () => onchange(s.value));
-            return s;
-        }
-
-        function renderBlockSettings(block, i, container) {
-            const set = (k, v) => {
-                block[k] = v;
-                const sn = document.querySelector(`.blk-item[data-i="${i}"] .blk-snippet`);
-                if (sn) sn.textContent = blockSnippet(block);
-                schedulePreview();
-            };
-            const type = block.legacy ? 'html' : (block.type || 'text');
-
-            if (type === 'heading') {
-                container.appendChild(field('Текст заголовка', textInput(block.text, v => set('text', v))));
-                container.appendChild(field('Размер', selectInput([
-                    ['h1', 'Самый крупный (H1)'],
-                    ['h2', 'Крупный (H2)'],
-                    ['h3', 'Средний (H3)'],
-                ], block.level || 'h2', v => set('level', v))));
-            } else if (type === 'text') {
-                container.appendChild(field('Текст', textareaInput(block.text, v => set('text', v), 7)));
-                container.appendChild(helpEl('Пустая строка между текстом — новый абзац.'));
-            } else if (type === 'image') {
-                const file = document.createElement('input');
-                file.type = 'file';
-                file.accept = 'image/*';
-                const status = document.createElement('div');
-                status.className = 'help';
-                file.addEventListener('change', async () => {
-                    if (!file.files.length) return;
-                    status.textContent = 'Загрузка…';
-                    const fd = new FormData();
-                    fd.append('file', file.files[0]);
-                    try {
-                        const resp = await fetch(`${location.origin}/admin/api/upload`, {method: 'POST', body: fd, headers: {'X-CSRF-Token': window.CSRF_TOKEN}});
-                        const result = await resp.json();
-                        if (result.success) {
-                            set('src', result.url);
-                            status.textContent = 'Загружено: ' + result.url;
-                            const img = container.querySelector('.preview-img img');
-                            if (img) { img.src = result.url; img.style.display = ''; }
-                        } else {
-                            status.textContent = 'Ошибка: ' + (result.error || '');
-                        }
-                    } catch (e) { status.textContent = 'Ошибка сети: ' + e.message; }
-                });
-                container.appendChild(field('Загрузить с компьютера', file));
-                container.appendChild(status);
-                container.appendChild(field('…или ссылка на картинку', textInput(block.src, v => {
-                    set('src', v);
-                    const img = container.querySelector('.preview-img img');
-                    if (img) { img.src = v; img.style.display = v ? '' : 'none'; }
-                }, 'https://…')));
-                const pv = document.createElement('div');
-                pv.className = 'preview-img';
-                const img = document.createElement('img');
-                img.src = block.src || '';
-                img.style.display = block.src ? '' : 'none';
-                pv.appendChild(img);
-                container.appendChild(pv);
-                container.appendChild(field('Подпись для поисковиков (alt)', textInput(block.alt, v => set('alt', v))));
-                container.appendChild(field('Подпись под картинкой', textInput(block.caption, v => set('caption', v))));
-            } else if (type === 'button') {
-                container.appendChild(field('Текст на кнопке', textInput(block.text, v => set('text', v))));
-                container.appendChild(field('Куда ведёт (адрес страницы)', textInput(block.url, v => set('url', v), '/catalog/')));
-                const colorRow = document.createElement('div');
-                colorRow.className = 'row';
-                const color = document.createElement('input');
-                color.type = 'color';
-                color.value = block.color || '#b49d84';
-                color.addEventListener('input', () => set('color', color.value));
-                colorRow.appendChild(field('Цвет кнопки', color));
-                colorRow.appendChild(field('Положение', selectInput([
-                    ['left', 'Слева'], ['center', 'По центру'], ['right', 'Справа'],
-                ], block.align || 'center', v => set('align', v))));
-                container.appendChild(colorRow);
-            } else if (type === 'video') {
-                container.appendChild(field('Ссылка на видео YouTube или Vimeo', textInput(block.url, v => set('url', v), 'https://youtube.com/watch?v=…')));
-                container.appendChild(helpEl('Достаточно обычной ссылки из адресной строки браузера.'));
-            } else if (type === 'products') {
-                container.appendChild(field('Заголовок над товарами (можно пусто)', textInput(block.title, v => set('title', v), 'Наши товары')));
-                const row = document.createElement('div');
-                row.className = 'row';
-                row.appendChild(field('Откуда товары', selectInput([
-                    ['all', 'Все товары WB'],
-                    ['wb', 'Только Wildberries'],
-                ], block.source || 'all', v => set('source', v))));
-                const limit = document.createElement('input');
-                limit.type = 'number';
-                limit.min = 1;
-                limit.max = 48;
-                limit.value = block.limit || 8;
-                limit.addEventListener('input', () => set('limit', parseInt(limit.value || 8, 10)));
-                row.appendChild(field('Сколько карточек показать', limit));
-                container.appendChild(row);
-                container.appendChild(helpEl('Карточки сами подгрузятся с актуальными ценами и скидками из админки, с кнопками «Купить» и «В избранное».'));
-            } else if (type === 'divider') {
-                container.appendChild(helpEl('Горизонтальная линия-разделитель. Настроек нет.'));
-            } else if (type === 'reviews') {
-                container.appendChild(field('Заголовок секции', textInput(block.title, v => set('title', v))));
-                container.appendChild(field('Отзывы (JSON)', textareaInput(JSON.stringify(block.items || [], null, 2), v => {
-                    try { set('items', JSON.parse(v || '[]')); } catch (e) { /* невалидный JSON — оставляем прежнее */ }
-                }, 10)));
-                container.appendChild(helpEl('Один отзыв — объект {"name": "Имя", "text": "Текст", "rating": 5}. Оценка от 1 до 5.'));
-            } else if (type === 'form') {
-                container.appendChild(field('Заголовок над формой', textInput(block.title, v => set('title', v))));
-                container.appendChild(field('Подпись на кнопке', textInput(block.button, v => set('button', v), 'Отправить')));
-                container.appendChild(field('Кому передать заявку (телефон/email, необязательно)', textInput(block.recipient, v => set('recipient', v))));
-                container.appendChild(helpEl('Заявки попадают в раздел «Клиенты и заявки» админки. Форма работает и без JavaScript.'));
-            } else if (type === 'map') {
-                container.appendChild(field('Заголовок над картой', textInput(block.title, v => set('title', v))));
-                container.appendChild(field('Адрес или координаты', textInput(block.address, v => set('address', v), 'Москва, Красная площадь, 1')));
-                container.appendChild(helpEl('Карта Яндекса построится автоматически по адресу.'));
-            } else if (type === 'faq') {
-                container.appendChild(field('Заголовок секции', textInput(block.title, v => set('title', v))));
-                container.appendChild(field('Вопросы и ответы (JSON)', textareaInput(JSON.stringify(block.items || [], null, 2), v => {
-                    try { set('items', JSON.parse(v || '[]')); } catch (e) { /* невалидный JSON — оставляем прежнее */ }
-                }, 10)));
-                container.appendChild(helpEl('Один пункт — объект {"q": "Вопрос", "a": "Ответ"}.'));
-            } else if (type === 'banner') {
-                container.appendChild(field('Заголовок', textInput(block.title, v => set('title', v))));
-                container.appendChild(field('Подзаголовок', textInput(block.subtitle, v => set('subtitle', v))));
-                const row = document.createElement('div');
-                row.className = 'row';
-                row.appendChild(field('Текст на кнопке', textInput(block.button, v => set('button', v), 'Подробнее')));
-                row.appendChild(field('Ссылка кнопки', textInput(block.url, v => set('url', v), '/catalog/')));
-                container.appendChild(row);
-                const colorRow = document.createElement('div');
-                colorRow.className = 'row';
-                const color = document.createElement('input');
-                color.type = 'color';
-                color.value = block.bg || '#b49d84';
-                color.addEventListener('input', () => set('bg', color.value));
-                colorRow.appendChild(field('Цвет фона', color));
-                container.appendChild(colorRow);
-            } else if (type === 'html') {
-                if (block.legacy) {
-                    container.appendChild(helpEl('Это содержимое перенесённой страницы. Добавьте свои блоки выше или ниже — или удалите этот блок и соберите страницу заново.'));
-                }
-                container.appendChild(field('HTML-код', textareaInput(block.html, v => set('html', v), 14)));
-            }
         }
 
         /* ================= Настройки сайта ================= */
@@ -2086,7 +1404,7 @@
                     renderPagesList();
                     selectPage(data.pages.length - 1);
                     hideAddPage();
-                    showMsg('Страница создана — соберите её из блоков и нажмите «Сохранить всё»', true);
+                    showMsg('Страница создана — открываем редактор…', true);
                     $('new-page-slug').value = '';
                     $('new-page-title').value = '';
                 } else {
@@ -2112,7 +1430,6 @@
                     data.pages.splice(currentPageIndex, 1);
                     currentPageIndex = Math.max(0, currentPageIndex - 1);
                     renderPagesList();
-                    selectPage(currentPageIndex);
                     showMsg('Страница удалена', true);
                 } else {
                     showMsg('Ошибка: ' + (result.error || ''), false);
@@ -3426,7 +2743,6 @@
         bindSiteFields();
         renderMenuEditor();
         renderSocialsEditor();
-        selectPage(0);
         loadAllProducts();
         loadExportSettings('wb');
         loadThemePresets();
