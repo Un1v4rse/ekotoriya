@@ -100,6 +100,14 @@
 - Следующий шаг: финальный коммит + `git push origin main`.
 - Примечания: ветка main локально впереди origin/main на все коммиты цикла 3
   (9c33d8d…966e30c); push без --force.
+- **UPDATE (2026-09-26 00:40)**: финальный коммит 2dfaf9c сделан; `git push origin main`
+  ОТКЛОНЁН GitHub: токен без scope `workflow`, а в незапушенных 39 коммитах есть
+  `.github/workflows/ci.yml` (коммит f5a3fe7, этап-6 цикла 1) — GitHub требует токен с
+  правом workflow для обновления workflow-файлов. Решение: обновить PAT на
+  github.com → Settings → Developer settings → Fine-grained/классический токен с галочкой
+  **workflow**, либо сделать scope «repo + workflow». Код полностью готов: main локальный
+  содержит циклы 1–3 целиком, 220 тестов зелёные. После обновления токена — просто
+  `git push origin main`.
 
 ## [2026-09-25 22:50] Задача: [цикл3-этап-3.1] — CN-T-сводка + закрытие недоделки CN-T9.1 («Мои блоки»)
 - Статус: done
