@@ -815,7 +815,7 @@ def index():
     if not page:
         return 'Index page not found', 404
     html = render_template(page['template'], **make_context(content, page))
-    return Response(_inject_admin_edit_button(html, f"/admin/page/{page['slug']}"))
+    return Response(_inject_lazyload_fix(_inject_admin_edit_button(html, f"/admin/page/{page['slug']}")))
 
 
 # Fallback routes for legacy /bitrix/... and /upload/... URLs that some
@@ -951,6 +951,7 @@ def basket_page():
         html = _inject_editor(html, 'basket')
     else:
         html = _inject_admin_edit_button(html, request.path + '?edit=1')
+        html = _inject_lazyload_fix(html)
     return Response(html)
 
 
@@ -1072,6 +1073,7 @@ def personal_page():
         html = _inject_editor(html, 'personal')
     else:
         html = _inject_admin_edit_button(html, request.path + '?edit=1')
+        html = _inject_lazyload_fix(html)
     return Response(html)
 
 
@@ -1101,6 +1103,7 @@ def auth_page():
         html = _inject_editor(html, 'auth')
     else:
         html = _inject_admin_edit_button(html, request.path + '?edit=1')
+        html = _inject_lazyload_fix(html)
     return Response(html)
 
 
@@ -1650,13 +1653,13 @@ def page_route(path):
     page = get_page_by_url(content, url)
     if page and page.get('slug') not in SYSTEM_PAGE_SLUGS:
         html = render_template(page['template'], **make_context(content, page))
-        return Response(_inject_admin_edit_button(html, f"/admin/page/{page['slug']}"))
+        return Response(_inject_lazyload_fix(_inject_admin_edit_button(html, f"/admin/page/{page['slug']}")))
     # Try slug match (double underscores represent slashes)
     slug = path.replace('/', '__').replace('-', '_')
     page = get_page_by_slug(content, slug)
     if page and page.get('slug') not in SYSTEM_PAGE_SLUGS:
         html = render_template(page['template'], **make_context(content, page))
-        return Response(_inject_admin_edit_button(html, f"/admin/page/{page['slug']}"))
+        return Response(_inject_lazyload_fix(_inject_admin_edit_button(html, f"/admin/page/{page['slug']}")))
     # Fallback: if a parent path exists (e.g. product detail link under /catalog/namatrasniki/),
     # redirect to the nearest parent page to avoid 404s from original product cards.
     parts = path.split('/')
@@ -1680,6 +1683,7 @@ def page_not_found(e):
         html = _inject_editor(html, '404')
     else:
         html = _inject_admin_edit_button(html, request.path + '?edit=1')
+        html = _inject_lazyload_fix(html)
     return html
 
 
@@ -1717,6 +1721,19 @@ def admin_page_html():
 def admin_full_content():
     """Полный content.json (включая content_html всех страниц) — для бэкапа."""
     return jsonify(load_content())
+
+
+def _inject_lazyload_fix(html):
+    """Инжект полифилла Bitrix-lazyload (static/js/lazyload-fix.js) перед </body>.
+
+    На клонированных страницах фоны/картинки используют .lazy[data-bg]/[data-src],
+    а плагин ls.unveilhooks загружается раньше lazysizes и не регистрируется —
+    картинки не подгружались, оставался спиннер и пустые колонки.
+    Скрипт вставляется всем посетителям (проблема у всех, не только у админа).
+    """
+    if 'lazyload-fix.js' in html or '</body>' not in html:
+        return html
+    return html.replace('</body>', '<script src="/static/js/lazyload-fix.js" defer></script>\n</body>', 1)
 
 
 def _inject_admin_edit_button(html, edit_url):
