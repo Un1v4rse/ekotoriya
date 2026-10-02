@@ -67,7 +67,14 @@
   показаны», oneClickBuy не виден, WB-кнопки работают сразу после навигации;
   консоль чистая (только ERR_CONNECTION_CLOSED метрики — внешняя блокировка)
 - Бэкапы: backups/ — 3 шт. (лимит, ротация не требуется)
-- Следующий шаг: коммит + push; деплой на прод (файлы + миграция БД + rebuild app)
+- Следующий шаг: —
+- Примечания: ДЕПЛОЙ ВЫПОЛНЕН: файлы залиты на 185.56.162.91:/opt/ekotoriya, бэкап
+  живой БД в контейнере (/app/data/ekotoriya.db.bak_20261002), миграция
+  scripts/migrate_maps_to_template.py применена через `docker compose exec -T app
+  python - < ...` (все 4 поля index очищены), app пересобран (`up -d --build`).
+  Проверка прода: / 200 (MAPS 1 раз, перед footer), /catalog/ 200, /contacts/ 200,
+  /admin/login 200, /api/wb-products 200, favorit type_1.php содержит кнопку
+  «Показать ещё». Коммит 44e6623 запушен в main.
 - Примечания: GET на POST-only /admin/import/redirects → 404 вместо 405 и
   ajax_counter.php 404 — косметика, не трогали; БД (data/ekotoriya.db) в git
   не коммитится (gitignore) — миграция MAPS на проде выполняется скриптом
