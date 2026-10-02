@@ -20,6 +20,60 @@
 
 ---
 
+## [2026-10-02 18:40] Задача: [фикс] аудит сайта + задачи заказчика (Контакты вниз, «Показать ещё», 3 дефекта)
+- Статус: done
+- Сделано:
+  1. Полный аудит сайта (Playwright/Chrome MCP): найдено только 3 некритичных дефекта,
+     все исправлены:
+     - Мёртвые кнопки «Купить в 1 клик» (битрикс .one_click, обработчика нет) —
+       скрыты инжектом `<style>.one_click{display:none !important}</style>` в
+       `_inject_lazyload_fix` (app.py). WB-карточки не затронуты: их кнопка
+       «Купить в 1 клик» — это .wb-buy-btn, она рабочая.
+     - Гонка привязки обработчиков WB-кнопок (клик до initWbActions терялся) —
+       wb-actions.js переписан на делегирование (document click/submit,
+       closest('.wb-cart-btn'/'.wb-like-btn'/'.wb-buy-btn'/'.wb-order-form'));
+       initWbActions оставлен no-op; скрипт перенесён в <head> (index, catalog,
+       catalog__namatrasniki). Проверено Playwright: клик сразу после навигации
+       → /api/cart/add → редирект в /basket/.
+     - Накрутка лайков (каждый клик писал Event) — customers.add_like теперь
+       дедуплицирует по (customer_id|session_id, product_id), возвращает True/False.
+  2. «Контакты» (секция MAPS с картой) перенесена в самый низ главной: вырезана из
+     БД (pages.slug='index': content_html, blocks, draft_blocks, published_blocks —
+     все 4 поля) и вставлена статично в templates/pages/index.html перед footer.
+     Рендер проверен: секция на top≈8698, перед футером (8799), контент и карта
+     грузятся (лениво, как на оригинале). ВНИМАНИЕ: блок «Карта» больше недоступен
+     в конструкторе (статичная часть шаблона) — осознанное решение.
+  3. Блок «Популярные товары»: добавлена кнопка «Показать ещё»
+     (static/include/mainpage/components/favorit_item/type_1.php) — догрузка по 4
+     товара из /api/wb-products, при исчерпании «Все товары показаны» + disabled.
+     В демо-режиме 8 товаров: 4 → 8 → конец. Проверено в браузере.
+  4. «Блоки съехали» — проверено: порядок блоков главной в БД СОВПАДАЕТ с оригиналом
+     ekotoriya.ru (banner → tizers → middle_adv → catalog_tab → brands → reviews →
+     company → instagram → maps → news → blog → favorit); съезда нет, пустые
+     блоки (бренды/новости/блог) не рендерятся и на оригинале.
+  Миграция для прода: scripts/migrate_maps_to_template.py (вырезание MAPS из всех
+  4 полей, балансировка div; проверена на копии БД из backup_2026-09-26_00-32).
+  Восстановлен «грязный» templates/pages/akcii.html (тест test_duplicate_page
+  копирует _new_page_base.html в akcii.html — в коммит не включать, см. записи ниже).
+  Временные файлы data/_live_index.html, data/_sections.json, data/_maps_section.html
+  удалены.
+- Изменённые файлы: app.py, customers.py, static/js/wb-actions.js,
+  static/include/mainpage/components/favorit_item/type_1.php,
+  templates/pages/index.html, templates/pages/catalog.html,
+  templates/pages/catalog__namatrasniki.html, tests/test_customers.py,
+  scripts/migrate_maps_to_template.py (новый)
+- Проверки: pytest 221 passed (вкл. новый test_like_dedup_same_session_and_customer);
+  live: / 200, MAPS внизу страницы грузится, «Показать ещё» 4→8→«Все товары
+  показаны», oneClickBuy не виден, WB-кнопки работают сразу после навигации;
+  консоль чистая (только ERR_CONNECTION_CLOSED метрики — внешняя блокировка)
+- Бэкапы: backups/ — 3 шт. (лимит, ротация не требуется)
+- Следующий шаг: коммит + push; деплой на прод (файлы + миграция БД + rebuild app)
+- Примечания: GET на POST-only /admin/import/redirects → 404 вместо 405 и
+  ajax_counter.php 404 — косметика, не трогали; БД (data/ekotoriya.db) в git
+  не коммитится (gitignore) — миграция MAPS на проде выполняется скриптом
+
+---
+
 ## [2026-10-02 15:15] Задача: [цикл3-этап-4] пункты 4.1–4.2 — регрессия и финал (закрытие PROMPT_v4)
 - Статус: done
 - Сделано: проверено, что PROMPT_v4 — это промпт цикла 3, который выполнен ранее;

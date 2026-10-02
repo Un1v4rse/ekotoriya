@@ -230,9 +230,25 @@ def add_event(etype, product_id=None, product_name='', customer_id=None,
 
 
 def add_like(product_id, product_name='', customer_id=None, session_id=''):
-    """Публичный лайк товара (как раньше, плюс событие)."""
-    add_event('like', product_id=product_id, product_name=product_name,
+    """Публичный лайк товара (как раньше, плюс событие).
+
+    Дедупликация: повторный лайк того же товара от того же клиента
+    (или той же сессии) не создаёт новое событие — иначе публичный
+    счётчик накручивался неограниченно одним пользователем.
+    Возвращает True, если лайк записан, False — если уже был.
+    """
+    pid = _coerce_product_id(product_id)
+    if customer_id or session_id:
+        q = db.session.query(Event).filter_by(type='like', product_id=pid)
+        if customer_id:
+            q = q.filter_by(customer_id=customer_id)
+        else:
+            q = q.filter_by(session_id=session_id)
+        if q.first() is not None:
+            return False  # уже лайкнуто этим клиентом/сессией
+    add_event('like', product_id=pid, product_name=product_name,
               customer_id=customer_id, session_id=session_id)
+    return True
 
 
 def _int_key(pid):

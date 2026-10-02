@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ru" lang="ru"  >
 <head>
+<script src="/static/js/wb-actions.js"></script>
 	<title>{{ page.title }}</title>
 	<meta name="viewport" content="initial-scale=1.0, width=device-width, maximum-scale=1" />
 	<meta name="HandheldFriendly" content="true" />
@@ -789,6 +790,10 @@
 	    {% include 'recommendations_block_inner.html' %}
 	</div>
 	{% endif %}
+	<!-- «Контакты» (карта) — всегда в самом низу страницы, перед футером -->
+	<div class="drag-block container MAPS js-load-block loader_circle" data-class="maps_drag" data-file="/static/include/mainpage/components/maps/front_text_markers.php?v=4" style="--order-index: 15">
+		<div class="content_wrapper_block"><div class="maxwidth-theme wide"></div></div>
+	</div>
 <footer id="footer">
 				<!--'start_frame_cache_viewed-block'-->	<!--'end_frame_cache_viewed-block'-->                                                <div itemscope itemtype="http://schema.org/Organization">
 
@@ -1164,6 +1169,6 @@
                 
                     <div id="body_iframe_wrapper"></div>
 <div id="popup_iframe_wrapper"></div>
-<script src="/static/js/wb-actions.js"></script>
+
 </body>
 </html>

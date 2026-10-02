@@ -52,6 +52,21 @@ def test_likes_events_and_counts():
     assert str(likes[0]['product_id']) == '890129778'
 
 
+def test_like_dedup_same_session_and_customer():
+    """Повторный лайк той же сессией/клиентом не накручивает счётчик."""
+    assert customers.add_like('777000111', 'Товар', session_id='sess-x') is True
+    assert customers.add_like('777000111', 'Товар', session_id='sess-x') is False
+    c = customers.add_customer('Дедуп', '+7 900 444-55-77')
+    assert customers.add_like('777000222', 'Товар2', customer_id=c['id']) is True
+    assert customers.add_like('777000222', 'Товар2', customer_id=c['id']) is False
+    counts = customers.get_like_counts()
+    assert counts.get(777000111) == 1
+    assert counts.get(777000222) == 1
+    # другая сессия/клиент — отдельный лайк
+    assert customers.add_like('777000111', 'Товар', session_id='sess-y') is True
+    assert customers.get_like_counts().get(777000111) == 2
+
+
 def test_add_event_generic():
     c = customers.add_customer('События', '+7 900 555-66-77')
     customers.add_event('view', product_id='890129778', customer_id=c['id'])

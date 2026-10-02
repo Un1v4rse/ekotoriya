@@ -1,98 +1,99 @@
+/* Действия WB-карточек: корзина, лайк, заявка.
+ * Обработчики — делегированные (на document), поэтому работают для любых
+ * карточек независимо от момента их появления в DOM и от того, когда
+ * догрузился этот файл (раньше была гонка: клик раньше ~2 с уводил на
+ * страницу товара вместо добавления в корзину). */
 (function() {
-    function initWbActions(container) {
-        if (!container) container = document;
-        container.querySelectorAll('.wb-buy-btn').forEach(btn => {
-            if (btn.dataset.wbBound) return;
-            btn.dataset.wbBound = '1';
-            if (btn.dataset.stock === '0') {
-                // Товара нет в наличии — кнопка неактивна
-                btn.disabled = true;
-                btn.style.background = '#ccc';
-                btn.style.cursor = 'not-allowed';
+    var delegated = false;
+
+    function delegate() {
+        if (delegated) return;
+        delegated = true;
+
+        document.addEventListener('click', function(e) {
+            var buyBtn = e.target.closest && e.target.closest('.wb-buy-btn');
+            if (buyBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (buyBtn.dataset.stock === '0' || buyBtn.disabled) return;
+                var pid = buyBtn.dataset.id;
+                var form = document.querySelector('.wb-order-form[data-id="' + pid + '"]');
+                if (form) form.style.display = form.style.display === 'none' ? 'block' : 'none';
                 return;
             }
-            btn.addEventListener('click', function(e) {
+
+            var cartBtn = e.target.closest && e.target.closest('.wb-cart-btn');
+            if (cartBtn) {
                 e.preventDefault();
                 e.stopPropagation();
-                const pid = this.dataset.id;
-                const form = container.querySelector('.wb-order-form[data-id="' + pid + '"]');
-                if (form) {
-                    form.style.display = form.style.display === 'none' ? 'block' : 'none';
-                }
-            });
-        });
-        container.querySelectorAll('.wb-order-form').forEach(form => {
-            if (form.dataset.wbBound) return;
-            form.dataset.wbBound = '1';
-            form.addEventListener('submit', async function(e) {
+                if (cartBtn.disabled) return;
+                fetch('/api/cart/add', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({product_id: cartBtn.dataset.id, source: cartBtn.dataset.source || 'wb'})})
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.success) {
+                            cartBtn.textContent = '✓ В корзине (' + data.count + ')';
+                            setTimeout(function() { location.href = '/basket/'; }, 500);
+                        }
+                    })
+                    .catch(function(err) { console.error('cart error', err); });
+                return;
+            }
+
+            var likeBtn = e.target.closest && e.target.closest('.wb-like-btn');
+            if (likeBtn) {
                 e.preventDefault();
-                const result = this.querySelector('.wb-order-result');
-                const fd = new FormData(this);
-                fd.append('product_id', this.dataset.id);
-                const card = this.closest('.wb-product-card');
-                if (card) {
-                    const nameEl = card.querySelector('[data-name]');
-                    const btn = card.querySelector('.wb-buy-btn');
-                    if (nameEl) fd.append('product_name', nameEl.dataset.name || '');
-                    if (btn) fd.append('price', btn.dataset.price || 0);
-                }
-                const body = Object.fromEntries(fd.entries());
-                try {
-                    const resp = await fetch('/api/order', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
-                    const data = await resp.json();
+                e.stopPropagation();
+                fetch('/api/like', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({product_id: likeBtn.dataset.id, product_name: likeBtn.dataset.name || ''})})
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.success) {
+                            likeBtn.textContent = '❤ В избранном (' + data.likes + ')';
+                            likeBtn.style.borderColor = '#999';
+                            likeBtn.style.color = '#999';
+                        }
+                    })
+                    .catch(function(err) { console.error('like error', err); });
+            }
+        });
+
+        document.addEventListener('submit', function(e) {
+            var form = e.target.closest && e.target.closest('.wb-order-form');
+            if (!form) return;
+            e.preventDefault();
+            var result = form.querySelector('.wb-order-result');
+            var fd = new FormData(form);
+            fd.append('product_id', form.dataset.id);
+            var card = form.closest('.wb-product-card');
+            if (card) {
+                var nameEl = card.querySelector('[data-name]');
+                var btn = card.querySelector('.wb-buy-btn');
+                if (nameEl) fd.append('product_name', nameEl.dataset.name || '');
+                if (btn) fd.append('price', btn.dataset.price || 0);
+            }
+            var body = Object.fromEntries(fd.entries());
+            fetch('/api/order', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
                     result.textContent = data.success ? 'Заявка принята! Мы свяжемся с вами.' : 'Ошибка: ' + (data.error || '');
                     result.style.color = data.success ? '#137333' : '#c00';
-                    if (data.success) this.reset();
-                } catch (err) {
+                    if (data.success) form.reset();
+                })
+                .catch(function(err) {
                     result.textContent = 'Ошибка сети: ' + err.message;
                     result.style.color = '#c00';
-                }
-            });
-        });
-        container.querySelectorAll('.wb-cart-btn').forEach(btn => {
-            if (btn.dataset.wbBound) return;
-            btn.dataset.wbBound = '1';
-            btn.addEventListener('click', async function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                try {
-                    const resp = await fetch('/api/cart/add', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({product_id: this.dataset.id, source: this.dataset.source || 'wb'})});
-                    const data = await resp.json();
-                    if (data.success) {
-                        this.textContent = '✓ В корзине (' + data.count + ')';
-                        setTimeout(() => { location.href = '/basket/'; }, 500);
-                    }
-                } catch (err) {
-                    console.error('cart error', err);
-                }
-            });
-        });
-        container.querySelectorAll('.wb-like-btn').forEach(btn => {
-            if (btn.dataset.wbBound) return;
-            btn.dataset.wbBound = '1';
-            btn.addEventListener('click', async function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                const pid = this.dataset.id;
-                const name = this.dataset.name || '';
-                try {
-                    const resp = await fetch('/api/like', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({product_id: pid, product_name: name})});
-                    const data = await resp.json();
-                    if (data.success) {
-                        this.textContent = '❤ В избранном (' + data.likes + ')';
-                        this.style.borderColor = '#999';
-                        this.style.color = '#999';
-                    }
-                } catch (err) {
-                    console.error('like error', err);
-                }
-            });
+                });
         });
     }
-    window.initWbActions = initWbActions;
+
+    /* Совместимость: динамические блоки (например, «Популярные товары»)
+     * вызывают initWbActions(container) после вставки разметки.
+     * С делегированием ничего привязывать не нужно — функция остаётся
+     * как безопасный no-op. */
+    window.initWbActions = function() {};
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => initWbActions(document));
+        document.addEventListener('DOMContentLoaded', delegate);
     } else {
-        initWbActions(document);
+        delegate();
     }
 })();
