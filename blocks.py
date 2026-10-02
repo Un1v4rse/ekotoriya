@@ -766,7 +766,13 @@ def render_block(block):
         elif vm:
             embed = f'https://player.vimeo.com/video/{vm}'
         else:
-            return ''
+            # Пустая/неподдерживаемая ссылка — показываем заглушку, чтобы блок
+            # был виден на холсте и на сайте (иначе блок «теряется» невидимым)
+            inner = ('<div style="border:2px dashed #c9c9c9;border-radius:8px;'
+                     'padding:2.5rem 1rem;text-align:center;color:#999;'
+                     'font-size:0.95rem;background:#fafafa;">'
+                     '🎬 Видео: укажите ссылку YouTube или Vimeo в настройках блока</div>')
+            return _block_wrapper(block, inner, extra_style='margin:1.5rem 0')
         inner = (f'<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:8px;">'
                  f'<iframe src="{embed}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;"'
                  f' allowfullscreen loading="lazy"></iframe></div>')
@@ -888,7 +894,12 @@ def render_block(block):
                 continue
             items.append(f'<details><summary>{esc(q)}</summary><p>{esc(a)}</p></details>')
         if not items:
-            return ''
+            # Заглушка: опорожнённый блок иначе исчезает с холста редактора
+            return _block_wrapper(block, (
+                '<div style="border:2px dashed #c9c9c9;border-radius:8px;'
+                'padding:2rem 1rem;text-align:center;color:#999;'
+                'font-size:0.95rem;background:#fafafa;">'
+                '❓ FAQ: добавьте вопросы в настройках блока</div>'))
         title = (block.get('title') or '').strip()
         title_typo = _typo(block, 'title')
         title_html = f'<h2 style="{title_typo}">{esc(title)}</h2>' if title else ''
@@ -941,7 +952,14 @@ def render_block(block):
         # через санитайзер — script/iframe/on* не доходят до страницы.
         # Без обёртки: тест на точное равенство заглушки, raw HTML целиком.
         if _is_superadmin():
-            return _sanitize_html(block.get('html', '') or '')
+            raw_html = block.get('html', '') or ''
+            if not raw_html.strip():
+                # Пустой HTML — заглушка, иначе блок невидим на холсте
+                return ('<div style="border:2px dashed #c9c9c9;border-radius:8px;'
+                        'padding:2rem 1rem;text-align:center;color:#999;'
+                        'font-size:0.95rem;background:#fafafa;">'
+                        '⚙ HTML-блок: добавьте код в настройках блока</div>')
+            return _sanitize_html(raw_html)
         return '<!-- html block: restricted -->'
 
     if btype == 'timer':
@@ -1011,7 +1029,10 @@ def render_block(block):
                 imgs.append(f'<div class="cb-gallery-item"><img src="{esc(src)}" alt="{esc(it.get("alt") or "")}" loading="lazy"></div>')
         if not imgs:
             # Заглушка noimage: пустая галерея иначе исчезает с холста редактора.
-            inner = ('<div class="maxwidth-theme"><div class="cb-gallery-grid">'
+            # Заголовок выводим в обеих ветках — иначе title теряется у пустой галереи.
+            title0 = (block.get('title') or '').strip()
+            heading0 = f'<h2 style="{_typo(block, "title")}">{esc(title0)}</h2>' if title0 else ''
+            inner = ('<div class="maxwidth-theme">' + heading0 + '<div class="cb-gallery-grid">'
                      '<div class="cb-gallery-item"><img src="/static/noimage.png" alt="" loading="lazy" style="opacity:.7"></div>'
                      '<div class="cb-gallery-item"><img src="/static/noimage.png" alt="" loading="lazy" style="opacity:.7"></div>'
                      '<div class="cb-gallery-item"><img src="/static/noimage.png" alt="" loading="lazy" style="opacity:.7"></div>'
@@ -1049,7 +1070,12 @@ def render_block(block):
                 f'{icon_html}<div class="cb-feature-title" style="{t_title}">{esc(title)}</div>'
                 f'<div class="cb-feature-text" style="{t_text}">{esc(text)}</div></div>')
         if not items:
-            return ''
+            # Заглушка: опорожнённый блок иначе исчезает с холста редактора
+            return _block_wrapper(block, (
+                '<div style="border:2px dashed #c9c9c9;border-radius:8px;'
+                'padding:2rem 1rem;text-align:center;color:#999;'
+                'font-size:0.95rem;background:#fafafa;">'
+                '✨ Преимущества: добавьте пункты в настройках блока</div>'))
         cols = str(block.get('cols', 4))
         cols = cols if cols in ('2', '3', '4', '5') else '4'
         title = (block.get('title') or '').strip()

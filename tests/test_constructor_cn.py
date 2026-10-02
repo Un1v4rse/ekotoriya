@@ -97,6 +97,26 @@ def test_html_block_restricted_for_anonymous():
         '<!-- html block: restricted -->'
 
 
+def test_empty_html_block_shows_placeholder_for_superadmin():
+    # Пустой HTML-блок не должен исчезать с холста — показываем заглушку
+    with app_module.app.test_request_context():
+        from flask import session
+        session['admin_role'] = 'superadmin'
+        html = blocks_module.render_block({'type': 'html', 'html': ''})
+    assert 'HTML-блок' in html
+
+
+def test_empty_video_block_shows_placeholder():
+    # Пустая/неподдерживаемая ссылка видео — заглушка, а не пустота
+    html = blocks_module.render_block({'type': 'video', 'url': ''})
+    assert 'Видео' in html
+    html2 = blocks_module.render_block({'type': 'video', 'url': 'https://example.com/x'})
+    assert 'Видео' in html2
+    # валидная ссылка — реальный embed
+    html3 = blocks_module.render_block({'type': 'video', 'url': 'https://youtu.be/dQw4w9WgXcQ'})
+    assert 'youtube.com/embed' in html3
+
+
 def test_html_block_renders_for_superadmin():
     with app_module.app.test_request_context():
         from flask import session
@@ -274,3 +294,18 @@ def test_system_page_edit_mode_requires_pages_role():
     r = editor.get('/basket/?edit')
     assert r.status_code == 200
     assert 'page-editor.js' in r.get_data(as_text=True)
+
+
+def test_empty_gallery_renders_title_in_fallback():
+    # Заголовок пустой галереи не должен теряться (рендерился только с картинками)
+    html = blocks_module.render_block(
+        {'type': 'gallery', 'title': 'Фото производства', 'cols': 3, 'items': [{'src': '', 'alt': ''}]})
+    assert 'Фото производства' in html
+    assert 'noimage' in html
+
+
+def test_emptied_features_and_faq_show_placeholder():
+    html = blocks_module.render_block({'type': 'features', 'title': 'X', 'items': [{'title': '', 'text': ''}]})
+    assert 'Преимущества' in html
+    html2 = blocks_module.render_block({'type': 'faq', 'title': 'X', 'items': [{'q': '', 'a': ''}]})
+    assert 'FAQ' in html2

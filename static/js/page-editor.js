@@ -2710,7 +2710,11 @@
         });
         if (apply && b && cfg) {
             if (cfg.whole) {
-                b.html = textEdit.targets.map(t => t.innerHTML).join('');
+                // ВАЖНО: сохраняем outerHTML, а не innerHTML — иначе у секции
+                // при первой же правке срезается корневой элемент (wrapper)
+                // и блок теряет классы/стили (drag-block и т.п.) навсегда.
+                b.html = textEdit.targets.map(t =>
+                    t instanceof Element ? t.outerHTML : (t.textContent || '')).join('');
             } else if (cfg.multi) {
                 b[cfg.field] = textEdit.targets.map(t => t.innerText.trim()).filter(Boolean).join('\n\n');
             } else if (textEdit.targets[0]) {
