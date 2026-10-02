@@ -11,9 +11,23 @@
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <link rel="preload" fetchpriority="high" as="image" href="/static/upload/iblock/b01/xmi6kr95b3ietlvvphzwvv7rfdn64asp.webp">
 <style>
-  /* До инициализации swiper первый слайд должен быть виден (защита от FOUC),
-     но высоту ему НЕ фиксируем — её задаёт swiper по контенту, как остальным слайдам. */
+  /* До инициализации swiper первый слайд должен быть виден (защита от FOUC). */
   .main-slider__wrapper > .swiper-slide:first-child { width: 100% !important; opacity: 1 !important; visibility: visible !important; background-size: cover !important; background-position: center !important; }
+  /* Высота слайдов фиксируется ступенями, как на оригинале: высота раньше
+     зависела от контента/шрифтов и баннер при медленной загрузке был урезан,
+     после прокрутки «возвращался в норму». Фиксированная высота убирает
+     зависимость от тайминга загрузки шрифтов и картинок.
+     Фактические значения сняты с прода: 360→280, 480–767→350, 768–1023→380, ≥1024→631. */
+  .top_slider_wrapp .main-slider__wrapper .main-slider__item { height: 350px !important; }
+  @media (max-width: 479px) {
+    .top_slider_wrapp .main-slider__wrapper .main-slider__item { height: 280px !important; }
+  }
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .top_slider_wrapp .main-slider__wrapper .main-slider__item { height: 380px !important; }
+  }
+  @media (min-width: 1024px) {
+    .top_slider_wrapp .main-slider__wrapper .main-slider__item { height: 631px !important; }
+  }
 </style>
 <meta name="description" content="{{ page.meta_description }}" />
 <link href="/static/bitrix/css/aspro.max/notice.min.css" rel="stylesheet"/>
