@@ -20,6 +20,60 @@
 
 ---
 
+## [2026-10-02 15:15] Задача: [цикл3-этап-4] пункты 4.1–4.2 — регрессия и финал (закрытие PROMPT_v4)
+- Статус: done
+- Сделано: проверено, что PROMPT_v4 — это промпт цикла 3, который выполнен ранее;
+  остались незакрытыми только пункты 4.1–4.2 PLAN_v3. Выполнены: регрессионная
+  проверка (pytest 220 passed; /, /catalog/, /contacts/, /company/, /blog/,
+  /basket/, /auth/, /admin/login, robots.txt, sitemap.xml, /theme.css — 200;
+  /personal/* → 302 для неавторизованного; /api/client/register → 200, клиент
+  создан в БД). 400 при проверке через curl в Git Bash — артефакт MSYS-квотинга,
+  через urllib тот же запрос → 200. Пункты 4.1/4.2 отмечены в PLAN_v3.md.
+- Изменённые файлы: PLAN_v3.md, WORKLOG.md
+- Проверки: pytest 220 passed; live-проверки перечислены выше
+- Бэкапы: backups/ — 3 шт. (лимит, ротация не требуется)
+- Следующий шаг: коммит + push; план PROMPT_v4 полностью закрыт
+- Примечания: всё из PROMPT_v4 (этапы 0–3) было выполнено в сессиях цикла 3,
+  это подтверждено WORKLOG и git-историей ([цикл3-этап-*] коммиты, push в main)
+
+---
+
+## [2026-10-02 15:00] Задача: [деплой-1] Прод-деплой на VPS 185.56.162.91
+- Статус: done
+- Сделано: сервер Ubuntu 26.04 (x86_64, 41G диск, 3.8G RAM, порты 80/443 свободны).
+  Установлен Docker 29.8.2 + Compose v5.5.1 (get.docker.com). GitHub clone не прошёл
+  (репо требует авторизации с сервера) → деплой через `git archive HEAD` → SFTP →
+  распаковка в `/opt/ekotoriya`. Папка `data/` (БД после `PRAGMA wal_checkpoint(TRUNCATE)`,
+  md5 `43cae666…` совпал с локальной) залита через SFTP в `/opt/ekotoriya/data/`.
+  Создан `/opt/ekotoriya/.env` (SECRET_KEY сгенерирован, ADMIN_USER=admin,
+  ADMIN_PASS=Eko#6a716c01, токены WB/Ozon пустые — демо-режим). В docker-compose.yml на
+  сервере `FORCE_HTTPS: "1"` → `"0"` (сертификатов нет, редирект на https по IP сломал бы
+  проверку; TLS — когда появится домен).
+- Изменённые файлы: на сервере — /opt/ekotoriya (всё), локально — deploy_ssh.py,
+  deploy_sftp_data.py (вспомогательные скрипты деплоя, не в git по смыслу, лежат в корне)
+- Проверки: SSH root-пароль работает; docker compose version OK; md5 БД совпал;
+  состав data/ на сервере = локальному (image_cache пуст и там, и там);
+  итог: / 200 (~0.2s), /admin/ 302→login 200, POST login 302→/admin/ 200 (доступ
+  подтверждён), /catalog/ 200, robots.txt/sitemap.xml/theme.css 200, 32 страницы
+  рендерятся из той же БД. Браузер (Chrome DevTools MCP): все статические ресурсы
+  200, порядок секций главной = исправленному (hero → преимущества → маркетплейсы →
+  рекомендации → О компании), консоль чистая кроме заблокированной Яндекс.Метрики
+  (так же локально) и одного 404 bitrix-остатка (ajax_counter.php — локально тоже
+  не существует как файл, функционал не зависит)
+- Бэкапы: локальные backups/ без изменений
+- Исправлено в ходе деплоя (коммит b74cbba, запушен): nginx.conf `root /var/www`
+  вместо `/var/www/static` — иначе путь дублировал /static/ и вся статика 404.
+  На сервере дополнительно: compose `FORCE_HTTPS=0`, снят :ro у ./static в nginx
+  (том app-uploads не мог создать mountpoint на read-only fs)
+- Следующий шаг: при появлении домена — выпустить TLS, вернуть FORCE_HTTPS=1,
+  раскомментировать блок :443 в nginx.conf. Обновления: tar+SFTP (git clone с
+  сервера требует авторизации) → `docker compose up -d --build`
+- Примечания: helper-скрипты deploy_ssh.py / deploy_sftp_data.py используют paramiko
+  (venv). Git Bash без sshpass. Обновление на сервере в будущем: повторный tar+SFTP
+  либо настройка git-доступа (deploy key), затем `docker compose up -d --build`.
+
+---
+
 ## [2026-09-25 21:20] Задача: [цикл3-этап-1] CN-L — вёрстка холста scale-to-fit
 - Статус: done
 - Сделано: переработан каркас редактора (`page-editor.js`/`page-editor.css`): body.pe-active
