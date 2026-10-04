@@ -20,7 +20,44 @@
 
 ---
 
-## [2026-10-02 23:20] Задача: [фикс] «блоки съехали» на главной — урезанный баннер при загрузке
+## [2026-10-04 14:15] Задача: [фикс] «блоки не по центру» + неработающая кнопка «человек» в шапке
+- Статус: done
+- Диагностика (Chrome DevTools MCP, прод 1920 + оригинал ekotoriya.ru для сверки):
+  1. Центрирование. На оригинале контент центрируется правилом
+     `.middle>.container{width:100%!important;padding:0!important}` (fluid-контейнер,
+     внутри `.maxwidth-theme` 1408px `margin:0 auto`). В наших шаблонах обёртки
+     `<div class="middle">` вокруг `{{ page.content_html }}` не было → `.container`
+     получал фиксированную bootstrap-ширину 1170px и прижимался влево. Часть блоков
+     главной (восстановленный оригинальный контент из БД) обёрнут в `.middle` в самом
+     content_html, а добавленные нами (CATALOG_TAB «Каталог товаров», wb-блоки, MAPS)
+     — нет, поэтому съезжали именно они.
+  2. Кнопка «человек» (`a.personal-link` в шапке). Имела атрибуты Bitrix
+     `data-event="jqm" data-name="auth"` — обработчик Aspro (main.js:5308) делает
+     preventDefault и пытается открыть битрикс-модалку (jqmEx), которой в клоне нет →
+     клик мёртвый.
+- Сделано:
+  1. Во все 34 шаблона templates/pages/*.html добавлена обёртка `<div class="middle">`
+     вокруг `{{ page.content_html | safe }}` (в т.ч. `_new_page_base.html` для страниц
+     конструктора). Скриптовая замена единого паттерна, затем ручная правка базового.
+  2. У всех 132 ссылок `a.personal-link` в 33 шаблонах удалены атрибуты
+     `data-event="jqm" data-param-backurl data-param-type="auth" data-name="auth"` —
+     ссылка стала обычной (`href="/personal/"`), анонима редиректит на `/auth/`.
+- Изменённые файлы: templates/pages/*.html (34 файла), templates/pages/_new_page_base.html
+- Проверки:
+  - Локально: `.container` fluid (1600), parent `.middle`, `.maxwidth-theme` auto-margin,
+    «Каталог товаров» 1400px по центру, клик по иконке → /auth/?next=/personal/, 380px без overflow.
+  - `pytest -q` — 225 passed.
+  - Прод (после деплоя): scrollWidth==1920==innerWidth; CATALOG_TAB container 1920 в `.middle`;
+    вкладка каталога 1400px @ x=260; maxwidth-theme 1408 @ x=256; personal-link без jqm;
+    клик → /auth/?next=/personal/; мобильная 380px без горизонтального скролла.
+- Деплой: git archive HEAD templates/pages → tar на сервер в /opt/ekotoriya (первый заход
+  ошибочно распаковал в /opt/ekotoriya/templates — лишнее удалено), docker compose up -d --build app.
+- Коммит: eb0d161, запушен в main.
+- Следующий шаг: ждать проверки заказчиком.
+- Примечания: при деплое выяснилось, что главная частично рендерится из content_html-снапшота
+  в БД (там есть собственный `.middle` оригинальной вёрстки) — обёртка в шаблоне даёт
+  вложенный `.middle`, безвредно. Перезапись шаблонов нормализовала концы строк
+  (убраны одиночные CR) — диф большой, функционально без изменений.
 - Статус: done
 - Диагностика (Chrome DevTools MCP, DOM + скриншоты local/prod):
   1. Порядок блоков главной в БД совпадает с оригиналом (banner → tizers →
