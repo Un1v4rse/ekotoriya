@@ -417,7 +417,7 @@
 
                         <div>
 
-                                    <i class="svg svg-inline-phone  inline " aria-hidden="true"><svg width="5" height="13" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#phone_footer"></use></svg></i><a rel="nofollow" href="tel:88002010824">8 800 201 08 24</a>
+                                    <i class="svg svg-inline-phone  inline " aria-hidden="true"><svg width="5" height="13" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#phone_footer"></use></svg></i><a rel="nofollow" href="tel:{{ (site.phone or '8 800 201 08 24') | digits }}">{{ site.phone or '8 800 201 08 24' }}</a>
 
                                         </div>
 
@@ -495,7 +495,7 @@
 
                             <div class="email blocks color-theme-hover">
 
-                    <i class="svg inline  svg-inline-email" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="11" height="9" viewBox="0 0 11 9"><path  data-name="Rectangle 583 copy 16" class="cls-1" d="M367,142h-7a2,2,0,0,1-2-2v-5a2,2,0,0,1,2-2h7a2,2,0,0,1,2,2v5A2,2,0,0,1,367,142Zm0-2v-3.039L364,139h-1l-3-2.036V140h7Zm-6.634-5,3.145,2.079L366.634,135h-6.268Z" transform="translate(-358 -133)"/></svg></i>                    <a href="mailto:HelloEkotoriya@yandex.ru">helloekotoriya@yandex.ru</a>                </div>
+                    <i class="svg inline  svg-inline-email" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="11" height="9" viewBox="0 0 11 9"><path  data-name="Rectangle 583 copy 16" class="cls-1" d="M367,142h-7a2,2,0,0,1-2-2v-5a2,2,0,0,1,2-2h7a2,2,0,0,1,2,2v5A2,2,0,0,1,367,142Zm0-2v-3.039L364,139h-1l-3-2.036V140h7Zm-6.634-5,3.145,2.079L366.634,135h-6.268Z" transform="translate(-358 -133)"/></svg></i>                    <a href="mailto:{{ site.email or 'helloekotoriya@yandex.ru' }}">{{ site.email or 'helloekotoriya@yandex.ru' }}</a>                </div>
 
         
 
@@ -503,7 +503,7 @@
 
                 <i class="svg inline  svg-inline-addr" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="9" height="12" viewBox="0 0 9 12"><path class="cls-1" d="M959.135,82.315l0.015,0.028L955.5,87l-3.679-4.717,0.008-.013a4.658,4.658,0,0,1-.83-2.655,4.5,4.5,0,1,1,9,0A4.658,4.658,0,0,1,959.135,82.315ZM955.5,77a2.5,2.5,0,0,0-2.5,2.5,2.467,2.467,0,0,0,.326,1.212l-0.014.022,2.181,3.336,2.034-3.117c0.033-.046.063-0.094,0.093-0.142l0.066-.1-0.007-.009a2.468,2.468,0,0,0,.32-1.2A2.5,2.5,0,0,0,955.5,77Z" transform="translate(-951 -75)"/></svg></i>                <div class="title font_upper muted">Адрес производства</div>
 
-г. Череповец, ул. Гоголя 56            </div>
+{{ site.address or 'г. Череповец, ул. Гоголя 56' }}            </div>
 
                         						<div class="social-block">
 
@@ -570,7 +570,7 @@
 
             <div class="phone with_dropdown no-icons">
 
-                                    <i class="svg svg-inline-phone  inline " aria-hidden="true"><svg width="5" height="13" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#phone_black"></use></svg></i><a rel="nofollow" href="tel:88002010824">8 800 201 08 24</a>
+                                    <i class="svg svg-inline-phone  inline " aria-hidden="true"><svg width="5" height="13" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#phone_black"></use></svg></i><a rel="nofollow" href="tel:{{ (site.phone or '8 800 201 08 24') | digits }}">{{ site.phone or '8 800 201 08 24' }}</a>
 
                                             </div>
 
@@ -802,7 +802,7 @@
 
             <div class="phone with_dropdown no-icons">
 
-                                    <i class="svg svg-inline-phone  inline " aria-hidden="true"><svg width="5" height="13" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#phone_black"></use></svg></i><a rel="nofollow" href="tel:88002010824">8 800 201 08 24</a>
+                                    <i class="svg svg-inline-phone  inline " aria-hidden="true"><svg width="5" height="13" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#phone_black"></use></svg></i><a rel="nofollow" href="tel:{{ (site.phone or '8 800 201 08 24') | digits }}">{{ site.phone or '8 800 201 08 24' }}</a>
 
                                             </div>
 
@@ -818,7 +818,7 @@
 
                         <div class="address blocks">
 
-                            г. Череповец, ул. Гоголя 56                        </div>
+                            {{ site.address or 'г. Череповец, ул. Гоголя 56' }}                        </div>
 
                     </div>
 
@@ -1049,7 +1049,7 @@
 
                         <div class="more_phone flexbox flexbox--row flexbox--gap flexbox--gap-16">
 
-                            <a class="more_phone_a dark-color no-decript flexbox flexbox--row flexbox--gap flexbox--gap-8" rel="nofollow" href="tel:88002010824">
+                            <a class="more_phone_a dark-color no-decript flexbox flexbox--row flexbox--gap flexbox--gap-8" rel="nofollow" href="tel:{{ (site.phone or '8 800 201 08 24') | digits }}">
 
                                 <span class="phones__phone-icon no-icon">
 
@@ -1057,7 +1057,7 @@
 
                                 <span class="phones__phone-link-text flexbox dropdown--top-reverse flexbox--gap flexbox--gap-8">
 
-                                    <span class="phones__phone-title">8 800 201 08 24</span>
+                                    <span class="phones__phone-title">{{ site.phone or '8 800 201 08 24' }}</span>
 
                                                                     </span>
 
@@ -1394,11 +1394,11 @@
 
                     <li>
 
-                        <a rel="nofollow" href="tel:88002010824" class="dark-color no-decript">
+                        <a rel="nofollow" href="tel:{{ (site.phone or '8 800 201 08 24') | digits }}" class="dark-color no-decript">
 
                             <i class="svg svg-phone"></i>
 
-                            <i class="svg svg-inline-phone  inline " aria-hidden="true"><svg width="5" height="13" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#phone_black"></use></svg></i>                            <span>8 800 201 08 24</span>
+                            <i class="svg svg-inline-phone  inline " aria-hidden="true"><svg width="5" height="13" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#phone_black"></use></svg></i>                            <span>{{ site.phone or '8 800 201 08 24' }}</span>
 
                                                     </a>
 
@@ -1418,11 +1418,11 @@
 
                     <i class="svg inline  svg-inline-address" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="9" height="12" viewBox="0 0 9 12"><path class="cls-1" d="M959.135,82.315l0.015,0.028L955.5,87l-3.679-4.717,0.008-.013a4.658,4.658,0,0,1-.83-2.655,4.5,4.5,0,1,1,9,0A4.658,4.658,0,0,1,959.135,82.315ZM955.5,77a2.5,2.5,0,0,0-2.5,2.5,2.467,2.467,0,0,0,.326,1.212l-0.014.022,2.181,3.336,2.034-3.117c0.033-.046.063-0.094,0.093-0.142l0.066-.1-0.007-.009a2.468,2.468,0,0,0,.32-1.2A2.5,2.5,0,0,0,955.5,77Z" transform="translate(-951 -75)"/></svg></i>                    <div class="title font_upper muted">Адрес производства</div>
 
-г. Череповец, ул. Гоголя 56                </div>
+{{ site.address or 'г. Череповец, ул. Гоголя 56' }}                </div>
 
                                         <div class="email">
 
-                    <i class="svg inline  svg-inline-email" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="11" height="9" viewBox="0 0 11 9"><path  data-name="Rectangle 583 copy 16" class="cls-1" d="M367,142h-7a2,2,0,0,1-2-2v-5a2,2,0,0,1,2-2h7a2,2,0,0,1,2,2v5A2,2,0,0,1,367,142Zm0-2v-3.039L364,139h-1l-3-2.036V140h7Zm-6.634-5,3.145,2.079L366.634,135h-6.268Z" transform="translate(-358 -133)"/></svg></i>                    <a href="mailto:HelloEkotoriya@yandex.ru">helloekotoriya@yandex.ru</a>                </div>
+                    <i class="svg inline  svg-inline-email" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="11" height="9" viewBox="0 0 11 9"><path  data-name="Rectangle 583 copy 16" class="cls-1" d="M367,142h-7a2,2,0,0,1-2-2v-5a2,2,0,0,1,2-2h7a2,2,0,0,1,2,2v5A2,2,0,0,1,367,142Zm0-2v-3.039L364,139h-1l-3-2.036V140h7Zm-6.634-5,3.145,2.079L366.634,135h-6.268Z" transform="translate(-358 -133)"/></svg></i>                    <a href="mailto:{{ site.email or 'helloekotoriya@yandex.ru' }}">{{ site.email or 'helloekotoriya@yandex.ru' }}</a>                </div>
 
                                 </div>
 
@@ -1746,7 +1746,7 @@
 
                         <div>
 
-                                    <i class="svg svg-inline-phone  inline " aria-hidden="true"><svg width="5" height="13" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#phone_footer"></use></svg></i><a rel="nofollow" href="tel:88002010824">8 800 201 08 24</a>
+                                    <i class="svg svg-inline-phone  inline " aria-hidden="true"><svg width="5" height="13" ><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/header_icons_srite.svg#phone_footer"></use></svg></i><a rel="nofollow" href="tel:{{ (site.phone or '8 800 201 08 24') | digits }}">{{ site.phone or '8 800 201 08 24' }}</a>
 
                                         </div>
 
@@ -1772,7 +1772,7 @@
 
                             <div class="email blocks">
 
-                    <i class="svg inline  svg-inline-email" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="11" height="9" viewBox="0 0 11 9"><path  data-name="Rectangle 583 copy 16" class="cls-1" d="M367,142h-7a2,2,0,0,1-2-2v-5a2,2,0,0,1,2-2h7a2,2,0,0,1,2,2v5A2,2,0,0,1,367,142Zm0-2v-3.039L364,139h-1l-3-2.036V140h7Zm-6.634-5,3.145,2.079L366.634,135h-6.268Z" transform="translate(-358 -133)"/></svg></i>                    <a href="mailto:HelloEkotoriya@yandex.ru">helloekotoriya@yandex.ru</a>                </div>
+                    <i class="svg inline  svg-inline-email" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="11" height="9" viewBox="0 0 11 9"><path  data-name="Rectangle 583 copy 16" class="cls-1" d="M367,142h-7a2,2,0,0,1-2-2v-5a2,2,0,0,1,2-2h7a2,2,0,0,1,2,2v5A2,2,0,0,1,367,142Zm0-2v-3.039L364,139h-1l-3-2.036V140h7Zm-6.634-5,3.145,2.079L366.634,135h-6.268Z" transform="translate(-358 -133)"/></svg></i>                    <a href="mailto:{{ site.email or 'helloekotoriya@yandex.ru' }}">{{ site.email or 'helloekotoriya@yandex.ru' }}</a>                </div>
 
         
 
@@ -1786,7 +1786,7 @@
 
                 <i class="svg inline  svg-inline-addr" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="9" height="12" viewBox="0 0 9 12"><path class="cls-1" d="M959.135,82.315l0.015,0.028L955.5,87l-3.679-4.717,0.008-.013a4.658,4.658,0,0,1-.83-2.655,4.5,4.5,0,1,1,9,0A4.658,4.658,0,0,1,959.135,82.315ZM955.5,77a2.5,2.5,0,0,0-2.5,2.5,2.467,2.467,0,0,0,.326,1.212l-0.014.022,2.181,3.336,2.034-3.117c0.033-.046.063-0.094,0.093-0.142l0.066-.1-0.007-.009a2.468,2.468,0,0,0,.32-1.2A2.5,2.5,0,0,0,955.5,77Z" transform="translate(-951 -75)"/></svg></i>                <div class="title font_upper muted">Адрес производства</div>
 
-г. Череповец, ул. Гоголя 56            </div>
+{{ site.address or 'г. Череповец, ул. Гоголя 56' }}            </div>
 
                                                         </div>
 

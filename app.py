@@ -55,6 +55,13 @@ IMAGE_CACHE_DIR.mkdir(exist_ok=True)
 ADMIN_CREDENTIALS_FILE = BASE_DIR / 'data' / 'admin_credentials.json'
 
 app = Flask(__name__)
+
+
+@app.template_filter('digits')
+def _digits_filter(s):
+    """Только цифры из строки — для tel:-ссылок из настроек сайта."""
+    import re
+    return re.sub(r'\D', '', str(s or ''))
 # SECRET_KEY только из окружения: без него сессии не переживают перезапуск.
 if os.environ.get('SECRET_KEY'):
     app.secret_key = os.environ['SECRET_KEY']
