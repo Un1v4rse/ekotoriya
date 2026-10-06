@@ -58,9 +58,47 @@ body.pe-active {
     overflow-y: hidden;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    /* Контейнер для @container-адаптива: подписи кнопок сворачиваются
+       в иконки по мере нехватки ширины — скролл панели не нужен. */
+    container-type: inline-size;
 }
 #pe-topbar::-webkit-scrollbar { display: none; }
 #pe-topbar > * { flex: 0 0 auto; }
+#pe-topbar .pe-tb-ico { display: none; }
+/* Прогрессивное сворачивание подписей в иконки (по ширине самой панели) */
+@container (max-width: 2120px) {
+    #pe-btn-pagesettings .pe-tb-label { display: none; }
+    #pe-btn-pagesettings .pe-tb-ico { display: inline; }
+}
+@container (max-width: 1960px) {
+    #pe-btn-preview .pe-tb-label { display: none; }
+    #pe-btn-preview .pe-tb-ico { display: inline; }
+    #pe-topbar { gap: 0.35rem; padding: 0 0.55rem; }
+}
+@container (max-width: 1820px) {
+    #pe-btn-draft .pe-tb-label { display: none; }
+    #pe-btn-draft .pe-tb-ico { display: inline; }
+}
+@container (max-width: 1700px) {
+    #pe-btn-versions .pe-tb-label,
+    #pe-btn-exit .pe-tb-label { display: none; }
+    #pe-btn-versions .pe-tb-ico,
+    #pe-btn-exit .pe-tb-ico { display: inline; }
+    #pe-topbar .pe-title { max-width: 170px; }
+    .pe-save-indicator { min-width: 0; }
+    #pe-topbar button { padding: 0.32rem 0.55rem; }
+}
+@container (max-width: 1520px) {
+    #pe-btn-publish .pe-tb-label { display: none; }
+    #pe-btn-publish .pe-tb-ico { display: inline; }
+    #pe-topbar .pe-title { max-width: 130px; }
+    #pe-device-switch button .pe-dev-label { display: none; }
+}
+@container (max-width: 1360px) {
+    #pe-btn-zoom { font-size: 0.72rem; }
+    #pe-status-badge { display: none; }
+    #pe-topbar .pe-title { max-width: 90px; }
+}
 #pe-topbar .pe-title {
     font-weight: 700;
     max-width: 260px;
@@ -1185,21 +1223,29 @@ body.pe-ui-hidden #pe-legacy-banner { display: none !important; }
 #pe-ui-restore:hover { background: var(--pe-panel-2); border-color: var(--pe-accent); }
 body.pe-ui-hidden #pe-ui-restore { display: flex; }
 
-/* ---------------- Подсказка горячих клавиш (CN-P 3.3) ---------------- */
+/* ---------------- Справка: горячие клавиши и кнопки панели ---------------- */
 #pe-hotkeys {
     position: fixed; inset: 0; z-index: 6000;
     background: rgba(20, 21, 25, 0.45);
     display: flex; align-items: center; justify-content: center;
 }
 .pe-hotkeys-panel {
-    background: #fff; border-radius: 12px; width: 480px; max-width: 92vw;
-    max-height: 80vh; overflow-y: auto; box-shadow: 0 18px 50px rgba(0,0,0,.35);
-    padding: 1rem 1.2rem 1.2rem;
+    background: #fff; border-radius: 12px; width: 680px; max-width: 94vw;
+    max-height: 85vh; display: flex; flex-direction: column;
+    box-shadow: 0 18px 50px rgba(0,0,0,.35);
+    padding: 1rem 1.2rem 0;
 }
 .pe-hotkeys-head {
     display: flex; align-items: center; justify-content: space-between;
-    font-weight: 700; font-size: 1rem; margin-bottom: .6rem;
+    font-weight: 700; font-size: 1rem; margin-bottom: .6rem; flex: 0 0 auto;
 }
+.pe-hotkeys-body { overflow-y: auto; padding-bottom: 1.2rem; }
+.pe-hotkeys-section {
+    font-weight: 700; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--pe-accent-dark, #7a6a55); margin: .9rem 0 .3rem;
+    padding-bottom: .25rem; border-bottom: 1px solid #e6ddd0;
+}
+.pe-hotkeys-body .pe-hotkeys-table:first-of-type { margin-top: 0; }
 .pe-hotkeys-close {
     border: 0; background: var(--pe-panel-2, #eee); border-radius: 8px;
     width: 28px; height: 28px; cursor: pointer; font-size: .9rem;
@@ -1207,7 +1253,7 @@ body.pe-ui-hidden #pe-ui-restore { display: flex; }
 .pe-hotkeys-close:hover { background: var(--pe-danger, #c0392b); color: #fff; }
 .pe-hotkeys-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
 .pe-hotkeys-table td { padding: .38rem .25rem; border-bottom: 1px solid #eee; vertical-align: top; }
-.pe-hotkeys-table td:first-child { white-space: nowrap; width: 45%; }
+.pe-hotkeys-table td:first-child { white-space: nowrap; width: 42%; }
 .pe-hotkeys-table kbd {
     display: inline-block; padding: .1rem .38rem; border: 1px solid #ccc;
     border-bottom-width: 2px; border-radius: 5px; background: #f6f6f6;

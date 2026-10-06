@@ -359,14 +359,14 @@
         '<button type="button" id="pe-btn-fullwidth" title="Во всю ширину: растянуть страницу на весь холст без масштаба">⇤⇥</button>' +
         '<button type="button" id="pe-btn-hotkeys" class="pe-tb-icon" title="Горячие клавиши (?)">?</button>' +
         '<span class="pe-top-spacer"></span>' +
-        '<button type="button" id="pe-btn-pagesettings" title="SEO и настройки страницы">Настройки страницы</button>' +
-        '<button type="button" id="pe-btn-versions" title="Версии и снапшоты страницы">Версии</button>' +
-        '<button type="button" id="pe-btn-preview" title="Предпросмотр как у посетителя">Предпросмотр</button>' +
+        '<button type="button" id="pe-btn-pagesettings" title="SEO и настройки страницы"><span class="pe-tb-ico" aria-hidden="true">⚙</span><span class="pe-tb-label">Настройки страницы</span></button>' +
+        '<button type="button" id="pe-btn-versions" title="Версии и снапшоты страницы"><span class="pe-tb-ico" aria-hidden="true">⧉</span><span class="pe-tb-label">Версии</span></button>' +
+        '<button type="button" id="pe-btn-preview" title="Предпросмотр как у посетителя"><span class="pe-tb-ico" aria-hidden="true">▶</span><span class="pe-tb-label">Предпросмотр</span></button>' +
         '<button type="button" id="pe-btn-hideui" class="pe-tb-icon" title="Скрыть все панели и посмотреть на страницу (Esc — вернуть панели)">👁</button>' +
         '<span class="pe-badge-status pe-badge-draft" id="pe-status-badge" title="Состояние публикации">…</span>' +
-        '<button type="button" id="pe-btn-draft" title="Сохранить черновик (Ctrl+S)">Сохранить черновик</button>' +
-        '<button type="button" id="pe-btn-publish" class="pe-primary" title="Опубликовать: изменения станут видны посетителям">Опубликовать</button>' +
-        '<button type="button" id="pe-btn-exit" title="Выйти из редактора">Выйти</button>';
+        '<button type="button" id="pe-btn-draft" title="Сохранить черновик (Ctrl+S)"><span class="pe-tb-ico" aria-hidden="true">💾</span><span class="pe-tb-label">Сохранить черновик</span></button>' +
+        '<button type="button" id="pe-btn-publish" class="pe-primary" title="Опубликовать: изменения станут видны посетителям"><span class="pe-tb-ico" aria-hidden="true">🚀</span><span class="pe-tb-label">Опубликовать</span></button>' +
+        '<button type="button" id="pe-btn-exit" title="Выйти из редактора"><span class="pe-tb-ico" aria-hidden="true">⎋</span><span class="pe-tb-label">Выйти</span></button>';
 
     // Левая панель: библиотека блоков + структура страницы
     const leftPanel = el('div', '', {id: 'pe-left'});
@@ -673,24 +673,64 @@
         }, {passive: false});
     }
 
-    /* ==================== Подсказка горячих клавиш (CN-P 3.3) ==================== */
+    /* ==================== Подсказка: горячие клавиши и кнопки панели ==================== */
     let hotkeysHelp = null;
     function toggleHotkeysHelp() {
         if (hotkeysHelp) { hotkeysHelp.remove(); hotkeysHelp = null; return; }
         const wrap = el('div', '', {id: 'pe-hotkeys'});
         wrap.innerHTML =
-            '<div class="pe-hotkeys-panel"><div class="pe-hotkeys-head">Горячие клавиши' +
+            '<div class="pe-hotkeys-panel"><div class="pe-hotkeys-head">Справка: кнопки и горячие клавиши' +
             '<button type="button" class="pe-hotkeys-close" title="Закрыть (Esc)">✕</button></div>' +
+            '<div class="pe-hotkeys-body">' +
+            '<div class="pe-hotkeys-section">Горячие клавиши</div>' +
             '<table class="pe-hotkeys-table">' +
+            '<tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Сохранить черновик</td></tr>' +
             '<tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Отменить действие</td></tr>' +
             '<tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Повторить действие</td></tr>' +
             '<tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Удалить выбранный блок</td></tr>' +
-            '<tr><td><kbd>Esc</kbd></td><td>Снять выделение, закрыть панели</td></tr>' +
-            '<tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Сохранить черновик</td></tr>' +
+            '<tr><td><kbd>Esc</kbd></td><td>Закончить правку текста → закрыть панели/окна → снять выделение; в режиме чистого просмотра — вернуть панели</td></tr>' +
+            '<tr><td><kbd>?</kbd></td><td>Открыть/закрыть эту справку</td></tr>' +
             '<tr><td><kbd>Ctrl</kbd>+<kbd>колесо</kbd></td><td>Масштаб холста 50–100%</td></tr>' +
-            '<tr><td><kbd>←↑→↓</kbd></td><td>Двигать элемент в Zero-блоке</td></tr>' +
+            '<tr><td><kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd></td><td>Двигать элемент в Zero-блоке</td></tr>' +
             '<tr><td><kbd>Shift</kbd>+<kbd>←↑→↓</kbd></td><td>Изменить размер элемента в Zero-блоке</td></tr>' +
-            '</table></div>';
+            '<tr><td><kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>Ctrl</kbd>+<kbd>I</kbd></td><td>Жирный / курсив при правке текста (или кнопки B/I в мини-панели)</td></tr>' +
+            '</table>' +
+            '<div class="pe-hotkeys-section">Работа с блоками на холсте</div>' +
+            '<table class="pe-hotkeys-table">' +
+            '<tr><td>Клик по блоку</td><td>Выбрать блок — настройки появятся в правой панели</td></tr>' +
+            '<tr><td>Двойной клик по тексту/картинке</td><td>Редактировать содержимое прямо на странице (Esc — закончить)</td></tr>' +
+            '<tr><td>⠿ на плашке блока</td><td>Перетащить, чтобы переместить блок; ↑/↓ — сдвиг на одну позицию</td></tr>' +
+            '<tr><td>⧉ на плашке блока</td><td>Дублировать блок</td></tr>' +
+            '<tr><td>💾 на плашке блока</td><td>Сохранить в «Мои блоки» — можно вставить на любую страницу</td></tr>' +
+            '<tr><td>🚫 на плашке блока</td><td>Скрыть блок на странице (не удаляя)</td></tr>' +
+            '<tr><td>🗑 на плашке блока</td><td>Удалить блок (или клавиша Delete)</td></tr>' +
+            '<tr><td>Клик по странице мимо блоков</td><td>Снять выделение</td></tr>' +
+            '</table>' +
+            '<div class="pe-hotkeys-section">Верхняя панель</div>' +
+            '<table class="pe-hotkeys-table">' +
+            '<tr><td>☰</td><td>Показать/скрыть левую панель «Контент страницы» (список блоков и библиотека)</td></tr>' +
+            '<tr><td>↶ / ↷</td><td>Отменить / повторить (Ctrl+Z / Ctrl+Shift+Z)</td></tr>' +
+            '<tr><td>Сохранено</td><td>Индикатор состояния: «Сохранено» / «Сохраняю…» / «Не сохранено»</td></tr>' +
+            '<tr><td>🖥 / 📱 устройства</td><td>Ширина просмотра страницы (1200/768/360 px). Только для проверки адаптивности — на опубликованную страницу не влияет</td></tr>' +
+            '<tr><td>100%</td><td>Масштаб холста. Клик — вернуть 100%. Ctrl+колесо — плавный зум 50–100%</td></tr>' +
+            '<tr><td>⇤⇥</td><td>Во всю ширину: растянуть страницу на весь холст без масштабирования</td></tr>' +
+            '<tr><td>?</td><td>Эта справка (клавиша ?)</td></tr>' +
+            '<tr><td>⚙ Настройки страницы</td><td>SEO (title, description), заголовок H1, адрес (slug) страницы</td></tr>' +
+            '<tr><td>⧉ Версии</td><td>Снапшоты страницы: посмотреть или восстановить любую версию</td></tr>' +
+            '<tr><td>▶ Предпросмотр</td><td>Открыть страницу так, как её видят посетители</td></tr>' +
+            '<tr><td>👁</td><td>Скрыть все панели и посмотреть на страницу целиком. Esc или плавающая кнопка — вернуть панели</td></tr>' +
+            '<tr><td>Черновик / Опубликовано</td><td>Бейдж состояния публикации</td></tr>' +
+            '<tr><td>💾 Сохранить черновик</td><td>Сохранить изменения без публикации (Ctrl+S). Посетители их не увидят</td></tr>' +
+            '<tr><td>🚀 Опубликовать</td><td>Сохранить и опубликовать — изменения станут видны посетителям</td></tr>' +
+            '<tr><td>⎋ Выйти</td><td>Выйти из редактора (черновик сохраняется автоматически)</td></tr>' +
+            '</table>' +
+            '<div class="pe-hotkeys-section">Боковые панели</div>' +
+            '<table class="pe-hotkeys-table">' +
+            '<tr><td>◀ / ▶ (правый верхний угол панели)</td><td>Свернуть панель — холст станет шире. У свёрнутой панели полоска у края холста: наведите курсор — появится кнопка открытия</td></tr>' +
+            '<tr><td>Контент страницы (слева)</td><td>Список блоков страницы: порядок, переименование, скрытие, удаление; ниже — библиотека блоков для добавления</td></tr>' +
+            '<tr><td>Настройки блока (справа)</td><td>Поля выбранного блока: тексты, картинки, ссылки, фон. Изменения применяются сразу, отменяются Ctrl+Z</td></tr>' +
+            '</table>' +
+            '</div></div>';
         wrap.addEventListener('click', e => { if (e.target === wrap) toggleHotkeysHelp(); });
         wrap.querySelector('.pe-hotkeys-close').addEventListener('click', () => toggleHotkeysHelp());
         document.body.appendChild(wrap);
@@ -3161,6 +3201,7 @@
             return;
         }
         if (typing) return;
+        if (e.key === '?') { toggleHotkeysHelp(); return; }
         if (e.key === 'Delete' || e.key === 'Backspace') {
             if (selectedIdx >= 0) { e.preventDefault(); removeBlock(selectedIdx); }
             return;
