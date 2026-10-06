@@ -107,6 +107,13 @@ try:
 except Exception as _migrate_err:
     print(f'[migrate_cycle2] пропущено: {_migrate_err}')
 
+# Миграция «цикл 3»: products.site_section — раздел сайта (управление из админки).
+try:
+    import migrate_cycle3
+    migrate_cycle3.migrate(app)
+except Exception as _migrate_err:
+    print(f'[migrate_cycle3] пропущено: {_migrate_err}')
+
 # Кэширование (AR-3): SimpleCache по умолчанию, тип — через env CACHE_TYPE.
 from flask_caching import Cache
 cache = Cache(app, config={
@@ -684,6 +691,16 @@ def _absolute_url(url, host_url):
     return host_url.rstrip('/') + (url if url.startswith('/') else '/' + url)
 
 
+def _page_section(page):
+    """Раздел сайта по slug страницы: catalog__namatrasniki → 'namatrasniki'.
+
+    Пустая строка — страница не привязана к разделу (показываются все товары).
+    """
+    slug = (page.get('slug') or '')
+    m = re.match(r'^catalog__([a-z0-9]+?)(?:__|$)', slug)
+    return m.group(1) if m else ''
+
+
 def _seo_org(content, host_url):
     """Organization (JSON-LD): название, логотип, контакты — на всех страницах."""
     site = content.get('site', {})
@@ -782,9 +799,16 @@ def make_context(content, page):
     # контакты захардкожены — подменяем на актуальные из настроек сайта.
     if page.get('content_html'):
         page = {**page, 'content_html': _sync_contacts_html(page['content_html'], site)}
+    # Раздел сайта: на страницах разделов (catalog__namatrasniki и глубже)
+    # показываем товары без назначенного раздела + товары этого раздела.
+    page_section = _page_section(page)
+    if page_section:
+        all_products = [p for p in all_products
+                        if not p.get('site_section') or p.get('site_section') == page_section]
     ctx = {
         'site': site,
         'page': page,
+        'page_section': page_section,
         'menu': content.get('menu', []),
         'socials': content.get('socials', []),
         'wb_products': all_products,
@@ -2792,6 +2816,63 @@ def admin_product_discount():
     return _product_discount_response(request.get_json() or {})
 
 
+def _product_section_response(data):
+    """Назначение товару раздела сайта (catalog__* slug) или '' (все разделы)."""
+    from db import db as _db
+    from models import Product
+
+    def _set_one(source, product_id, section):
+        try:
+            product_id = int(product_id)
+        except (TypeError, ValueError):
+            return False
+        prod = _db.session.query(Product).filter_by(source=source, nm_id=product_id).first()
+        if prod is None:
+            return False
+        prod.site_section = (section or '')[:60]
+        return True
+
+    section = data.get('section', '')
+    items = data.get('items')
+    if items:  # массовое назначение
+        count = 0
+        for it in items:
+            if _set_one(it.get('source', 'wb'),
+                        it.get('product_id') or it.get('id'), section):
+                count += 1
+        _db.session.commit()
+        invalidate_site_cache()
+        return jsonify({'success': True, 'count': count})
+    product_id = data.get('product_id') or data.get('nm_id')
+    if not product_id:
+        return jsonify({'success': False, 'error': 'product_id required'}), 400
+    if not _set_one(data.get('source', 'wb'), product_id, section):
+        return jsonify({'success': False, 'error': 'Товар не найден'}), 404
+    _db.session.commit()
+    invalidate_site_cache()
+    return jsonify({'success': True})
+
+
+@app.route('/admin/api/product-section', methods=['POST'])
+@admin_required
+def admin_product_section():
+    """Раздел сайта для товара: один ({source, product_id, section}) или массово ({items, section})."""
+    return _product_section_response(request.get_json() or {})
+
+
+@app.route('/admin/api/site-sections')
+@admin_required
+def admin_site_sections():
+    """Разделы каталога сайта — для выпадающих списков в админке."""
+    content = load_content()
+    sections = []
+    for p in content.get('pages', []):
+        m = re.match(r'^catalog__([a-z0-9]+)$', p.get('slug') or '')
+        if m:
+            sections.append({'key': m.group(1), 'title': p.get('title') or m.group(1)})
+    return jsonify({'success': True, 'sections': sections})
+
+
 def _product_discount_response(data):
     source = data.get('source', 'wb')
     product_id = data.get('product_id') or data.get('nm_id')
@@ -2870,7 +2951,12 @@ def _discount_bulk_response(data):
             return jsonify({'success': False, 'error': 'items required'}), 400
         count = 0
         for it in items:
-            if _set_product_discount(it.get('source', 'wb'), it.get('product_id'),
+            product_id = it.get('product_id') or it.get('id')
+            try:
+                product_id = int(product_id)
+            except (TypeError, ValueError):
+                continue
+            if _set_product_discount(it.get('source', 'wb'), product_id,
                                      discount_type, value):
                 count += 1
         _audit_log('discount.bulk', 'products', f'{scope}:{count}', {

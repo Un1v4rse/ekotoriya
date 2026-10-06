@@ -166,14 +166,24 @@
         .mrow button.addchild { width: auto; padding: 0 0.6rem; font-size: 0.78rem; }
 
         /* Товары WB */
-        .prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 1rem; margin-top: 1rem; }
-        .prod-card { border: 1px solid var(--border); border-radius: 9px; padding: 0.9rem; background: #fff; }
-        .prod-card img { width: 100%; height: 150px; object-fit: contain; background: #f8f8f8; border-radius: 6px; margin-bottom: 0.5rem; }
+        .prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(225px, 1fr)); gap: 1rem; margin-top: 1rem; }
+        .prod-card { border: 1px solid var(--border); border-radius: 9px; padding: 0.9rem; background: #fff;
+                     display: flex; flex-direction: column; }
+        .prod-card .pimg { width: 100%; height: 150px; object-fit: contain; background: #f8f8f8; border-radius: 6px;
+                           margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: center; }
+        .prod-card .pimg img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .prod-card .pimg .no-photo { color: #bbb; font-size: 0.8rem; }
         .prod-card .pname { font-weight: 600; font-size: 0.88rem; min-height: 2.6em; overflow: hidden; margin-bottom: 0.4rem; }
+        .prod-card .pprice { margin-bottom: 0.4rem; }
         .prod-card .old { text-decoration: line-through; color: #999; font-size: 0.83rem; }
         .prod-card .new { font-weight: 700; color: var(--danger); margin-left: 0.4rem; }
-        .prod-card .disc-row { display: flex; gap: 0.4rem; margin-top: 0.4rem; }
-        .prod-card .disc-row input { flex: 1; padding: 0.35rem 0.5rem; }
+        .prod-card .disc-row { display: flex; gap: 0.45rem; margin-top: auto; padding-top: 0.5rem; align-items: stretch; }
+        .prod-card .disc-row input { flex: 1 1 3.2rem; min-width: 0; width: 100%; padding: 0.4rem 0.45rem; font-size: 0.95rem; font-weight: 600; text-align: center; }
+        .prod-card .disc-row select { padding: 0.4rem 0.3rem; font-size: 0.88rem; }
+        .prod-card .disc-row button { padding: 0.4rem 0.85rem; font-size: 0.85rem; white-space: nowrap; }
+        .prod-card .field-label { font-size: 0.75rem; color: #888; margin-bottom: 0.25rem; }
+        .prod-card .sect-row { margin-top: 0.45rem; }
+        .prod-card .sect-row select { width: 100%; padding: 0.4rem 0.45rem; font-size: 0.85rem; }
 
         table.adm { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
         table.adm th { background: #f4f4f8; padding: 0.45rem 0.6rem; border: 1px solid var(--border); text-align: left; }
@@ -629,7 +639,7 @@
                         <div class="field">
                             <label for="wb-token">API-токен WB (категория «Контент» или «Цены и скидки»)</label>
                             <input type="text" id="wb-token" data-path="site.wb_api_token" placeholder="Оставьте пустым — будет демо-каталог">
-                            <div class="help">Товары загружаются официальным API продавца WB (api-seller.wildberries.ru): карточки и фото — через «Контент», цены и скидки — через «Цены и скидки». Токен создаётся в кабинете WB: Настройки → Доступ к API. <a href="https://dev.wildberries.ru" target="_blank">Документация WB API ↗</a></div>
+                            <div class="help">Товары загружаются официальным Seller API WB (content-api / discounts-prices-api / marketplace-api): карточки и фото — через «Контент», цены и скидки — через «Цены и скидки». Токен создаётся в кабинете WB: Настройки → Доступ к API. <a href="https://dev.wildberries.ru" target="_blank">Документация WB API ↗</a></div>
                         </div>
                         <div class="field">
                             <label style="font-weight:400;display:flex;align-items:center;gap:0.4rem;">
@@ -821,7 +831,15 @@
                             <button type="button" class="secondary" onclick="applySelectedDiscount()">Применить выбранным</button>
                             <span id="sel-bulk-result" class="help" style="display:inline;"></span>
                         </div>
-                        <p class="help">Отметьте товары галочками на вкладках Wildberries или Ozon — скидка применится ко всем отмеченным.</p>
+                        <h3>Раздел сайта выбранным</h3>
+                        <div class="field" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                            <select id="sel-bulk-section" class="bulk-section-select">
+                                <option value="">Все разделы сайта</option>
+                            </select>
+                            <button type="button" class="secondary" onclick="applySelectedSection()">Назначить раздел</button>
+                            <span id="sel-bulk-section-result" class="help" style="display:inline;"></span>
+                        </div>
+                        <p class="help">Отметьте товары галочками на вкладках Wildberries или Ozon — раздел назначится всем отмеченным. Товар без раздела показывается на всех страницах каталога.</p>
                     </div>
                 </section>
 
@@ -1576,6 +1594,16 @@
         async function loadAllProducts() {
             if (productsLoaded) return;
             try {
+                await loadSiteSections();
+                const bulkSel = $('sel-bulk-section');
+                if (bulkSel && bulkSel.options.length <= 1) {
+                    for (const s of siteSections) {
+                        const opt = document.createElement('option');
+                        opt.value = s.key;
+                        opt.textContent = s.title;
+                        bulkSel.appendChild(opt);
+                    }
+                }
                 const resp = await fetch(`${location.origin}/admin/api/wb-products`);
                 const result = await resp.json();
                 if (!result.success) return;
@@ -1606,22 +1634,31 @@
                 <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.8rem;margin-bottom:0.3rem;">
                     <input type="checkbox" class="wb-select" data-source="${p.source}" data-id="${p.nm_id}"> выбрать
                 </label>
-                <img src="${p.photo}" alt="" loading="lazy">
+                <div class="pimg">${p.photo ? `<img src="${p.photo}" alt="" loading="lazy">` : '<span class="no-photo">нет фото</span>'}</div>
                 <div class="pname">${escapeHtml(p.name)}</div>
-                <div><span class="old">${p.price} ₽</span><span class="new">${p.final_price} ₽</span></div>
-                ${hidden ? '<div class="help" style="color:var(--danger);">скрыт с сайта</div>' : ''}
+                <div class="pprice"><span class="old">${p.price} ₽</span><span class="new">${p.final_price} ₽</span></div>
+                ${hidden ? '<div class="help" style="color:var(--danger);margin-bottom:0.3rem;">скрыт с сайта</div>' : ''}
+                <div class="field-label">Скидка для сайта (${discType === 'amount' ? 'руб' : '%'}):</div>
                 <div class="disc-row">
-                    <input type="number" min="0" max="99" value="${discVal}" class="disc-input" title="Скидка админа">
-                    <select class="disc-type" title="Тип скидки">
+                    <input type="number" min="0" max="99" value="${discVal}" class="disc-input" title="Скидка для сайта" placeholder="0">
+                    <select class="disc-type" title="Тип скидки: проценты или рубли">
                         <option value="percent" ${discType === 'percent' ? 'selected' : ''}>%</option>
-                        <option value="amount" ${discType === 'amount' ? 'selected' : ''}>руб</option>
+                        <option value="amount" ${discType === 'amount' ? 'selected' : ''}>₽</option>
                     </select>
-                    <button type="button" class="secondary" style="padding:0.3rem 0.7rem;font-size:0.82rem;">OK</button>
+                    <button type="button" class="secondary">Применить</button>
+                </div>
+                <div class="sect-row">
+                    <select class="sect-select" title="Раздел сайта, где показывается товар">
+                        ${siteSectionsOptions(p.site_section)}
+                    </select>
                 </div>`;
-            card.querySelector('button').addEventListener('click', () => {
+            card.querySelector('.disc-row button').addEventListener('click', () => {
                 setProductDiscount(p.source, p.nm_id,
                     parseInt(card.querySelector('.disc-input').value || 0, 10),
                     card.querySelector('.disc-type').value);
+            });
+            card.querySelector('.sect-select').addEventListener('change', (e) => {
+                setProductSection(p.source, p.nm_id, e.target.value);
             });
             return card;
         }
@@ -1657,6 +1694,58 @@
                 showMsg(result.success ? 'Скидка сохранена' : 'Ошибка: ' + (result.error || ''), result.success);
                 if (result.success) await reloadProducts();
             } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
+        }
+
+        let siteSections = [];
+
+        function siteSectionsOptions(current) {
+            let opts = `<option value=""${!current ? ' selected' : ''}>Все разделы сайта</option>`;
+            for (const s of siteSections) {
+                opts += `<option value="${s.key}"${current === s.key ? ' selected' : ''}>${escapeHtml(s.title)}</option>`;
+            }
+            return opts;
+        }
+
+        async function loadSiteSections() {
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/site-sections`);
+                const result = await resp.json();
+                if (result.success) siteSections = result.sections || [];
+            } catch (e) { siteSections = []; }
+        }
+
+        async function setProductSection(source, productId, section) {
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/product-section`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({source, product_id: productId, section})
+                });
+                const result = await resp.json();
+                showMsg(result.success ? 'Раздел сохранён' : 'Ошибка: ' + (result.error || ''), result.success);
+                if (result.success) await reloadProducts();
+            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
+        }
+
+        async function applySelectedSection() {
+            const items = Array.from(document.querySelectorAll('.wb-select:checked'))
+                .map(cb => ({source: cb.dataset.source, product_id: parseInt(cb.dataset.id, 10)}));
+            const section = $('sel-bulk-section').value;
+            const resultEl = $('sel-bulk-section-result');
+            if (!items.length) { resultEl.textContent = 'Отметьте галочками хотя бы один товар на вкладке Wildberries или Ozon'; return; }
+            resultEl.textContent = 'Применение…';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/product-section`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({items, section})
+                });
+                const result = await resp.json();
+                resultEl.textContent = result.success
+                    ? `Раздел назначен ${result.count} товарам`
+                    : 'Ошибка: ' + (result.error || '');
+                if (result.success) await reloadProducts();
+            } catch (e) { resultEl.textContent = 'Ошибка сети: ' + e.message; }
         }
 
         async function marketSync(source, light) {

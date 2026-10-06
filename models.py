@@ -117,6 +117,7 @@ class Product(db.Model):
     rating = db.Column(db.Float, nullable=True)
     review_count = db.Column(db.Integer, default=0)
     extra = db.Column(db.JSON, nullable=True)               # характеристики из API (CT-2)
+    site_section = db.Column(db.String(60), default='', index=True)  # раздел сайта (п.2 цикла 3): '' = везде
     created_at = db.Column(db.DateTime, default=utcnow)
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
 
@@ -140,6 +141,7 @@ class Product(db.Model):
             'url': self.url or '',
             'stock': self.stock or 0,
             'visible': bool(self.visible),
+            'site_section': self.site_section or '',
             'updated_at': self.updated_at.isoformat() if self.updated_at else '',
         }
         if self.rating:
