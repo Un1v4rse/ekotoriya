@@ -292,7 +292,11 @@ def add_cache_headers(response):
         # response as a script and the site's lazy-load queue would stall.
         response.headers['Content-Type'] = 'text/html; charset=utf-8'
         response.headers['Cache-Control'] = 'no-store, must-revalidate'
-    elif path.startswith('/static/') or path == '/theme.css' or path.startswith('/proxy/image'):
+    elif path == '/theme.css':
+        # Генерируемый CSS (тема + BLOCKS_CSS). Генерация дешёвая, зато правки
+        # стилей блоков/меню доезжают до браузеров без бампа версии темы.
+        response.headers['Cache-Control'] = 'no-cache'
+    elif path.startswith('/static/') or path.startswith('/proxy/image'):
         response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
     elif path.endswith(('.js', '.css', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.ico', '.woff', '.woff2')):
         response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
@@ -1406,6 +1410,7 @@ a {{
 def theme_css():
     """Generate CSS from site theme settings."""
     content = load_content()
+    # Cache-Control ставит after_request (no-cache — ревалидация при каждом заходе)
     return Response(_theme_css_text(content.get('site', {}).get('theme', {})),
                     mimetype='text/css')
 
@@ -1505,6 +1510,126 @@ span.cb-feature-icon { display: block; height: auto; width: 100%; }
 .cb-timer-countdown { display: inline-block; font-size: 2rem; font-weight: 700; letter-spacing: 1px; color: #c00; font-variant-numeric: tabular-nums; }
 .cb-timer-btn { display: inline-block; background: #b49d84; color: #fff; padding: 0.7rem 1.8rem; border-radius: 6px; text-decoration: none; font-weight: 600; }
 .cb-timer-btn:hover { opacity: 0.9; }
+
+/* ---------- Голые текстовые блоки перенесённых страниц (ul/ol/p/h на верхнем
+   уровне контента) — прижимались к границам страницы. Оформляем как контейнер.
+   В шаблонах контент лежит либо прямо в #content, либо в обёртке .middle. ---------- */
+#content > ul:not([class]),
+#content > ol:not([class]),
+#content > p:not([class]),
+#content > h1:not([class]),
+#content > h2:not([class]),
+#content > h3:not([class]),
+#content > h4:not([class]),
+#content .middle > ul:not([class]),
+#content .middle > ol:not([class]),
+#content .middle > p:not([class]),
+#content .middle > h1:not([class]),
+#content .middle > h2:not([class]),
+#content .middle > h3:not([class]),
+#content .middle > h4:not([class]) {
+    max-width: var(--theme-container-width, 1400px);
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 24px;
+    padding-right: 24px;
+    box-sizing: border-box;
+}
+#content > ul:not([class]),
+#content > ol:not([class]),
+#content .middle > ul:not([class]),
+#content .middle > ol:not([class]) { padding-left: 48px; margin-top: 1.2rem; margin-bottom: 1.2rem; }
+#content > ul:not([class]) li,
+#content > ol:not([class]) li,
+#content .middle > ul:not([class]) li,
+#content .middle > ol:not([class]) li { margin-bottom: 0.6rem; line-height: 1.6; }
+
+/* ---------- Выпадающие меню навигации: аккуратный современный вид ---------- */
+.table-menu .dropdown-menu,
+#headerfixed .dropdown-menu {
+    display: block;
+    border: 0 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+    padding: 8px !important;
+    background: #fff !important;
+    min-width: 220px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(8px);
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
+    overflow: auto;
+    max-height: 70vh;
+}
+.table-menu .dropdown:hover > .wrap > .dropdown-menu,
+.table-menu .dropdown.open > .wrap > .dropdown-menu,
+#headerfixed .dropdown:hover > .wrap > .dropdown-menu,
+#headerfixed .dropdown.open > .wrap > .dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+.table-menu .dropdown-menu .customScrollbar,
+.table-menu .dropdown-menu .scrollblock { padding: 0 !important; }
+.table-menu .dropdown-menu ul.menu-wrapper,
+.table-menu .dropdown-menu ul.menu-wrapper > li {
+    padding: 0 !important;
+    margin: 0 !important;
+    list-style: none;
+}
+.table-menu .dropdown-menu ul.menu-wrapper > li > a,
+.table-menu .dropdown-menu .menu-item > a {
+    display: block !important;
+    padding: 10px 14px !important;
+    margin: 2px 0 !important;
+    border-radius: 8px !important;
+    color: #333 !important;
+    font-size: 0.95rem;
+    line-height: 1.35;
+    text-decoration: none;
+    transition: background 0.12s ease, color 0.12s ease, padding-left 0.12s ease;
+    background: transparent !important;
+    border: 0 !important;
+    position: relative;
+}
+.table-menu .dropdown-menu ul.menu-wrapper > li > a:hover,
+.table-menu .dropdown-menu .menu-item > a:hover,
+.table-menu .dropdown-menu ul.menu-wrapper > li.dropdown-submenu:hover > a {
+    background: rgba(180, 157, 132, 0.14) !important;
+    color: #7a5c3e !important;
+    padding-left: 18px !important;
+}
+.table-menu .dropdown-menu ul.menu-wrapper > li > a .name.option-font-bold { font-weight: 600; }
+/* Скроллбар выпадашки — в цветах темы */
+.table-menu .dropdown-menu::-webkit-scrollbar,
+#headerfixed .dropdown-menu::-webkit-scrollbar { width: 6px; }
+.table-menu .dropdown-menu::-webkit-scrollbar-thumb,
+#headerfixed .dropdown-menu::-webkit-scrollbar-thumb {
+    background: #d8cfc4; border-radius: 3px;
+}
+.table-menu .dropdown-menu::-webkit-scrollbar-track,
+#headerfixed .dropdown-menu::-webkit-scrollbar-track { background: transparent; }
+/* Стрелочка-приглашение у пункта с подменю */
+.table-menu .dropdown-menu li.dropdown-submenu > a::after {
+    content: '›';
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #b49d84;
+    font-size: 1rem;
+}
+/* Подменю второго уровня */
+.table-menu .dropdown-menu ul.dropdown-menu.toggle_menu {
+    border-radius: 10px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14) !important;
+    padding: 6px !important;
+    background: #fff !important;
+    border: 0 !important;
+}
+/* Плавное появление самого пункта меню при наведении на родителя */
+.table-menu td.menu-item > .wrap > a > div { transition: color 0.15s ease; }
+.table-menu td.menu-item.dropdown:hover > .wrap > a > div { color: #9a8269; }
 """
 
 

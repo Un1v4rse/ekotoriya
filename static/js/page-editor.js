@@ -351,9 +351,9 @@
         '</span>' +
         '<span class="pe-save-indicator" id="pe-save-indicator" title="Состояние сохранения">Сохранено</span>' +
         '<span class="pe-device-switch" id="pe-device-switch" title="Ширина страницы (на рендер не влияет)">' +
-        '<button type="button" data-dev="desktop" class="pe-dev-active" title="Desktop 1200px">🖥 Desktop</button>' +
-        '<button type="button" data-dev="tablet" title="Tablet 768px">📱 Tablet</button>' +
-        '<button type="button" data-dev="mobile" title="Mobile 360px">📱 Mobile</button>' +
+        '<button type="button" data-dev="desktop" class="pe-dev-active" title="Desktop 1200px">🖥 <span class="pe-dev-label">Desktop</span></button>' +
+        '<button type="button" data-dev="tablet" title="Tablet 768px">📱 <span class="pe-dev-label">Tablet</span></button>' +
+        '<button type="button" data-dev="mobile" title="Mobile 360px">📱 <span class="pe-dev-label">Mobile</span></button>' +
         '</span>' +
         '<button type="button" id="pe-btn-zoom" class="pe-tb-icon" title="Масштаб холста (Ctrl + колесо — зум 50–100%). Клик — по ширине">100%</button>' +
         '<button type="button" id="pe-btn-fullwidth" title="Во всю ширину: растянуть страницу на весь холст без масштаба">⇤⇥</button>' +
@@ -362,6 +362,7 @@
         '<button type="button" id="pe-btn-pagesettings" title="SEO и настройки страницы">Настройки страницы</button>' +
         '<button type="button" id="pe-btn-versions" title="Версии и снапшоты страницы">Версии</button>' +
         '<button type="button" id="pe-btn-preview" title="Предпросмотр как у посетителя">Предпросмотр</button>' +
+        '<button type="button" id="pe-btn-hideui" class="pe-tb-icon" title="Скрыть все панели и посмотреть на страницу (Esc — вернуть панели)">👁</button>' +
         '<span class="pe-badge-status pe-badge-draft" id="pe-status-badge" title="Состояние публикации">…</span>' +
         '<button type="button" id="pe-btn-draft" title="Сохранить черновик (Ctrl+S)">Сохранить черновик</button>' +
         '<button type="button" id="pe-btn-publish" class="pe-primary" title="Опубликовать: изменения станут видны посетителям">Опубликовать</button>' +
@@ -441,6 +442,25 @@
     legacyBanner.textContent = 'Страница перенесённого дизайна — доступно редактирование секциями. Добавляйте новые блоки выше и ниже существующих.';
     legacyBanner.style.display = 'none';
 
+    // Плавающая кнопка возврата панелей из режима чистого просмотра (👁)
+    const uiRestore = el('button', '', {id: 'pe-ui-restore', type: 'button',
+        title: 'Вернуть панели редактора (Esc)'});
+    uiRestore.innerHTML = '🛠 Показать панели редактора';
+    uiRestore.addEventListener('click', () => setUiHidden(false));
+    let uiHidden = false;
+    function setUiHidden(v) {
+        if (uiHidden === !!v) return;
+        if (v && textEdit.active) finishTextEdit(true);
+        uiHidden = !!v;
+        document.body.classList.toggle('pe-ui-hidden', uiHidden);
+        if (uiHidden) {
+            hoverIdx = -1;
+            updateOverlayPositions();
+        } else {
+            updateOverlayPositions();
+        }
+    }
+
     /* ============================== Boot ============================== */
     document.addEventListener('DOMContentLoaded', boot);
     /* defer-скрипт выполняется при readyState 'interactive' — до DOMContentLoaded,
@@ -460,7 +480,7 @@
         canvasArea.append(legacyBanner, scaleViewport, badgesLayer, highlight, dropLine,
             addBtn, addBtnBridge, rightBackdrop, canvasHint);
         document.body.append(topbar, workspaceEl, mediaOverlay, versionsOverlay,
-            pageSettingsOverlay, toastBox);
+            pageSettingsOverlay, toastBox, uiRestore);
         restoreLayoutState();
         bindPanelControls();
         bindZoomControls();
@@ -708,6 +728,7 @@
         $('pe-btn-pagesettings').addEventListener('click', openPageSettings);
         $('pe-btn-versions').addEventListener('click', openVersions);
         $('pe-btn-preview').addEventListener('click', openPreview);
+        $('pe-btn-hideui').addEventListener('click', () => setUiHidden(true));
         $('pe-device-switch').addEventListener('click', e => {
             const btn = e.target.closest('button[data-dev]');
             if (!btn) return;
@@ -825,8 +846,18 @@
     function buildMap() {
         blockMap = [];
         if (contentEl) {
+            // Маркеры <!--blk:N--> обычно — прямые дети #content, но в части
+            // шаблонов content_html обёрнут в <div class="middle"> (ищем реальный
+            // контейнер маркеров, иначе карта блоков пустая и клики/ховер мертвы).
+            let container = null;
+            const tw = document.createTreeWalker(contentEl, NodeFilter.SHOW_COMMENT);
+            let cn;
+            while ((cn = tw.nextNode())) {
+                if (/^\s*blk:\d+\s*$/.test(cn.nodeValue)) { container = cn.parentNode; break; }
+            }
+            const root = container || contentEl;
             let cur = null;
-            [...contentEl.childNodes].forEach(n => {
+            [...root.childNodes].forEach(n => {
                 if (n.nodeType === Node.COMMENT_NODE) {
                     const m = n.nodeValue.match(/^\s*blk:(\d+)\s*$/);
                     if (m) { cur = {i: +m[1], elements: [], start: n, nodes: []}; blockMap.push(cur); return; }
@@ -1843,14 +1874,14 @@
                 ['left', 'Слева'], ['center', 'По центру'], ['right', 'Справа'],
             ], b.align || 'left', v => set('align', v))));
             container.appendChild(field('Цвет текста (необязательно)', colorInput(b.text_color, v => set('text_color', v))));
-            container.appendChild(el('div', 'pe-help')).textContent = 'Совет: текст можно править прямо на холсте — кликните по заголовку.';
+            container.appendChild(el('div', 'pe-help')).textContent = 'Совет: текст можно править прямо на холсте — двойной клик по заголовку.';
         } else if (type === 'text') {
             container.appendChild(field('Текст', textareaInput(b.text, v => set('text', v), 8)));
             container.appendChild(field('Положение', selectInput([
                 ['left', 'Слева'], ['center', 'По центру'], ['right', 'Справа'],
             ], b.align || 'left', v => set('align', v))));
             container.appendChild(field('Цвет текста (необязательно)', colorInput(b.text_color, v => set('text_color', v))));
-            container.appendChild(el('div', 'pe-help')).textContent = 'Пустая строка — новый абзац. Клик по абзацу на холсте — правка на месте.';
+            container.appendChild(el('div', 'pe-help')).textContent = 'Пустая строка — новый абзац. Двойной клик по абзацу на холсте — правка на месте.';
         } else if (type === 'image') {
             container.appendChild(imageField('Картинка', b, 'src', set));
             container.appendChild(field('Подпись для поисковиков (alt)', textInput(b.alt, v => set('alt', v))));
@@ -1925,7 +1956,7 @@
             container.appendChild(field('Фон (необязательно)', colorInput(b.bg, v => set('bg', v))));
             container.appendChild(field('Отступ сверху и снизу, px', numberInput(b.padding || 0, v => set('padding', v), 0, 200)));
             container.appendChild(field('Цвет текста (необязательно)', colorInput(b.text_color, v => set('text_color', v))));
-            container.appendChild(el('div', 'pe-help')).textContent = 'Текст и картинки внутри секции правятся прямо на холсте кликом по тексту.';
+            container.appendChild(el('div', 'pe-help')).textContent = 'Текст внутри секции правится прямо на холсте: выделите секцию одним кликом, затем двойной клик по нужному заголовку или абзацу — откроется правка на месте.';
         } else if (type === 'text_image') {
             container.appendChild(field('Заголовок', textInput(b.title, v => set('title', v))));
             container.appendChild(field('Текст', textareaInput(b.text, v => set('text', v), 7)));
@@ -2573,6 +2604,11 @@
     // (esc() в blocks.py), поэтому разметка <b>/<i>/<a> не дошла бы до публичной
     // страницы. Мини-тулбар применяет форматирование визуально в contenteditable,
     // при сохранении остаётся чистый текст (как в редакторе цикла 1).
+    // Текстовые «листья» внутри секции перенесённого дизайна: двойной клик по
+    // такому элементу правит ТОЛЬКО его (а не всю секцию — иначе браузер
+    // вешает contenteditable на гигантский wrapper и страница подвисает).
+    const SECTION_TEXT_SEL = 'h1,h2,h3,h4,h5,h6,p,li,td,th,blockquote,figcaption,' +
+        'a,button,span,strong,em,b,i,small,label';
     const EDITABLES = {
         heading: [{sel: 'h1,h2,h3,h4', field: 'text'}],
         text: [{sel: 'p', field: 'text', multi: true}],
@@ -2590,8 +2626,19 @@
         form: [{sel: 'h2', field: 'title'}, {sel: 'form button[type="submit"]', field: 'button', btn: true}],
         button: [{sel: 'a', field: 'text', btn: true}],
         map: [{sel: 'h2', field: 'title'}],
-        section: [{sel: '*', field: 'html', whole: true}],
+        section: [{sel: SECTION_TEXT_SEL, field: 'html', section: true}],
     };
+
+    // Ближайший к клику текстовый элемент внутри секции (не выходя за её корни)
+    function sectionTextTarget(entry, node) {
+        let n = node && node.nodeType === 1 ? node : (node && node.parentElement);
+        while (n && n !== document.body) {
+            if (entry.elements.indexOf(n) >= 0) return null;   // корень секции — выше текстовых листьев
+            if (n.matches && n.matches(SECTION_TEXT_SEL)) return n;
+            n = n.parentElement;
+        }
+        return null;
+    }
 
     const textEdit = {active: false, idx: -1, targets: [], cfg: null, original: [], bar: null, target: null};
 
@@ -2618,7 +2665,11 @@
         textEdit.active = true;
         textEdit.idx = idx;
         textEdit.cfg = cfg;
-        if (cfg.whole) {
+        if (cfg.section) {
+            const t = sectionTextTarget(entry, targetEl);
+            if (!t) return;
+            textEdit.targets = [t];
+        } else if (cfg.whole) {
             textEdit.targets = entry.elements.slice();
         } else if (cfg.multi) {
             textEdit.targets = entryTargets(entry, cfg.sel);
@@ -2709,7 +2760,15 @@
             if (!apply) t.innerHTML = textEdit.original[k];
         });
         if (apply && b && cfg) {
-            if (cfg.whole) {
+            if (cfg.section) {
+                // Правили один лист внутри секции — сохраняем HTML всей секции
+                // с корневых элементов (как whole, но источник — корни, а не targets)
+                const entry = entryAt(textEdit.idx);
+                if (entry) {
+                    b.html = entry.elements.map(t =>
+                        t instanceof Element ? t.outerHTML : (t.textContent || '')).join('');
+                }
+            } else if (cfg.whole) {
                 // ВАЖНО: сохраняем outerHTML, а не innerHTML — иначе у секции
                 // при первой же правке срезается корневой элемент (wrapper)
                 // и блок теряет классы/стили (drag-block и т.п.) навсегда.
@@ -2731,15 +2790,19 @@
         updateOverlayPositions();
     }
 
-    /* ==================== Клики по холсту: выделение / инлайн / картинки ==================== */
+    /* ==================== Клики по холсту: выделение / инлайн / картинки ====================
+       Обычный клик — ВЫБОР блока (подсветка + правая панель).
+       Двойной клик — ПРАВКА: текстового элемента (contenteditable) или картинки (медиатека). */
     document.addEventListener('click', onDocClick, true);
     function onDocClick(e) {
         const inEditorUI = e.target.closest &&
             e.target.closest('#pe-topbar,#pe-left,#pe-right,#pe-left-rail,#pe-right-rail,#pe-canvas-hint,#pe-right-backdrop,' +
-                '.pe-toolbar,.pe-addbtn,#pe-addbtn-bridge,' +
+                '.pe-toolbar,.pe-addbtn,#pe-addbtn-bridge,#pe-ui-restore,' +
                 '.pe-modal-overlay,.pe-textbar,#pe-legacy-banner,.pe-toasts,.pe-zero-float,.pe-zero-handles');
         if (inEditorUI) return;
         if (zero.active) return;   // Zero-оверлей обрабатывает клики сам
+        // Режим чистого просмотра: страница живёт своей жизнью (ссылки кликабельны)
+        if (document.body.classList.contains('pe-ui-hidden')) return;
         // ссылки на холсте не должны уводить с редактора
         if (e.target.closest && e.target.closest('#content a')) e.preventDefault();
 
@@ -2750,41 +2813,58 @@
         }
         const idx = blockIndexFromPoint(e.clientX, e.clientY);
         if (idx < 0) { select(-1); return; }
-        const b = blocks[idx];
-        if (!b || b.legacy) { select(idx); return; }
+        select(idx);
+    }
 
-        // клик по картинке → модалка медиатеки
+    document.addEventListener('dblclick', onDocDblClick, true);
+    function onDocDblClick(e) {
+        const inEditorUI = e.target.closest &&
+            e.target.closest('#pe-topbar,#pe-left,#pe-right,#pe-left-rail,#pe-right-rail,#pe-canvas-hint,#pe-right-backdrop,' +
+                '.pe-toolbar,.pe-addbtn,#pe-addbtn-bridge,#pe-ui-restore,' +
+                '.pe-modal-overlay,.pe-textbar,#pe-legacy-banner,.pe-toasts,.pe-zero-float,.pe-zero-handles');
+        if (inEditorUI) return;
+        if (zero.active) return;
+        if (document.body.classList.contains('pe-ui-hidden')) return;
+        if (textEdit.active) return;   // уже правим — второй клик часть выделения
+        if (e.target.closest && e.target.closest('#content a')) e.preventDefault();
+        const idx = blockIndexFromPoint(e.clientX, e.clientY);
+        if (idx < 0) return;
+        const b = blocks[idx];
+        if (!b || b.legacy) return;
+        e.stopPropagation();
+        e.preventDefault();
+        select(idx);
+
+        // двойной клик по картинке → модалка медиатеки
         const img = e.target.closest ? e.target.closest('img') : null;
         if (img && contentContains(idx, img)) {
-            if (b.type === 'image') { e.stopPropagation(); select(idx); openImageModal(idx, null); return; }
+            if (b.type === 'image') { openImageModal(idx, null); return; }
             if (b.type === 'gallery') {
                 const entry = entryAt(idx);
                 const items = entry ? entry.elements.flatMap(elm => [...elm.querySelectorAll('.cb-gallery-item img')]) : [];
                 const k = items.indexOf(img);
-                if (k >= 0) { e.stopPropagation(); select(idx); openImageModal(idx, k); return; }
+                if (k >= 0) { openImageModal(idx, k); return; }
             }
-            if (b.type === 'text_image') { e.stopPropagation(); select(idx); openImageModal(idx, null); }
+            if (b.type === 'text_image') { openImageModal(idx, null); return; }
         }
-        // клик по текстовому элементу → contenteditable
+        // двойной клик по текстовому элементу → contenteditable
         const cfgs = EDITABLES[b.type];
-        if (cfgs) {
-            const entry = entryAt(idx);
-            if (entry) {
-                for (const c of cfgs) {
-                    const ts = c.whole ? entry.elements
-                        : c.multi ? entryTargets(entry, c.sel)
-                        : [entryMatch(entry, c.sel)].filter(Boolean);
-                    const m = ts.find(t => t === e.target || t.contains(e.target));
-                    if (m) {
-                        e.stopPropagation();
-                        select(idx);
-                        startTextEdit(idx, e.target);
-                        return;
-                    }
-                }
-            }
+        if (!cfgs) return;
+        const entry = entryAt(idx);
+        if (!entry) return;
+        if (b.type === 'section') {
+            // Секция: правим один конкретный текстовый элемент, а не всю секцию целиком
+            const t = sectionTextTarget(entry, e.target);
+            if (t) startTextEdit(idx, t);
+            return;
         }
-        select(idx);
+        for (const c of cfgs) {
+            const ts = c.multi ? entryTargets(entry, c.sel)
+                : c.whole ? entry.elements
+                : [entryMatch(entry, c.sel)].filter(Boolean);
+            const m = ts.find(t => t === e.target || t.contains(e.target));
+            if (m) { startTextEdit(idx, e.target); return; }
+        }
     }
     function contentContains(idx, node) {
         const entry = entryAt(idx);
@@ -3059,6 +3139,11 @@
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
             e.preventDefault();
             saveDraft(true);
+            return;
+        }
+        // В режиме чистого просмотра остальные клавиши не работают; Esc возвращает панели
+        if (document.body.classList.contains('pe-ui-hidden')) {
+            if (e.key === 'Escape') setUiHidden(false);
             return;
         }
         if (zero.active && zero.onKeyDown(e)) return;
