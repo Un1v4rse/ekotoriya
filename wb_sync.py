@@ -32,7 +32,12 @@ def app_context():
     from db import standalone_app
     return standalone_app().app_context()
 
-API_BASE = 'https://api-seller.wildberries.ru'
+# WB разделил монолитный api-seller.wildberries.ru на отдельные хосты:
+# Content API (карточки), Prices&Discounts (цены/скидки), Marketplace (склады/остатки).
+API_BASE = 'https://api-seller.wildberries.ru'  # legacy, не используется
+API_CONTENT = 'https://content-api.wildberries.ru'
+API_PRICES = 'https://discounts-prices-api.wildberries.ru'
+API_MARKETPLACE = 'https://marketplace-api.wildberries.ru'
 
 # Демо-товары (nmID Экотории, найденные через поиск).
 # Фото — локальные: CDN WB с некоторых сетей недоступен, демо-режим должен
@@ -165,7 +170,7 @@ def build_product(card, price_info):
 
 def fetch_cards(token, limit=100, max_total=1000):
     """Список карточек продавца через Content API (с курсорной постраничностью)."""
-    url = f'{API_BASE}/content/v2/get/cards/list?locale=ru'
+    url = f'{API_CONTENT}/content/v2/get/cards/list?locale=ru'
     headers = {'Authorization': token, 'Content-Type': 'application/json'}
     cards = []
     cursor = None
@@ -216,7 +221,7 @@ def fetch_prices(token, nm_ids):
     headers = {'Authorization': token, 'Content-Type': 'application/json'}
     try:
         r = requests.post(
-            f'{API_BASE}/public/api/v1/prices',
+            f'{API_PRICES}/public/api/v1/prices',
             headers=headers, json={'nmIDs': nm_ids}, timeout=60,
         )
         if r.status_code == 200:
@@ -226,7 +231,7 @@ def fetch_prices(token, nm_ids):
     except requests.RequestException:
         pass
     # Резервный (старый) метод
-    r = requests.post(f'{API_BASE}/api/v2/list/goods/filter', headers=headers, json={'nmList': nm_ids}, timeout=60)
+    r = requests.post(f'{API_PRICES}/api/v2/list/goods/filter', headers=headers, json={'nmList': nm_ids}, timeout=60)
     if r.status_code == 200:
         return r.json().get('data', {}).get('listGoods', [])
     return []
@@ -235,7 +240,7 @@ def fetch_prices(token, nm_ids):
 def fetch_warehouses(token):
     """Список складов продавца: GET /api/v3/warehouses → [warehouseId, ...]."""
     r = requests.get(
-        f'{API_BASE}/api/v3/warehouses',
+        f'{API_MARKETPLACE}/api/v3/warehouses',
         headers={'Authorization': token}, timeout=60,
     )
     r.raise_for_status()
@@ -255,7 +260,7 @@ def fetch_stocks(token, nm_ids):
     try:
         for warehouse_id in fetch_warehouses(token):
             r = requests.post(
-                f'{API_BASE}/api/v3/stocks/{warehouse_id}',
+                f'{API_MARKETPLACE}/api/v3/stocks/{warehouse_id}',
                 headers=headers, json={'skus': skus}, timeout=60,
             )
             if r.status_code != 200:
@@ -282,9 +287,9 @@ def push_discount(token, nm_id, percent):
     headers = {'Authorization': token, 'Content-Type': 'application/json'}
     body = [{'nmID': int(nm_id), 'discount': int(percent)}]
     try:
-        r = requests.post(f'{API_BASE}/discount/v1/save', headers=headers, json=body, timeout=60)
+        r = requests.post(f'{API_PRICES}/discount/v1/save', headers=headers, json=body, timeout=60)
         if r.status_code in (404, 405):
-            r = requests.post(f'{API_BASE}/api/v2/list/goods/set/discounts', headers=headers, json=body, timeout=60)
+            r = requests.post(f'{API_PRICES}/api/v2/list/goods/set/discounts', headers=headers, json=body, timeout=60)
         if r.status_code in (200, 201, 204):
             return True, 'Скидка отправлена в WB'
         return False, f'WB API вернул {r.status_code}: {r.text[:200]}'
