@@ -209,8 +209,9 @@ def test_page_templates_create_contacts(admin_client):
 
     c = app_module.app.test_client()
     body = c.get('/kontakty/').get_data(as_text=True)
-    assert body and '8 800 201 08 24' in body
-    assert 'info@ekotoriya.ru' in body
+    # контакты из пресета синхронизируются с site-настройками
+    assert body and '+7 900 000-00-00' in body
+    assert 'test@example.com' in body
     assert 'map-widget' in body   # адрес карты URL-encoded внутри iframe
 
     _cleanup_template('kontakty')

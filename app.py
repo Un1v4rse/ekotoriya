@@ -62,6 +62,31 @@ def _digits_filter(s):
     """Только цифры из строки — для tel:-ссылок из настроек сайта."""
     import re
     return re.sub(r'\D', '', str(s or ''))
+
+# Дефолтные контакты клонированного шаблона. В content_html-страницах
+# (снапшоты перенесённого дизайна) они захардкожены — подменяем при рендере
+# на актуальные значения из настроек сайта, чтобы любое изменение в админке
+# мгновенно отражалось на всех страницах.
+_DEFAULT_PHONE = '8 800 201 08 24'
+_DEFAULT_EMAIL = 'helloekotoriya@yandex.ru'
+_DEFAULT_ADDRESS = 'г. Череповец, ул. Гоголя 56'
+
+
+def _sync_contacts_html(html, site):
+    """Заменить дефолтные контакты в HTML-строке на текущие из настроек."""
+    if not html or not isinstance(html, str):
+        return html
+    phone = (site or {}).get('phone') or _DEFAULT_PHONE
+    email = (site or {}).get('email') or _DEFAULT_EMAIL
+    address = (site or {}).get('address') or _DEFAULT_ADDRESS
+    digits = re.sub(r'\D', '', phone)
+    out = html.replace('tel:88002010824', 'tel:' + digits)
+    out = re.sub(r'mailto:helloekotoriya@yandex\.ru', 'mailto:' + email, out,
+                 flags=re.I)
+    out = out.replace(_DEFAULT_PHONE, phone)
+    out = re.sub(r'helloekotoriya@yandex\.ru', email, out, flags=re.I)
+    out = out.replace(_DEFAULT_ADDRESS, address)
+    return out
 # SECRET_KEY только из окружения: без него сессии не переживают перезапуск.
 if os.environ.get('SECRET_KEY'):
     app.secret_key = os.environ['SECRET_KEY']
@@ -753,6 +778,10 @@ def make_context(content, page):
     popular = _popular_cached()
     host_url = request.host_url
     site = content.get('site', {})
+    # Синхронизация контактов: в content_html (снапшоты перенесённого дизайна)
+    # контакты захардкожены — подменяем на актуальные из настроек сайта.
+    if page.get('content_html'):
+        page = {**page, 'content_html': _sync_contacts_html(page['content_html'], site)}
     ctx = {
         'site': site,
         'page': page,
