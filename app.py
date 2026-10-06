@@ -2869,7 +2869,8 @@ def admin_site_sections():
     for p in content.get('pages', []):
         m = re.match(r'^catalog__([a-z0-9]+)$', p.get('slug') or '')
         if m:
-            sections.append({'key': m.group(1), 'title': p.get('title') or m.group(1)})
+            title = (p.get('h1') or '').strip() or p.get('title') or m.group(1)
+            sections.append({'key': m.group(1), 'title': title})
     return jsonify({'success': True, 'sections': sections})
 
 
