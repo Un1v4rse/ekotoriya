@@ -20,6 +20,58 @@
 
 ---
 
+## [2026-10-06 22:05] Задача: [фикс] аудит ВСЕХ интеграций настроек + управление разделами товаров + UI скидки
+- Статус: done
+- Сделано:
+  1. ПОЛНЫЙ аудит всех настроек админки (41 data-path), не только контактов:
+     - Найдено и исправлено: `templates/seo_head.html` (canonical, OpenGraph,
+       JSON-LD, Яндекс.Метрика, Google Analytics, extra_head) НЕ был подключён
+       в 29 из 33 шаблонов страниц → добавлен перед `</head>` везде; в
+       index/catalog удалены задублированные ручные og-теги.
+     - `site.logo` (загрузка логотипа в админке) нигде не использовался —
+       логотип был захардкожен в 32 шаблонах (96 вхождений SVG). Заменено на
+       `{{ site.logo or '<дефолтный svg>' }}` — логотип из админки теперь
+       применяется на всех страницах.
+     - Проверено работающим: theme.* (theme.css на всех страницах),
+       phone/email/address (п.1 прошлой сессии), menu/socials (site_menu/
+       site_socials в 32/33 шаблонах), recommendations.* (recommendations.py),
+       hide_zero_stock (_products_cached), seo.redirects/robots_txt,
+       wb/ozon_autosync + токены, title (seo_org).
+  2. Управление товарами из админки (п.2 заказчика): новая колонка
+     `products.site_section` (миграция migrate_cycle3.py, идемпотентный ALTER,
+     запуск при старте app.py). Раздел = slug страницы каталога верхнего
+     уровня (catalog__namatrasniki → 'namatrasniki'). Товар без раздела
+     показывается на всех страницах каталога (обратная совместимость);
+     с разделом — только на своей странице раздела + /catalog/ + главная.
+     Фильтр в make_context через `_page_section()`. API: GET
+     /admin/api/site-sections, POST /admin/api/product-section (одиночное
+     и массовое {items, section}). UI: селект раздела в карточке товара
+     (автосохранение по change) + блок «Раздел сайта выбранным» на сабвкладке
+     «Скидки и каталог». На страницы catalog__odeyala и catalog__naperniki
+     добавлен include wb_catalog_block (раньше блок каталога был только на
+     /catalog/, /catalog/namatrasniki/ и главной).
+  3. UI скидки в карточках админки: инпут скидки был 31px («не видно что
+     вводится») → переверстано: подпись «Скидка для сайта (%):», инпут flex
+     55% (≈166px, жирный, по центру), селект %/₽, кнопка «Применить» во всю
+     ширину карточки — ничего не прилипает. Заголовки разделов в селектах —
+     из h1 страницы (были длинные SEO-title).
+- Изменённые файлы: app.py (_page_section, make_context фильтр, site-sections,
+  product-section, migrate_cycle3 hook), models.py (site_section),
+  migrate_cycle3.py (новый), templates/admin.html (CSS/JS карточек, разделы),
+  templates/pages/*.html (seo_head + site.logo во всех; odeyala/naperniki —
+  wb_catalog_block), tests/test_product_sections.py (новый, 6 тестов)
+- Проверки: pytest 231 passed (225 + 6 новых). На проде (Playwright MCP):
+  селект раздела в карточке сохраняет (товару 890129778 назначен 'namatrasniki'
+  через UI — подтверждено API), инпут скидки 166px, разделы «Наматрасники/
+  Наперники/Одеяла». Фильтр на сайте: товар с разделом namatrasniki есть на
+  /catalog/namatrasniki/ (12 вхождений) и /catalog/ (6), ОТСУТСТВУЕТ на
+  /catalog/odeyala/ (0). Миграция на сервере применена (колонка есть).
+- Бэкапы: не требовались (ALTER ADD COLUMN обратимо, откат — git revert 35e5cd7)
+- Следующий шаг: заказчик может раскидать товары по разделам; при желании
+  добавить drag-and-drop сортировку внутри раздела (отдельная задача).
+- Примечания: синхронизация WB/Ozon НЕ затирает site_section (колонка не
+  трогается в wb_sync/ozon_sync — только явные поля обновляются).
+
 ## [2026-10-06 20:45] Задача: [фикс] синхронизация настроек с сайтом + WB API новые хосты + UI «Интеграций»
 - Статус: done
 - Сделано:
