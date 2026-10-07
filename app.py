@@ -265,7 +265,8 @@ def add_cache_headers(response):
 
     Этап 6.1 (2.2.7 ТЗ): CSP мягкий — на страницах есть инлайн-скрипты/стили
     (unsafe-inline обязателен), script-src допускает https: (Метрика/GA),
-    frame-src — только Яндекс.Карты и YouTube/Vimeo (блок map/video).
+    frame-src — 'self' (редактор страниц грузит контент в same-origin iframe)
+    плюс Яндекс.Карты и YouTube/Vimeo (блок map/video).
     """
     path = request.path
     response.headers['Content-Security-Policy'] = (
@@ -275,7 +276,7 @@ def add_cache_headers(response):
         "script-src 'self' 'unsafe-inline' https:; "
         "font-src 'self' data:; "
         "connect-src 'self' https:; "
-        "frame-src https://yandex.ru https://yastatic.net https://www.youtube.com https://player.vimeo.com; "
+        "frame-src 'self' https://yandex.ru https://yastatic.net https://www.youtube.com https://player.vimeo.com; "
         "frame-ancestors 'self'"
     )
     if FORCE_HTTPS:
@@ -878,6 +879,9 @@ def index():
     page = get_page_by_slug(content, 'index') or get_page_by_url(content, '/')
     if not page:
         return 'Index page not found', 404
+    if _pe_bare_admin():
+        # Контент для iframe редактора: с маркерами блоков, без кнопки админа.
+        return Response(_inject_lazyload_fix(_render_page_html_marked(content, page)))
     html = render_template(page['template'], **make_context(content, page))
     return Response(_inject_lazyload_fix(_inject_admin_edit_button(html, f"/admin/page/{page['slug']}")))
 
@@ -1837,12 +1841,16 @@ def page_route(path):
     url = '/' + path + '/'
     page = get_page_by_url(content, url)
     if page and page.get('slug') not in SYSTEM_PAGE_SLUGS:
+        if _pe_bare_admin():
+            return Response(_inject_lazyload_fix(_render_page_html_marked(content, page)))
         html = render_template(page['template'], **make_context(content, page))
         return Response(_inject_lazyload_fix(_inject_admin_edit_button(html, f"/admin/page/{page['slug']}")))
     # Try slug match (double underscores represent slashes)
     slug = path.replace('/', '__').replace('-', '_')
     page = get_page_by_slug(content, slug)
     if page and page.get('slug') not in SYSTEM_PAGE_SLUGS:
+        if _pe_bare_admin():
+            return Response(_inject_lazyload_fix(_render_page_html_marked(content, page)))
         html = render_template(page['template'], **make_context(content, page))
         return Response(_inject_lazyload_fix(_inject_admin_edit_button(html, f"/admin/page/{page['slug']}")))
     # Fallback: if a parent path exists (e.g. product detail link under /catalog/namatrasniki/),
@@ -1939,6 +1947,10 @@ def _inject_admin_edit_button(html, edit_url):
         return html
     if not _role_allows(_admin_role(), 'pages'):
         return html
+    # Режим редактора-обёртки: страница грузится внутрь iframe (?pe_bare=1) —
+    # плавающая кнопка редактирования внутри контента не нужна.
+    if request.args.get('pe_bare'):
+        return html
     button = (
         '<style>'
         '#admin-edit-fab{position:fixed;right:18px;bottom:18px;z-index:99999;'
@@ -1952,6 +1964,27 @@ def _inject_admin_edit_button(html, edit_url):
     if '</body>' in html:
         return html.replace('</body>', button + '\n</body>', 1)
     return html + button
+
+
+def _pe_bare_admin():
+    """Запрос контента для редактора-обёртки (?pe_bare=1) от авторизованного
+    админа с правом редактирования страниц."""
+    return (request.args.get('pe_bare')
+            and session.get('admin_user')
+            and _role_allows(_admin_role(), 'pages'))
+
+
+def _render_page_html_marked(content, page, extra_ctx=None):
+    """HTML страницы с маркерами блоков <!--blk:N--> (рендер для редактора)."""
+    blocks = page.get('blocks')
+    if not isinstance(blocks, list):
+        blocks = [{'type': 'html', 'legacy': True, 'html': page.get('content_html', '')}]
+    edit_page = dict(page)
+    edit_page['content_html'] = blocks_module.render_blocks_marked(blocks)
+    ctx = make_context(content, edit_page)
+    if extra_ctx:
+        ctx.update(extra_ctx)
+    return render_template(page['template'], **ctx)
 
 
 def _inject_editor(html, slug):
@@ -1980,12 +2013,16 @@ def admin_edit_page(slug):
     page = get_page_by_slug(content, slug)
     if not page:
         return 'Страница не найдена', 404
-    blocks = page.get('blocks')
-    if not isinstance(blocks, list):
-        blocks = [{'type': 'html', 'legacy': True, 'html': page.get('content_html', '')}]
-    edit_page = dict(page)
-    edit_page['content_html'] = blocks_module.render_blocks_marked(blocks)
-    html = render_template(page['template'], **make_context(content, edit_page))
+    if slug not in SYSTEM_PAGE_SLUGS:
+        # Обычные страницы: редактор-обёртка (page_editor_wrapper.html) — контент
+        # страницы грузится в same-origin iframe шириной 1200/768/360, поэтому
+        # media queries страницы применяются честно (режимы Tablet/Mobile).
+        editor_ver = int(os.path.getmtime(os.path.join(BASE_DIR, 'static', 'js', 'page-editor.js')))
+        html = render_template('page_editor_wrapper.html', slug=slug,
+                               content_url=page.get('url') or '/',
+                               csrf_token=get_csrf_token(), editor_ver=editor_ver)
+        return Response(html)
+    html = _render_page_html_marked(content, page)
     return Response(_inject_editor(html, slug))
 
 
@@ -3256,6 +3293,10 @@ def catalog_page():
             pass
     ctx = make_context(content, page)
     ctx['catalog_view'] = _filtered_catalog(request.args)
+    if _pe_bare_admin():
+        # Контент для iframe редактора: с маркерами блоков, без кнопки админа.
+        return Response(_inject_lazyload_fix(
+            _render_page_html_marked(content, page, {'catalog_view': ctx['catalog_view']})))
     return render_template(page['template'], **ctx)
 
 

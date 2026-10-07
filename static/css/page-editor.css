@@ -193,6 +193,14 @@ body.pe-active {
     background: #fff;
     min-height: 100px;
 }
+/* Контент страницы в режиме обёртки: same-origin iframe шириной 100% scaleBox
+   (1200/768/360) — media queries страницы применяются честно. Высота — inline-
+   стилем из JS (= scrollHeight документа контента). */
+#pe-content-frame {
+    display: block;
+    border: 0;
+    width: 100%;
+}
 
 #pe-canvas-hint {
     position: absolute;
@@ -1263,3 +1271,50 @@ body.pe-ui-hidden #pe-ui-restore { display: flex; }
 /* ---------------- «Мои блоки» (CN-T9.1) ---------------- */
 .pe-lib-my > summary { color: var(--pe-accent-dark, #7a5c3e); font-weight: 700; }
 .pe-lib-my-card { border-left: 3px solid var(--pe-accent, #a98a63); }
+
+/* ---------------- Состав секции: список элементов ---------------- */
+.pe-sec-el { border: 1px solid var(--pe-border); border-radius: 8px; margin-top: .6rem; overflow: hidden; }
+.pe-sec-el-head {
+    width: 100%; display: flex; align-items: center; gap: .35rem;
+    padding: .45rem .6rem; border: 0; cursor: pointer; text-align: left;
+    background: var(--pe-panel-2); color: var(--pe-text);
+    font: 600 .8rem -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+}
+.pe-sec-el-head:hover { background: #40434d; }
+.pe-sec-el-arrow { color: var(--pe-text-dim); }
+.pe-sec-el-closed .pe-sec-el-list,
+.pe-sec-el-closed .pe-sec-el-add { display: none; }
+.pe-sec-el-list { max-height: 320px; overflow-y: auto; padding: .25rem 0; }
+.pe-sec-el-empty { padding: .6rem; font-size: .78rem; color: var(--pe-text-dim); }
+.pe-sec-el-row {
+    display: flex; align-items: center; gap: .4rem;
+    padding: .3rem .55rem; cursor: pointer; font-size: .8rem;
+}
+.pe-sec-el-row:hover { background: rgba(255,255,255,.06); }
+.pe-sec-el-tag {
+    flex: 0 0 auto; font-size: .62rem; font-weight: 700; letter-spacing: .03em;
+    color: var(--pe-text-dim); border: 1px solid var(--pe-border);
+    border-radius: 4px; padding: .05rem .3rem; min-width: 26px; text-align: center;
+}
+.pe-sec-el-name {
+    flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--pe-text);
+}
+.pe-sec-el-act { flex: 0 0 auto; opacity: 0; }
+.pe-sec-el-row:hover .pe-sec-el-act { opacity: 1; }
+.pe-sec-el-act button {
+    border: 0; background: transparent; cursor: pointer; font-size: .82rem;
+    padding: .1rem .25rem; border-radius: 4px; color: var(--pe-text-dim);
+}
+.pe-sec-el-act button:hover { background: rgba(192,57,43,.25); }
+.pe-sec-el-add {
+    display: flex; flex-wrap: wrap; gap: .3rem; padding: .45rem .55rem;
+    border-top: 1px solid var(--pe-border);
+}
+.pe-sec-el-add button {
+    border: 1px solid var(--pe-border); border-radius: 999px; cursor: pointer;
+    background: var(--pe-panel-2); color: var(--pe-text);
+    font: 600 .72rem -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    padding: .22rem .6rem;
+}
+.pe-sec-el-add button:hover { border-color: var(--pe-accent); color: var(--pe-accent); }

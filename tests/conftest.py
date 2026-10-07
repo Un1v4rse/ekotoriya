@@ -48,7 +48,7 @@ MINIMAL_CONTENT = {
             'url': '/catalog/',
             'title': 'Каталог',
             'template': 'pages/catalog.html',
-            'blocks': [],
+            'blocks': [{'type': 'heading', 'level': 2, 'text': 'Каталог товаров'}],
         },
         {
             'slug': 'catalog__namatrasniki',

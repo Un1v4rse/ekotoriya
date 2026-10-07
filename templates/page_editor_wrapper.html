@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Редактор страницы — {{ slug }}</title>
+<link rel="stylesheet" href="/static/css/page-editor.css?v={{ editor_ver }}">
+<script>
+window.CSRF_TOKEN = "{{ csrf_token }}";
+window.PE_CONTENT_URL = "{{ content_url }}";
+</script>
+</head>
+<body>
+<div id="pe-workspace">
+<div id="pe-canvas-area">
+<div id="pe-scale-viewport">
+<div id="pe-scale-box" style="width:1200px;margin-left:-600px">
+<iframe id="pe-content-frame" src="{{ content_url }}{% if '?' in content_url %}&{% else %}?{% endif %}pe_bare=1"></iframe>
+</div>
+</div>
+</div>
+</div>
+<script src="/static/js/page-editor.js?v={{ editor_ver }}" data-slug="{{ slug }}" defer></script>
+</body>
+</html>

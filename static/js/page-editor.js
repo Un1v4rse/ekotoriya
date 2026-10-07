@@ -21,6 +21,54 @@
     const API = p => `${location.origin}/admin/api${p}`;
     const CSRF = () => window.CSRF_TOKEN || '';
 
+    /* Режим обёртки (обычные страницы): контент страницы живёт в same-origin
+       iframe (#pe-content-frame из page_editor_wrapper.html) шириной
+       1200/768/360 — media queries страницы применяются честно. Без обёртки
+       (системные страницы ?edit=1) — старое поведение: перенос body в scaleBox.
+       CD/CW заполняются после загрузки iframe (onFrameLoaded). */
+    const PE_CONTENT_URL = window.PE_CONTENT_URL || '';
+    const IFRAME_MODE = !!PE_CONTENT_URL;
+    let contentFrame = null;         // iframe с контентом (IFRAME_MODE)
+    let CD = null;                   // contentDocument iframe
+    let CW = null;                   // contentWindow iframe
+
+    /* Документ, в котором живут ноды контента: ноды для вставки в контент
+       создаём через CD.createElement, иначе вставка чужой ноды ведёт себя
+       как adoptNode и ломает обработчики/стили. */
+    function contentDoc() { return (IFRAME_MODE && CD) ? CD : document; }
+    function cel(tag) { return contentDoc().createElement(tag); }
+    /* Визуальные координаты окна для элемента контента. В iframe-режиме
+       getBoundingClientRect элемента — в системе viewport iframe (без scale),
+       переводим: fr — визуальный rect самого iframe (с учётом transform). */
+    function contentRect(elm) {
+        const r = elm.getBoundingClientRect();
+        if (!IFRAME_MODE || !contentFrame) return r;
+        const fr = contentFrame.getBoundingClientRect();
+        const s = scaleCurrent || 1;
+        return {
+            left: fr.left + r.left * s,
+            top: fr.top + r.top * s,
+            right: fr.left + r.right * s,
+            bottom: fr.top + r.bottom * s,
+            width: r.width * s,
+            height: r.height * s,
+        };
+    }
+    // clientY/clientX события из iframe → визуальные координаты окна редактора.
+    function frameToParentY(y) {
+        if (!IFRAME_MODE || !contentFrame) return y;
+        return contentFrame.getBoundingClientRect().top + y * (scaleCurrent || 1);
+    }
+    function frameToParentX(x) {
+        if (!IFRAME_MODE || !contentFrame) return x;
+        return contentFrame.getBoundingClientRect().left + x * (scaleCurrent || 1);
+    }
+    // На время drag из родительского документа (плашки блоков) гасим iframe,
+    // иначе mousemove над контентом уходит в iframe и родитель его не видит.
+    function setFramePointerEvents(v) {
+        if (IFRAME_MODE && contentFrame) contentFrame.style.pointerEvents = v;
+    }
+
     /* ============================== Хелперы ============================== */
     function $(id) { return document.getElementById(id); }
     function el(tag, cls, attrs) {
@@ -399,12 +447,16 @@
     const rightRail = el('div', '', {id: 'pe-right-rail'});
     rightRail.innerHTML = '<button type="button" id="pe-right-open" class="pe-rail-btn" title="Показать настройки блока">◀</button>';
 
-    // Каркас холста: workspace (flex-строка) → canvasArea (прокрутка) → viewport → scaleBox (страница)
-    workspaceEl = el('div', '', {id: 'pe-workspace'});
-    canvasArea = el('div', '', {id: 'pe-canvas-area'});
-    scaleViewport = el('div', '', {id: 'pe-scale-viewport'});
-    scaleBox = el('div', '', {id: 'pe-scale-box'});
-    scaleViewport.appendChild(scaleBox);
+    // Каркас холста: workspace (flex-строка) → canvasArea (прокрутка) → viewport → scaleBox (страница).
+    // В режиме обёртки скелетон уже размечен в page_editor_wrapper.html (iframe грузится
+    // сразу ровно в 1200px, и цепочку iframe ничего не двигает — перемещение iframe
+    // по DOM могло бы перезапустить его загрузку) — берём ноды из шаблона.
+    workspaceEl = $('pe-workspace') || el('div', '', {id: 'pe-workspace'});
+    canvasArea = $('pe-canvas-area') || el('div', '', {id: 'pe-canvas-area'});
+    scaleViewport = $('pe-scale-viewport') || el('div', '', {id: 'pe-scale-viewport'});
+    scaleBox = $('pe-scale-box') || el('div', '', {id: 'pe-scale-box'});
+    if (scaleViewport.parentElement !== canvasArea) canvasArea.appendChild(scaleViewport);
+    if (scaleBox.parentElement !== scaleViewport) scaleViewport.appendChild(scaleBox);
 
     // Подложка правой панели-оверлея (узкие окна <1440px): клик/Esc закрывает панель
     const rightBackdrop = el('div', '', {id: 'pe-right-backdrop'});
@@ -472,13 +524,27 @@
         if (editorBooted) return;
         editorBooted = true;
         document.body.classList.add('pe-active');
-        // Переносим весь контент body (реальная страница сайта: шапка, #content,
-        // подвал, скрипты) в масштабируемую обёртку — до добавления нод редактора.
-        [...document.body.childNodes].forEach(n => scaleBox.appendChild(n));
+        if (IFRAME_MODE) {
+            // Скелетон с iframe уже на своих местах (шаблон обёртки) — цепочку
+            // iframe не перемещаем. Размеры/события контента — после загрузки.
+            contentFrame = $('pe-content-frame');
+        } else {
+            // Переносим весь контент body (реальная страница сайта: шапка, #content,
+            // подвал, скрипты) в масштабируемую обёртку — до добавления нод редактора.
+            [...document.body.childNodes].forEach(n => scaleBox.appendChild(n));
+        }
         scaleBox.appendChild(emptyState);
-        workspaceEl.append(leftRail, leftPanel, canvasArea, rightRail, rightPanel);
-        canvasArea.append(legacyBanner, scaleViewport, badgesLayer, highlight, dropLine,
-            addBtn, addBtnBridge, rightBackdrop, canvasHint);
+        if (IFRAME_MODE) {
+            workspaceEl.insertBefore(leftRail, canvasArea);
+            workspaceEl.insertBefore(leftPanel, canvasArea);
+            workspaceEl.append(rightRail, rightPanel);
+            canvasArea.append(legacyBanner, badgesLayer, highlight, dropLine,
+                addBtn, addBtnBridge, rightBackdrop, canvasHint);
+        } else {
+            workspaceEl.append(leftRail, leftPanel, canvasArea, rightRail, rightPanel);
+            canvasArea.append(legacyBanner, scaleViewport, badgesLayer, highlight, dropLine,
+                addBtn, addBtnBridge, rightBackdrop, canvasHint);
+        }
         document.body.append(topbar, workspaceEl, mediaOverlay, versionsOverlay,
             pageSettingsOverlay, toastBox, uiRestore);
         restoreLayoutState();
@@ -496,10 +562,102 @@
             e.preventDefault();
             e.returnValue = '';
         });
-        loadInitial().catch(e => {
+        if (IFRAME_MODE) armFrameLifecycle();
+        else loadInitial().catch(e => {
             setSaveState('error');
             toast('Ошибка загрузки: ' + e.message, 'error');
         });
+    }
+
+    /* Жизненный цикл iframe-контента. Первый вход — запуск редактора; каждая
+       следующая загрузка — смена устройства (applyDevice): свежий документ
+       рендерится сразу под честную ширину, затем мы вписываем в него текущие
+       блоки черновика и перестраиваем карту/оверлеи. */
+    let frameReady = false;
+    let editorStarted = false;
+
+    function armFrameLifecycle() {
+        if (!contentFrame) { setTimeout(() => onFrameLoaded(), 200); return; }
+        contentFrame.addEventListener('load', () => setTimeout(onFrameLoaded, 60));
+        const poll = () => {
+            if (frameReady) return;
+            try {
+                if (contentFrame.contentDocument &&
+                    contentFrame.contentDocument.readyState === 'complete') {
+                    onFrameLoaded();
+                    return;
+                }
+            } catch (e) { /* ещё не доступен */ }
+            setTimeout(poll, 150);
+        };
+        poll();
+        setTimeout(() => { if (!frameReady) onFrameLoaded(); }, 8000);
+    }
+
+    function onFrameLoaded() {
+        if (frameReady) return;
+        try {
+            CD = contentFrame.contentDocument;
+            CW = contentFrame.contentWindow;
+        } catch (e) { CD = null; CW = null; }
+        if (!CD || !CD.getElementById('content')) {
+            // документ ещё не разобран — повторим позже
+            setTimeout(onFrameLoaded, 200);
+            return;
+        }
+        frameReady = true;
+        contentEl = CD.getElementById('content');
+        bindContentDocument();
+        bindLibraryDnD();          // DnD вешается на contentEl — после каждой загрузки заново
+        updateFrameHeight();
+        if (!editorStarted) {
+            editorStarted = true;
+            loadInitial().catch(e => {
+                setSaveState('error');
+                toast('Ошибка загрузки: ' + e.message, 'error');
+            });
+        } else {
+            syncContentAfterReload();
+        }
+    }
+
+    // После перезагрузки iframe (смена устройства) в свежем документе лежит
+    // опубликованный рендер — вписываем актуальные блоки черновика.
+    async function syncContentAfterReload() {
+        buildMap();
+        if (!hasLegacy) {
+            try {
+                const result = await apiPost('/preview-marked', {blocks}).then(r => r.json());
+                if (result.success && frameReady) {
+                    replaceContentFromHtml(result.content_html);
+                    return;
+                }
+            } catch (e) { /* оставляем опубликованный рендер */ }
+        }
+        if (zero.active) rebuildZeroOverlay();
+        updateOverlayPositions();
+        scheduleScaleUpdate();
+    }
+
+    // Обработчики, которые в iframe-режиме живут в документе контента: мышь/клики
+    // над iframe не всплывают в родительский документ. Координаты этих событий —
+    // в системе viewport iframe (без scale); все геометрические helper'ы выше это
+    // учитывают.
+    function bindContentDocument() {
+        if (!CD) return;
+        CD.addEventListener('mousemove', onMouseMove);
+        CD.addEventListener('scroll', updateOverlayPositions, {passive: true});
+        CD.addEventListener('keydown', onKeyDown);
+        CD.addEventListener('click', onDocClick, true);
+        CD.addEventListener('dblclick', onDocDblClick, true);
+        CD.addEventListener('wheel', onCanvasWheel, {passive: false});
+        // Высота iframe = высоте документа контента (пересчёт при изменениях).
+        updateFrameHeight();
+        if (CW && CW.ResizeObserver) {
+            const ro = new CW.ResizeObserver(() => scheduleScaleUpdate());
+            if (CD.body) ro.observe(CD.body);
+            if (CD.documentElement) ro.observe(CD.documentElement);
+        }
     }
 
     async function loadInitial() {
@@ -539,18 +697,93 @@
         setSaveState('saved');
     }
 
-    // Холст: контент уже перенесён в #pe-scale-box на boot(); здесь — DnD-библиотеки
-    // и применение ширины устройства (пересчёт масштаба).
+    // Холст: контент уже перенесён в #pe-scale-box на boot(); здесь — применение
+    // ширины устройства (пересчёт масштаба / перезагрузка iframe). В iframe-режиме
+    // contentEl и DnD настраиваются в onFrameLoaded (после загрузки документа).
     function setupCanvas() {
-        contentEl = document.getElementById('content');
-        if (!contentEl) return;
-        bindLibraryDnD();
+        if (IFRAME_MODE) {
+            if (!contentEl) return;
+        } else {
+            contentEl = document.getElementById('content');
+            if (!contentEl) return;
+            bindLibraryDnD();
+        }
         applyDevice();
     }
     function applyDevice() {
         pageWidth = DEVICE_WIDTHS[device] || DEVICE_WIDTHS.desktop;
         if (zero.active) rebuildZeroOverlay();
         scheduleScaleUpdate();
+        if (IFRAME_MODE && contentFrame) {
+            if (!deviceAppliedOnce) {
+                // Первое применение — ширина 1200 уже задана в шаблоне обёртки,
+                // перезагружать только что загруженный iframe не нужно.
+                deviceAppliedOnce = true;
+                return;
+            }
+            if (!frameReady) return;   // перезагрузка по смене устройства уже идёт
+            // Скриптовые виджеты сайта (слайдеры/меню) перестраиваются под новую
+            // ширину нестабильно (синтетический resize им недостаточен) — поэтому
+            // честнее перезагрузить iframe: свежий документ рендерится сразу под
+            // реальную ширину устройства, а черновик вписываем после загрузки.
+            if (textEdit.active) finishTextEdit(true);
+            if (zero.active) closeZero();
+            if (dirty) saveDraft();
+            frameReady = false;
+            applyScale();   // ширина scaleBox — ДО перезагрузки: iframe должен стартовать сразу под новую ширину
+            // Высоту сбрасываем ДО перезагрузки: у fixed-панелей сайта
+            // (#mobilefilter, #mobilemenu) заданы top:0;bottom:0 — в высоком
+            // окне iframe они растягиваются на всю высоту вьюпорта и раздувают
+            // scrollable overflow, из-за чего высота застревала на значении
+            // предыдущего устройства. В низком вьюпорте панели остаются
+            // компактными, а после загрузки высоту пересчитает updateFrameHeight.
+            contentFrame.style.height = '600px';
+            setTimeout(() => {
+                const sep = PE_CONTENT_URL.includes('?') ? '&' : '?';
+                contentFrame.src = PE_CONTENT_URL + sep + 'pe_bare=1&ts=' + Date.now();
+                setTimeout(() => { if (!frameReady) onFrameLoaded(); }, 8000);
+            }, 60);
+        }
+    }
+    let deviceAppliedOnce = false;
+
+    // Высота iframe = высоте документа контента (иначе появится внутренняя
+    // прокрутка iframe и scale-обёртка не покажет страницу целиком).
+    // ВАЖНО: замеряем НЕ scrollHeight, а нижнюю границу контента: fixed-панели
+    // сайта (#mobilefilter, #mobilemenu, ...) растягиваются на высоту окна
+    // iframe (top:0;bottom:0) и входят в scrollable overflow — при обратной
+    // связи «iframe высоты H → панель высоты H → scrollHeight = H» высота
+    // застревала на значении предыдущего устройства.
+    function measureContentHeight() {
+        let h = 0;
+        const win = CW, doc = CD;
+        if (!win || !doc || !doc.body) return 0;
+        const sy = win.pageYOffset || 0;
+        const walk = (el, inFixed) => {
+            for (const c of el.children) {
+                let skip = inFixed;
+                if (!skip && win.getComputedStyle(c).position === 'fixed') skip = true;
+                if (!skip) {
+                    const r = c.getBoundingClientRect();
+                    if (r.height > 0 && r.bottom + sy > h) h = r.bottom + sy;
+                }
+                walk(c, skip);
+            }
+        };
+        walk(doc.body, false);
+        return Math.ceil(h);
+    }
+    function updateFrameHeight() {
+        if (!IFRAME_MODE || !CD || !contentFrame) return;
+        let h = 0;
+        try { h = measureContentHeight(); } catch (e) { return; }
+        if (h <= 0) {
+            try {
+                h = Math.max(CD.body ? CD.body.scrollHeight : 0,
+                             CD.documentElement ? CD.documentElement.scrollHeight : 0);
+            } catch (e) { return; }
+        }
+        if (h > 0) contentFrame.style.height = h + 'px';
     }
 
     /* ==================== Панели: сворачивание и оверлей (CN-L 1.1/1.5) ==================== */
@@ -755,6 +988,11 @@
             roBox.observe(scaleBox);
         }
         window.addEventListener('resize', () => { applyPanelState(); scheduleScaleUpdate(); });
+        if (IFRAME_MODE) {
+            // Страховка для браузеров без ResizeObserver в iframe: поллинг высоты
+            // (рендер блоков, загрузка картинок меняют scrollHeight).
+            setInterval(updateFrameHeight, 700);
+        }
     }
 
     /* ============================ Топбар: события ============================ */
@@ -890,7 +1128,9 @@
             // шаблонов content_html обёрнут в <div class="middle"> (ищем реальный
             // контейнер маркеров, иначе карта блоков пустая и клики/ховер мертвы).
             let container = null;
-            const tw = document.createTreeWalker(contentEl, NodeFilter.SHOW_COMMENT);
+            const doc = contentEl.ownerDocument || document;
+            const NF = (doc.defaultView && doc.defaultView.NodeFilter) ? doc.defaultView.NodeFilter : NodeFilter;
+            const tw = doc.createTreeWalker(contentEl, NF.SHOW_COMMENT);
             let cn;
             while ((cn = tw.nextNode())) {
                 if (/^\s*blk:\d+\s*$/.test(cn.nodeValue)) { container = cn.parentNode; break; }
@@ -924,11 +1164,11 @@
     function entryRect(idx) {
         const entry = entryAt(idx);
         if (!entry || !entry.elements.length || !canvasArea) return null;
-        const first = entry.elements[0].getBoundingClientRect();
-        const last = entry.elements[entry.elements.length - 1].getBoundingClientRect();
+        const first = contentRect(entry.elements[0]);
+        const last = contentRect(entry.elements[entry.elements.length - 1]);
         const ar = canvasArea.getBoundingClientRect();
         const st = canvasArea.scrollTop;
-        const cr = contentEl ? contentEl.getBoundingClientRect() : {left: ar.left, right: ar.right};
+        const cr = contentEl ? contentRect(contentEl) : {left: ar.left, right: ar.right};
         return {
             top: first.top - ar.top + st,
             bottom: last.bottom - ar.top + st,
@@ -997,15 +1237,27 @@
         // Скролл теперь живёт внутри холста (#pe-canvas-area), а не в окне.
         canvasArea.addEventListener('scroll', updateOverlayPositions, {passive: true});
         // Ctrl + колесо над холстом — ручной зум 50–100% (шаг 10).
-        canvasArea.addEventListener('wheel', e => {
-            if (!e.ctrlKey) return;
-            e.preventDefault();
-            const cur = zoomMode === 'fit' ? computeScale().s : zoomMode;
-            setZoom(cur + (e.deltaY < 0 ? 0.1 : -0.1));
-        }, {passive: false});
+        canvasArea.addEventListener('wheel', onCanvasWheel, {passive: false});
+        if (IFRAME_MODE) {
+            // Клик по подложке холста мимо iframe — снять выделение (сам iframe
+            // клики в родителя не отдаёт, их обрабатывает bindContentDocument).
+            canvasArea.addEventListener('mousedown', e => {
+                if (e.target === canvasArea || e.target === scaleViewport) select(-1);
+            });
+        }
+    }
+
+    function onCanvasWheel(e) {
+        if (!e.ctrlKey && !e.metaKey) return;
+        e.preventDefault();
+        const cur = zoomMode === 'fit' ? computeScale().s : zoomMode;
+        setZoom(cur + (e.deltaY < 0 ? 0.1 : -0.1));
     }
 
     function onMouseMove(e) {
+        // В iframe-режиме геометрия блоков — в системе координат iframe; события
+        // родительского документа (панели, подложка) здесь игнорируем.
+        if (IFRAME_MODE && (!CW || e.view !== CW)) return;
         if (dragState.active || textEdit.active || zero.active) return;
         if (addBtnHover) return;
         if (e.target && e.target.closest && e.target.closest(
@@ -1114,15 +1366,18 @@
         const entry = entryAt(idx);
         if (entry) entry.elements.forEach(elm => { elm.style.opacity = '0.45'; });
         document.body.style.userSelect = 'none';
+        setFramePointerEvents('none');   // mousemove над контентом — в родителя
         document.addEventListener('mousemove', onDragMove);
         document.addEventListener('mouseup', onDragEnd);
     }
 
-    // clientY (визуальная система окна) → «документно-визуальная» система холста.
-    function dropIndexForY(clientY) {
+    // visualClientY (визуальная система ОКНА редактора) → «документно-визуальная»
+    // система холста. События из iframe вызывающий код переводит через
+    // frameToParentY — здесь работаем уже в единой системе окна.
+    function dropIndexForY(visualClientY) {
         if (!canvasArea) return {index: 0, before: true};
         const ar = canvasArea.getBoundingClientRect();
-        const y = clientY - ar.top + canvasArea.scrollTop;
+        const y = visualClientY - ar.top + canvasArea.scrollTop;
         for (const entry of blockMap) {
             const r = entryRect(entry.i);
             if (!r) continue;
@@ -1139,7 +1394,7 @@
         const r = entryRect(target.index);
         if (!r) return;
         const y = target.before ? r.top : r.bottom;
-        const cr = contentEl ? contentEl.getBoundingClientRect() : {left: 0, width: window.innerWidth};
+        const cr = contentEl ? contentRect(contentEl) : {left: 0, width: window.innerWidth};
         const ar = canvasArea ? canvasArea.getBoundingClientRect() : {left: 0};
         dropLine.style.display = 'block';
         dropLine.style.top = y + 'px';
@@ -1152,6 +1407,7 @@
         document.removeEventListener('mousemove', onDragMove);
         document.removeEventListener('mouseup', onDragEnd);
         document.body.style.userSelect = '';
+        setFramePointerEvents('');
         dropLine.style.display = 'none';
         const badge = badges.get(dragState.from);
         if (badge) badge.classList.remove('pe-badge-dragging');
@@ -1279,7 +1535,7 @@
         }
         for (const seg of segs) {
             const m = markers[seg.i];
-            const tpl = document.createElement('template');
+            const tpl = cel('template');
             tpl.innerHTML = seg.html;
             const nodes = [...tpl.content.childNodes];
             m.nodes.forEach(n => n.remove());
@@ -1314,7 +1570,7 @@
 
     function reviveScripts(root) {
         [...root.querySelectorAll('script')].forEach(old => {
-            const s = document.createElement('script');
+            const s = cel('script');
             if (old.src) s.src = old.src;
             else s.textContent = old.textContent;
             old.replaceWith(s);
@@ -1471,10 +1727,11 @@
         contentEl.addEventListener('dragover', e => {
             if (![...(e.dataTransfer.types || [])].includes('text/pe-block')) return;
             e.preventDefault();
-            const target = dropIndexForY(e.clientY);
+            // Координаты события из iframe — приводим к системе окна редактора.
+            const target = dropIndexForY(frameToParentY(e.clientY));
             if (!target) { dropLine.style.display = 'none'; return; }
             const r = entryRect(target.index);
-            const cr = contentEl.getBoundingClientRect();
+            const cr = contentRect(contentEl);
             const ar = canvasArea ? canvasArea.getBoundingClientRect() : {left: 0, top: 0};
             const y = r ? (target.before ? r.top : r.bottom)
                         : (cr.top - ar.top + (canvasArea ? canvasArea.scrollTop : 0) + cr.height / 2);
@@ -1550,7 +1807,7 @@
                 const entry = entryAt(idx);
                 if (entry && entry.elements.length && canvasArea) {
                     const ar = canvasArea.getBoundingClientRect();
-                    const top = entry.elements[0].getBoundingClientRect().top - ar.top + canvasArea.scrollTop - 70;
+                    const top = contentRect(entry.elements[0]).top - ar.top + canvasArea.scrollTop - 70;
                     canvasArea.scrollTo({top, behavior: 'smooth'});
                 }
             });
@@ -1897,6 +2154,196 @@
         return null;
     }
 
+    /* -------- Состав секции: список элементов + добавление/удаление --------
+       Список строится из b.html (DOMParser) — так панель всегда отражает
+       данные блока; индекс k в списке соответствует k-му элементу живого DOM
+       (секция рендерится на холсте как есть, порядок сохраняется). */
+    // Листья дерева: блочные тексты, ячейки, картинки, ссылки, кнопки.
+    // td/th — контейнеры: спускаемся внутрь (пустые ячейки с одним текстом
+    // фолбэком попадают сами). a с img внутри (thumb-ссылки) раскрываем,
+    // чтобы картинку можно было заменить.
+    const SEC_LEAF = 'h1,h2,h3,h4,h5,h6,p,li,td,th,blockquote,figcaption,button,img';
+    const SEC_INLINE = 'span,strong,em,b,i,small,label';
+    function secWalk(n, out) {
+        if (n.nodeType !== 1) return;
+        const tag = n.tagName.toLowerCase();
+        if (n.matches(SEC_LEAF)) {
+            if (tag === 'td' || tag === 'th') {
+                const before = out.length;
+                for (const c of n.children) secWalk(c, out);
+                if (out.length === before && (n.textContent || '').trim()) out.push(n);
+                return;
+            }
+            out.push(n);
+            return;
+        }
+        if (n.matches('a')) {
+            if (n.querySelector('img')) { for (const c of n.children) secWalk(c, out); return; }
+            out.push(n);
+            return;
+        }
+        if (n.matches(SEC_INLINE) && !n.children.length && (n.textContent || '').trim()) {
+            out.push(n);
+            return;
+        }
+        for (const c of n.children) secWalk(c, out);
+    }
+    function secCollect(roots) {
+        const out = [];
+        [...roots].forEach(r => {
+            if (r.matches && (r.matches(SEC_LEAF) || r.matches('a'))) secWalk(r, out);
+            else for (const c of r.children) secWalk(c, out);
+        });
+        return out;
+    }
+
+    // Живые элементы секции на холсте (тот же порядок, что и в b.html)
+    function sectionLiveItems(idx) {
+        const entry = entryAt(idx);
+        if (!entry || !entry.elements.length) return [];
+        return secCollect(entry.elements);
+    }
+
+    // Записать текущий DOM секции обратно в b.html (как finishTextEdit для секций)
+    function syncSectionHtml(idx, set) {
+        const entry = entryAt(idx);
+        if (!entry) return;
+        set('html', entry.elements.map(n => n.outerHTML).join(''));
+    }
+
+    // Элементы списком из данных блока: [{tag, icon, name}]
+    function sectionDataItems(b) {
+        const tpl = document.createElement('template');
+        tpl.innerHTML = b.html || '';
+        return secCollect(tpl.content.children).map(n => {
+            const tag = n.tagName.toLowerCase();
+            let icon = '¶', name = (n.textContent || '').trim().replace(/\s+/g, ' ');
+            if (tag === 'img') {
+                icon = '🖼';
+                const real = n.getAttribute('data-src') || n.getAttribute('src') || '';
+                name = (n.getAttribute('alt') || n.getAttribute('title') || real.split('/').pop() || 'без картинки');
+            } else if (tag === 'a') {
+                icon = '🔗';
+                if (!name) name = n.getAttribute('href') || 'ссылка';
+            } else if (/^h[1-6]$/.test(tag)) {
+                icon = 'H';
+            } else if (tag === 'li') {
+                icon = '•';
+            } else if (tag === 'button') {
+                icon = '🔘';
+            }
+            return {tag, icon, name: name.slice(0, 60) || '(пусто)'};
+        });
+    }
+
+    // Шаблоны новых элементов для «Добавить в секцию»
+    const SECTION_NEW = {
+        h2: ['Заголовок', () => '<h2>Новый заголовок</h2>'],
+        p: ['Текст', () => '<p>Новый текст. Замените его своим.</p>'],
+        ul: ['Список', () => '<ul><li>Первый пункт списка</li><li>Второй пункт списка</li></ul>'],
+        a: ['Кнопка-ссылка', () => '<a class="btn btn-default" href="#">Новая кнопка</a>'],
+        img: ['Картинка', src => '<img src="' + esc(src) + '" alt="">'],
+    };
+
+    function sectionAddElement(b, kind, src) {
+        const tpl = document.createElement('template');
+        tpl.innerHTML = b.html || '';
+        const html = SECTION_NEW[kind][1](src);
+        const nodeTpl = document.createElement('template');
+        nodeTpl.innerHTML = html;
+        const node = nodeTpl.content.firstElementChild;
+        if (!node) return b.html || '';
+        const kids = [...tpl.content.children];
+        const last = kids[kids.length - 1];
+        if (last && last.matches('div,section,article,main')) last.appendChild(node);
+        else if (last) last.after(node);          // сосед — внутрь заголовков/абзацев не вставляем
+        else tpl.content.appendChild(node);
+        return [...tpl.content.children].map(n => n.outerHTML).join('');
+    }
+
+    function sectionElementsPanel(b, idx, set) {
+        const wrap = el('div', 'pe-sec-el');
+        const head = el('button', 'pe-sec-el-head', {type: 'button', title: 'Состав секции: клик — развернуть/свернуть'});
+        const list = el('div', 'pe-sec-el-list');
+        const collapsed = localStorage.getItem('pe_sec_el_collapsed') === '1';
+        if (collapsed) wrap.classList.add('pe-sec-el-closed');
+
+        function refresh() {
+            const items = sectionDataItems(b);
+            head.innerHTML = '<span class="pe-sec-el-arrow">' + (wrap.classList.contains('pe-sec-el-closed') ? '▸' : '▾') +
+                '</span> Элементы секции (' + items.length + ')';
+            list.innerHTML = '';
+            if (!items.length) {
+                const empty = el('div', 'pe-sec-el-empty');
+                empty.textContent = 'В секции нет редактируемых элементов — добавьте их кнопками ниже.';
+                list.appendChild(empty);
+                return;
+            }
+            items.forEach((it, k) => {
+                const row = el('div', 'pe-sec-el-row', {title: it.tag + ' — клик: выделить и править на холсте'});
+                const chip = el('span', 'pe-sec-el-tag');
+                chip.textContent = it.tag.toUpperCase();
+                const nm = el('span', 'pe-sec-el-name');
+                nm.innerHTML = esc(it.icon + ' ' + it.name);
+                const act = el('span', 'pe-sec-el-act');
+                const del = el('button', '', {type: 'button', title: 'Удалить элемент из секции'});
+                del.textContent = '🗑';
+                del.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const live = sectionLiveItems(idx)[k];
+                    if (live) { live.remove(); syncSectionHtml(idx, set); updateOverlayPositions(); refresh(); }
+                });
+                act.appendChild(del);
+                row.append(chip, nm, act);
+                row.addEventListener('click', () => {
+                    const live = sectionLiveItems(idx)[k];
+                    if (!live) return;
+                    live.scrollIntoView({block: 'center', behavior: 'smooth'});
+                    if (it.tag === 'img') {
+                        openMediaPicker(live.getAttribute('src') || '').then(url => {
+                            if (url == null) return;
+                            live.setAttribute('src', url);
+                            syncSectionHtml(idx, set);
+                            refresh();
+                        });
+                    } else {
+                        select(idx);
+                        startTextEdit(idx, live);
+                    }
+                });
+                list.appendChild(row);
+            });
+        }
+
+        head.addEventListener('click', () => {
+            wrap.classList.toggle('pe-sec-el-closed');
+            localStorage.setItem('pe_sec_el_collapsed', wrap.classList.contains('pe-sec-el-closed') ? '1' : '0');
+            refresh();
+        });
+
+        // Панель добавления новых элементов
+        const addBar = el('div', 'pe-sec-el-add');
+        Object.keys(SECTION_NEW).forEach(kind => {
+            const btn = el('button', '', {type: 'button', title: 'Добавить в конец секции: ' + SECTION_NEW[kind][0]});
+            btn.textContent = '+' + SECTION_NEW[kind][0];
+            btn.addEventListener('click', async () => {
+                if (kind === 'img') {
+                    const url = await openMediaPicker('');
+                    if (url == null) return;
+                    set('html', sectionAddElement(b, 'img', url));
+                } else {
+                    set('html', sectionAddElement(b, kind));
+                }
+                refresh();
+            });
+            addBar.appendChild(btn);
+        });
+
+        wrap.append(head, list, addBar);
+        refresh();
+        return wrap;
+    }
+
     /* ==================== Вкладка «Контент» ==================== */
     function renderContentTab(b, idx, type, set, container) {
         if (b.legacy) {
@@ -1997,6 +2444,7 @@
             container.appendChild(field('Отступ сверху и снизу, px', numberInput(b.padding || 0, v => set('padding', v), 0, 200)));
             container.appendChild(field('Цвет текста (необязательно)', colorInput(b.text_color, v => set('text_color', v))));
             container.appendChild(el('div', 'pe-help')).textContent = 'Текст внутри секции правится прямо на холсте: выделите секцию одним кликом, затем двойной клик по нужному заголовку или абзацу — откроется правка на месте.';
+            container.appendChild(sectionElementsPanel(b, idx, set));
         } else if (type === 'text_image') {
             container.appendChild(field('Заголовок', textInput(b.title, v => set('title', v))));
             container.appendChild(field('Текст', textareaInput(b.text, v => set('text', v), 7)));
@@ -2669,12 +3117,15 @@
         section: [{sel: SECTION_TEXT_SEL, field: 'html', section: true}],
     };
 
-    // Ближайший к клику текстовый элемент внутри секции (не выходя за её корни)
+    // Ближайший к клику текстовый элемент внутри секции (не выходя за её корни).
+    // Корень может САМ быть текстовым листом (секция из одного голого h2/p) —
+    // тогда правим его, а не возвращаем null.
     function sectionTextTarget(entry, node) {
         let n = node && node.nodeType === 1 ? node : (node && node.parentElement);
         while (n && n !== document.body) {
-            if (entry.elements.indexOf(n) >= 0) return null;   // корень секции — выше текстовых листьев
+            const isRoot = entry.elements.indexOf(n) >= 0;
             if (n.matches && n.matches(SECTION_TEXT_SEL)) return n;
+            if (isRoot) return null;   // корень-обёртка — выше текстовых листьев
             n = n.parentElement;
         }
         return null;
@@ -2747,9 +3198,10 @@
         return out;
     }
     function selectAllText(node) {
-        const range = document.createRange();
+        const doc = node.ownerDocument || document;
+        const range = doc.createRange();
         range.selectNodeContents(node);
-        const sel = window.getSelection();
+        const sel = (doc.defaultView || window).getSelection();
         sel.removeAllRanges();
         sel.addRange(range);
     }
@@ -2766,11 +3218,14 @@
         bar.addEventListener('click', e => {
             const act = e.target.closest('button') && e.target.closest('button').dataset.act;
             if (!act) return;
-            if (act === 'bold') document.execCommand('bold');
-            if (act === 'italic') document.execCommand('italic');
+            // contenteditable живёт в документе контента — команды форматирования
+            // выполняем там, иначе они ничего не изменят.
+            const edDoc = (IFRAME_MODE && CD) ? CD : document;
+            if (act === 'bold') edDoc.execCommand('bold');
+            if (act === 'italic') edDoc.execCommand('italic');
             if (act === 'link') {
                 const url = prompt('Адрес ссылки (https://, mailto:, tel: или #якорь):', 'https://');
-                if (url && /^(https?:\/\/|mailto:|tel:|#)/i.test(url)) document.execCommand('createLink', false, url);
+                if (url && /^(https?:\/\/|mailto:|tel:|#)/i.test(url)) edDoc.execCommand('createLink', false, url);
                 else if (url) toast('Ссылка не применена: разрешены http(s), mailto:, tel: и #якорь', 'error');
             }
             if (act === 'done') finishTextEdit(true);
@@ -2781,7 +3236,7 @@
     }
     function positionTextToolbar() {
         if (!textEdit.bar || !textEdit.targets.length) return;
-        const r = textEdit.targets[0].getBoundingClientRect();
+        const r = contentRect(textEdit.targets[0]);
         const bar = textEdit.bar;
         bar.style.left = Math.max(8, Math.min(window.innerWidth - bar.offsetWidth - 8, r.left)) + 'px';
         bar.style.top = Math.max(52, r.top - bar.offsetHeight - 8) + 'px';
@@ -2835,6 +3290,9 @@
        Двойной клик — ПРАВКА: текстового элемента (contenteditable) или картинки (медиатека). */
     document.addEventListener('click', onDocClick, true);
     function onDocClick(e) {
+        // В iframe-режиме геометрия блоков — в системе координат iframe: обрабатываем
+        // только события из документа контента (их же вешает bindContentDocument).
+        if (IFRAME_MODE && (!CW || e.view !== CW)) return;
         const inEditorUI = e.target.closest &&
             e.target.closest('#pe-topbar,#pe-left,#pe-right,#pe-left-rail,#pe-right-rail,#pe-canvas-hint,#pe-right-backdrop,' +
                 '.pe-toolbar,.pe-addbtn,#pe-addbtn-bridge,#pe-ui-restore,' +
@@ -2843,8 +3301,10 @@
         if (zero.active) return;   // Zero-оверлей обрабатывает клики сам
         // Режим чистого просмотра: страница живёт своей жизнью (ссылки кликабельны)
         if (document.body.classList.contains('pe-ui-hidden')) return;
-        // ссылки на холсте не должны уводить с редактора
-        if (e.target.closest && e.target.closest('#content a')) e.preventDefault();
+        // ссылки на холсте не должны уводить с редактора (в iframe-режиме
+        // контент целиком внутри iframe, поэтому блокируем любые ссылки;
+        // в режиме чистого просмотра UI скрыт и здесь мы не доходим).
+        if (e.target.closest && e.target.closest(IFRAME_MODE ? 'a' : '#content a')) e.preventDefault();
 
         if (textEdit.active) {
             const inside = textEdit.targets.some(t => t.contains(e.target));
@@ -2858,6 +3318,7 @@
 
     document.addEventListener('dblclick', onDocDblClick, true);
     function onDocDblClick(e) {
+        if (IFRAME_MODE && (!CW || e.view !== CW)) return;
         const inEditorUI = e.target.closest &&
             e.target.closest('#pe-topbar,#pe-left,#pe-right,#pe-left-rail,#pe-right-rail,#pe-canvas-hint,#pe-right-backdrop,' +
                 '.pe-toolbar,.pe-addbtn,#pe-addbtn-bridge,#pe-ui-restore,' +
@@ -3386,13 +3847,21 @@
             startAngle: Math.atan2(e.clientY - (rect.top + start.y / 100 * rect.height + start.h / 100 * rect.height / 2),
                 e.clientX - (rect.left + start.x / 100 * rect.width + start.w / 100 * rect.width / 2)) * 180 / Math.PI,
         };
-        document.addEventListener('pointermove', onZeroDragMove);
+        // Ручки живут в документе контента (iframe) — координаты событий там же,
+        // в несжатой системе iframe; document — страховка на случай отпускания
+        // кнопки за пределами iframe (координаты up не используются).
+        const moveDoc = (IFRAME_MODE && CD) ? CD : document;
+        moveDoc.addEventListener('pointermove', onZeroDragMove);
+        moveDoc.addEventListener('pointerup', onZeroDragEnd, {once: true});
         document.addEventListener('pointerup', onZeroDragEnd, {once: true});
     }
 
     function onZeroDragMove(e) {
         const d = zero.drag;
         if (!d) return;
+        // События из родительского документа (мышь ушла за край iframe) — пропускаем:
+        // координатные системы разные, промежуточные позиции не важны.
+        if (IFRAME_MODE && (!CW || e.view !== CW)) return;
         e.preventDefault();
         const dx = (e.clientX - d.startX) / d.rect.width * 100;
         const dy = (e.clientY - d.startY) / d.rect.height * 100;
@@ -3431,7 +3900,10 @@
     }
 
     function onZeroDragEnd() {
-        document.removeEventListener('pointermove', onZeroDragMove);
+        const moveDoc = (IFRAME_MODE && CD) ? CD : document;
+        moveDoc.removeEventListener('pointermove', onZeroDragMove);
+        moveDoc.removeEventListener('pointerup', onZeroDragEnd);
+        document.removeEventListener('pointerup', onZeroDragEnd);
         zero.drag = null;
         markDirty();
         recordHistoryDebounced();
@@ -3481,17 +3953,21 @@
             const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180 / Math.PI;
             const nodeEl = findElNode(elm.id);
             const startRot = +elm.rotate || 0;
+            const moveDoc = (IFRAME_MODE && CD) ? CD : document;
             const move = ev => {
+                if (IFRAME_MODE && (!CW || ev.view !== CW)) return;
                 const ang = Math.atan2(ev.clientY - centerY, ev.clientX - centerX) * 180 / Math.PI;
                 elm.rotate = Math.round(startRot + (ang - startAngle));
                 applyElStyle(nodeEl, effCoords(zeroBlock(), elm), elm.rotate);
                 updateZeroSelectionFrame();
             };
             const up = () => {
-                document.removeEventListener('pointermove', move);
+                moveDoc.removeEventListener('pointermove', move);
+                document.removeEventListener('pointerup', up);
                 markDirty(); recordHistoryDebounced(); scheduleRefresh();
             };
-            document.addEventListener('pointermove', move);
+            moveDoc.addEventListener('pointermove', move);
+            moveDoc.addEventListener('pointerup', up, {once: true});
             document.addEventListener('pointerup', up, {once: true});
         });
         zero.handles.appendChild(rot);
