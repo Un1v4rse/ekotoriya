@@ -219,6 +219,22 @@
     <div class="wrap">
         <div class="grid">
             <nav>
+                <button data-tab="dashboard" data-section="dashboard">📊 Дашборд</button>
+                <button data-tab="site" data-section="site">🏠 Настройки сайта</button>
+                <button data-tab="theme" data-section="theme">🎨 Дизайн: цвета и шрифты</button>
+                <button data-tab="menu" data-section="menu">☰ Меню сайта (шапка)</button>
+                <button data-tab="zones" data-section="zones">🧱 Шапка и подвал</button>
+                <button data-tab="templates" data-section="pages">📐 Шаблоны</button>
+                <button data-tab="socials" data-section="socials">👍 Соцсети</button>
+                <button data-tab="wildberries" data-section="integrations">🛒 Интеграции (WB / Ozon)</button>
+                <button data-tab="customers" data-section="customers">👥 Клиенты и заявки</button>
+                <button data-tab="seo" data-section="seo">📈 Продвижение (SEO)</button>
+                <button data-tab="backup" data-section="backup">💾 Резервная копия</button>
+                {% if admin_role == 'superadmin' %}
+                <button data-tab="users" data-section="users">🛡 Пользователи</button>
+                <button data-tab="audit" data-section="audit">📋 Аудит-лог</button>
+                {% endif %}
+                <hr style="border:0;border-top:1px solid var(--border);margin:0.9rem 0;">
                 <h3>Страницы сайта</h3>
                 <div id="pages-list"></div>
                 <div style="margin-top:0.5rem;display:flex;gap:0.4rem;flex-wrap:wrap;">
@@ -242,22 +258,6 @@
                     </div>
                     <div id="add-page-result" class="help" style="margin-top:0.4rem;"></div>
                 </div>
-                <hr style="border:0;border-top:1px solid var(--border);margin:0.9rem 0;">
-                <button data-tab="dashboard" data-section="dashboard">📊 Дашборд</button>
-                <button data-tab="site" data-section="site">🏠 Настройки сайта</button>
-                <button data-tab="theme" data-section="theme">🎨 Дизайн: цвета и шрифты</button>
-                <button data-tab="menu" data-section="menu">☰ Меню сайта (шапка)</button>
-                <button data-tab="zones" data-section="zones">🧱 Шапка и подвал</button>
-                <button data-tab="templates" data-section="pages">📐 Шаблоны</button>
-                <button data-tab="socials" data-section="socials">👍 Соцсети</button>
-                <button data-tab="wildberries" data-section="integrations">🛒 Интеграции (WB / Ozon)</button>
-                <button data-tab="customers" data-section="customers">👥 Клиенты и заявки</button>
-                <button data-tab="seo" data-section="seo">📈 Продвижение (SEO)</button>
-                <button data-tab="backup" data-section="backup">💾 Резервная копия</button>
-                {% if admin_role == 'superadmin' %}
-                <button data-tab="users" data-section="users">🛡 Пользователи</button>
-                <button data-tab="audit" data-section="audit">📋 Аудит-лог</button>
-                {% endif %}
             </nav>
             <main>
                 <section id="tab-dashboard">
