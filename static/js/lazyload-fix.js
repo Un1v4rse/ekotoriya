@@ -37,6 +37,17 @@
     }
 
     function fixAll() {
+        /* В iframe редактора страницы скролл живёт в родительском документе,
+           поэтому IntersectionObserver (который обрезает видимую область по
+           границам iframe в родителе) для нижних блоков никогда не срабатывает.
+           В редакторе грузим всё сразу, без наблюдателей. */
+        var inEditorFrame = false;
+        try { inEditorFrame = !!(window.frameElement && window.frameElement.id === 'pe-content-frame'); } catch (e) {}
+        if (inEditorFrame) {
+            document.querySelectorAll('[data-bg].lazy, [data-lazyload].lazy').forEach(applyBg);
+            document.querySelectorAll('img.lazy[data-src]').forEach(applyImg);
+            return;
+        }
         var els = document.querySelectorAll('[data-bg].lazy, [data-lazyload].lazy');
         if (!('IntersectionObserver' in window)) {
             els.forEach(applyBg);
@@ -67,4 +78,7 @@
     } else {
         fixAll();
     }
+    /* Хук для редактора: контент, подгруженный в iframe позже (ленивые блоки,
+       черновик), тоже нужно «раскрыть» — редактор дёргает fixAll повторно. */
+    window.__lazyFixAll = fixAll;
 })();

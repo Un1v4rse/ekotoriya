@@ -1926,7 +1926,8 @@ def _inject_lazyload_fix(html):
     """
     if 'lazyload-fix.js' in html or '</body>' not in html:
         return html
-    inject = ('<script src="/static/js/lazyload-fix.js" defer></script>\n'
+    fix_ver = int(os.path.getmtime(os.path.join(BASE_DIR, 'static', 'js', 'lazyload-fix.js')))
+    inject = (f'<script src="/static/js/lazyload-fix.js?v={fix_ver}" defer></script>\n'
               # Мёртвые кнопки оригинального шаблона («Купить в 1 клик», сравнение):
               # onclick ссылается на несуществующие bitrix-функции (oneClickBuy/jqm) —
               # прячем, чтобы клик не давал JS-ошибку и не путал посетителя.

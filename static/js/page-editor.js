@@ -594,6 +594,55 @@
         setTimeout(() => { if (!frameReady) onFrameLoaded(); }, 8000);
     }
 
+    /* js-load-block (вкладки каталога, INSTAGRAMM, FAVORIT_ITEM и т.п.) грузят
+       контент через IntersectionObserver: iAppear ждёт, пока блок попадёт в
+       видимую область окна. В редакторе окно iframe не скроллится — скроллит
+       родительский холст, поэтому IO не срабатывает и блоки вечно висят
+       прелоадером. Повторяем здесь логику InitJsLoadBlock самого шаблона:
+       тот же URL (data-file + BLOCK/SHOW_ALL), тот же таргет, тот же разбор
+       ответа через BX.processHTML. Помечаем data-i-appeared, чтобы штатный
+       обработчик (если IO всё же дёрнется) не загрузил блок повторно. */
+    function forceLazyBlocks() {
+        if (!CD || !CW) return;
+        const els = [...CD.querySelectorAll('.js-load-block[data-file]')]
+            .filter(e => !e.dataset.iAppeared);
+        if (!els.length) return;
+        const loadOne = () => {
+            const el = els.shift();
+            if (!el) { updateFrameHeight(); return; }
+            el.dataset.iAppeared = 'true';
+            let url;
+            try { url = new URL(el.dataset.file, CD.location.origin); }
+            catch (e) { loadOne(); return; }
+            if (el.dataset.block) url.searchParams.set('BLOCK', el.dataset.block);
+            if (el.dataset.showAll) url.searchParams.set('SHOW_ALL', 'Y');
+            fetch(url).then(r => {
+                if (!r.ok) throw new Error('http ' + r.status);
+                return r.text();
+            }).then(html => {
+                const target = el.dataset.appendTo
+                    ? el.querySelector(el.dataset.appendTo)
+                    : (el.querySelector(':scope > div[id*="bx_incl_"]') || el);
+                el.removeAttribute('data-file');
+                el.classList.remove('loader_circle');
+                if (target) {
+                    if (CW.BX && CW.BX.processHTML && CW.BX.ajax && CW.BX.ajax.processScripts) {
+                        const ob = CW.BX.processHTML(html);
+                        target.innerHTML = ob.HTML;
+                        CW.BX.ajax.processScripts(ob.SCRIPT);
+                    } else {
+                        target.innerHTML = html;
+                    }
+                    /* раскрыть data-src/data-bg в подгруженном HTML */
+                    if (typeof CW.__lazyFixAll === 'function') CW.__lazyFixAll();
+                }
+                updateFrameHeight();
+                loadOne();
+            }).catch(() => loadOne());
+        };
+        loadOne();
+    }
+
     function onFrameLoaded() {
         if (frameReady) return;
         try {
@@ -610,6 +659,9 @@
         bindContentDocument();
         bindLibraryDnD();          // DnD вешается на contentEl — после каждой загрузки заново
         updateFrameHeight();
+        forceLazyBlocks();         // js-load-block грузятся по IO со скроллом окна — в
+        setTimeout(forceLazyBlocks, 2500);   // iframe редактора окно не скроллится,
+                                             // поэтому подгружаем их принудительно
         if (!editorStarted) {
             editorStarted = true;
             loadInitial().catch(e => {
@@ -630,6 +682,7 @@
                 const result = await apiPost('/preview-marked', {blocks}).then(r => r.json());
                 if (result.success && frameReady) {
                     replaceContentFromHtml(result.content_html);
+                    if (typeof CW.__lazyFixAll === 'function') CW.__lazyFixAll();
                     return;
                 }
             } catch (e) { /* оставляем опубликованный рендер */ }
