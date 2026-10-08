@@ -382,6 +382,7 @@ ADMIN_PATH_SECTIONS = [
     ('/admin/api/render-blocks', 'pages'),
     ('/admin/api/rebuild', 'pages'),
     ('/admin/api/block-templates', 'pages'),
+    ('/admin/api/section-presets', 'pages'),
     ('/admin/api/global-zones', 'site'),
     ('/admin/api/fonts', 'theme'),
     ('/admin/api/theme', 'theme'),
@@ -2637,6 +2638,22 @@ def admin_page_version_restore():
     db.session.commit()
     invalidate_site_cache()
     return jsonify({'success': True})
+
+
+SECTION_PRESETS_FILE = BASE_DIR / 'data' / 'section_presets.json'
+
+
+@app.route('/admin/api/section-presets')
+@admin_required
+def admin_section_presets():
+    """Пресеты секций дизайна для библиотеки конструктора (data/section_presets.json)."""
+    try:
+        presets = json.loads(SECTION_PRESETS_FILE.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        presets = []
+    if not isinstance(presets, list):
+        presets = []
+    return jsonify({'success': True, 'presets': presets})
 
 
 @app.route('/admin/api/block-templates', methods=['GET', 'POST', 'DELETE'])

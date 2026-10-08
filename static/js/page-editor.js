@@ -312,7 +312,6 @@
         },
         section: {
             icon: '🧩', label: 'Секция дизайна', desc: 'Фрагмент перенесённого дизайна страницы',
-            hidden: true,
             mock: '',
             make: () => ({type: 'section', name: 'Секция', html: ''}),
             presets: [],
@@ -321,6 +320,7 @@
 
     /* Категории библиотеки блоков (левая панель) */
     const CATEGORIES = [
+        {id: 'sections', name: 'Секции сайта', types: ['section']},
         {id: 'cover', name: 'Обложка', types: ['banner', 'text_image']},
         {id: 'headings', name: 'Заголовки', types: ['heading']},
         {id: 'text', name: 'Текст', types: ['text', 'text_columns']},
@@ -744,6 +744,7 @@
         setupCanvas();
         buildMap();
         await loadMyBlocks();
+        await loadSectionPresets();
         renderLibrary();
         renderStructure();
         startDraftAutosave();
@@ -1273,10 +1274,69 @@
         });
     }
 
+    /* CSS-классы секций дизайна → читаемые имена (как SECTION_NAMES в
+       migrate_sections.py). Порядок важен: специфичные ключи раньше общих. */
+    const SECTION_CLASS_NAMES = [
+        ['TOP_BIG_BANNERS', 'Главный баннер'],
+        ['BIG_BANNER_INDEX', 'Главный баннер'],
+        ['TIZERS', 'Преимущества'],
+        ['MIDDLE_ADV', 'Промо-блок'],
+        ['FLOAT_BANNERS', 'Баннеры'],
+        ['CATALOG_TAB', 'Вкладки каталога'],
+        ['BRANDS', 'Бренды'],
+        ['REVIEWS', 'Отзывы'],
+        ['COMPANY_TEXT', 'О компании'],
+        ['INSTAGRAMM', 'Фото из Instagram'],
+        ['BOTTOM_BANNERS', 'Нижние баннеры'],
+        ['CATALOG_SECTIONS', 'Разделы каталога'],
+        ['CATALOG_SECTION_LIST', 'Разделы каталога'],
+        ['SALE', 'Акции'],
+        ['NEWS', 'Новости'],
+        ['BLOG', 'Блог'],
+        ['MAPS', 'Карта'],
+        ['FAVORIT_ITEM', 'Популярные товары'],
+        ['LOOKBOOKS', 'Лукбук'],
+        ['STORIES', 'Истории'],
+        ['SERVICES', 'Услуги'],
+        ['GALLERY', 'Галерея'],
+        ['PARTNERS', 'Партнёры'],
+        ['PROJECTS', 'Проекты'],
+        ['VK_VIDEO', 'Видео VK'],
+        ['YOUTUBE', 'Видео YouTube'],
+        ['RUTUBE', 'Видео Rutube'],
+    ];
+
+    /* Производное название секции: по CSS-классу, затем по первому
+       заголовку, затем по текстовому содержимому. */
+    function sectionDerivedName(b) {
+        const html = b.html || '';
+        const classes = html.match(/class="([^"]*)"/gi) || [];
+        for (const cls of classes) {
+            const tokens = cls.slice(7, -1).toUpperCase().split(/\s+/);
+            for (const pair of SECTION_CLASS_NAMES) {
+                if (tokens.indexOf(pair[0]) !== -1) return pair[1];
+            }
+        }
+        const h = html.match(/<h[123][^>]*>([\s\S]*?)<\/h[123]>/i);
+        if (h) {
+            const t = h[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+            if (t) return t.slice(0, 40);
+        }
+        const t = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        return t ? t.slice(0, 40) : 'Секция дизайна';
+    }
+
+    /* Осмысленное имя секции: заданное вручную, иначе — производное. */
+    function sectionDisplayName(b) {
+        const name = (b.name || '').trim();
+        if (name && !/^секция\s*\d*$/i.test(name)) return name;
+        return sectionDerivedName(b);
+    }
+
     function blockLabel(b) {
         if (!b) return 'Блок';
         if (b.legacy) return '🧩 Дизайн страницы';
-        if (b.type === 'section') return '🧩 ' + (b.name || 'Секция дизайна');
+        if (b.type === 'section') return '🧩 ' + sectionDisplayName(b);
         const cfg = BLOCK_TYPES[b.type];
         if (b.name) return (cfg ? cfg.icon : '▦') + ' ' + b.name;
         return cfg ? cfg.icon + ' ' + cfg.label : '▦ ' + (b.type || 'text');
@@ -1715,6 +1775,19 @@
             const d = await apiGet('/block-templates');
             if (d && d.success && Array.isArray(d.templates)) myBlocks = d.templates;
         } catch (e) { /* секция просто не покажется */ }
+    }
+    /* Пресеты секций дизайна из /admin/api/section-presets: заполняем
+       BLOCK_TYPES.section.presets и перерендериваем библиотеку. При ошибке
+       сети или отсутствии файла — пустой список, редактор не ломается. */
+    async function loadSectionPresets() {
+        try {
+            const d = await apiGet('/section-presets');
+            if (!d || !d.success || !Array.isArray(d.presets)) return;
+            BLOCK_TYPES.section.presets = d.presets.map(p => ({
+                name: p.name || 'Секция',
+                make: () => ({type: 'section', name: p.name || 'Секция', html: p.html || ''}),
+            }));
+        } catch (e) { /* пресетов не будет — останется make() по умолчанию */ }
     }
     async function saveToMyBlocks(idx) {
         const b = blocks[idx];
@@ -2324,7 +2397,7 @@
         function refresh() {
             const items = sectionDataItems(b);
             head.innerHTML = '<span class="pe-sec-el-arrow">' + (wrap.classList.contains('pe-sec-el-closed') ? '▸' : '▾') +
-                '</span> Элементы секции (' + items.length + ')';
+                '</span> Элементы секции: ' + esc(sectionDisplayName(b)) + ' (' + items.length + ')';
             list.innerHTML = '';
             if (!items.length) {
                 const empty = el('div', 'pe-sec-el-empty');
