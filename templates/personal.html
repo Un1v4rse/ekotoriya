@@ -62,11 +62,11 @@
     <div class="lk-grid">
         {% for p in favorite_products %}
         <div class="lk-product">
-            <a href="/catalog/{{ p.get('source', 'wb') }}/{{ p.get('nm_id') or p.get('id') }}/">
+            <a href="{{ p.url }}"{% if not p.url.startswith('/') %} target="_blank" rel="noopener"{% endif %}>
                 {% if p.photo %}
                 <img src="{% if p.photo.startswith('/') %}{{ p.photo }}{% else %}/proxy/image?url={{ p.photo | urlencode }}{% endif %}" alt="{{ p.name }}" loading="lazy">
                 {% else %}
-                <img src="/static/noimage.png" alt="{{ p.name }}" loading="lazy">
+                <div class="lk-noimg" aria-hidden="true">{{ p.name[:1] }}</div>
                 {% endif %}
                 <div class="body">
                     <div class="name">{{ p.name }}</div>

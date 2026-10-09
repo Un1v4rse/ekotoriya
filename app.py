@@ -114,6 +114,13 @@ try:
 except Exception as _migrate_err:
     print(f'[migrate_cycle3] пропущено: {_migrate_err}')
 
+# Миграция «цикл 4»: events.payload — снапшот товара в лайках (избранное).
+try:
+    import migrate_cycle4
+    migrate_cycle4.migrate(app)
+except Exception as _migrate_err:
+    print(f'[migrate_cycle4] пропущено: {_migrate_err}')
+
 # Кэширование (AR-3): SimpleCache по умолчанию, тип — через env CACHE_TYPE.
 from flask_caching import Cache
 cache = Cache(app, config={
@@ -1168,11 +1175,35 @@ def personal_page():
     orders = customers.get_customer_orders(customer['id'])
     likes = customers.get_customer_likes(customer['id'])
     stats = customers.get_customer_stats(customer['id'])
-    # Избранное с полными карточками товаров
+    # Избранное: лайкнутые товары. Живые данные из каталога, если товар там
+    # есть; иначе — снапшот из события like (статичные карточки разделов).
+    # Позиции без названия и данных не показываем (вместо «заглушек»).
     products = get_products()
-    liked_ids = {str(l['product_id']) for l in likes}
-    favorite_products = [p for p in products
-                         if str(p.get('nm_id') or p.get('id')) in liked_ids]
+    by_id = {str(p.get('nm_id') or p.get('id')): p for p in products}
+    favorite_products = []
+    for l in likes:
+        pid = str(l['product_id'])
+        p = by_id.get(pid)
+        if p:
+            item = dict(p)
+            item['url'] = '/catalog/{}/{}/'.format(
+                p.get('source') or 'wb', p.get('nm_id') or p.get('id'))
+            favorite_products.append(item)
+            continue
+        snap = l.get('snapshot') or {}
+        name = (snap.get('name') or l.get('product_name') or '').strip()
+        if not name:
+            continue
+        favorite_products.append({
+            'name': name,
+            'photo': snap.get('photo') or '',
+            'price': snap.get('price') or 0,
+            'final_price': snap.get('price') or 0,
+            'url': snap.get('url') or '',
+            'source': snap.get('source') or '',
+            'nm_id': l['product_id'],
+            'from_snapshot': True,
+        })
     try:
         import recommendations
         personal = recommendations.personal_products(
@@ -3683,7 +3714,11 @@ def api_order():
 @app.route('/api/like', methods=['POST'])
 @_rate_limit(20)
 def api_like():
-    """Register a public like for a product."""
+    """Лайк/анлайк товара (toggle): повторный клик снимает лайк.
+
+    Принимает необязательный снапшот товара (price/photo/url/source), чтобы
+    избранное показывало товар даже вне каталога сайта.
+    """
     data = request.get_json() or request.form.to_dict() or {}
     product_id = data.get('product_id') or data.get('nm_id')
     product_name = data.get('product_name', '').strip()
@@ -3694,11 +3729,30 @@ def api_like():
         product_id = 0
     if not product_id:
         return jsonify({'success': False, 'error': 'product_id обязателен'}), 400
-    customers.add_like(product_id, product_name,
-                       customer_id=session.get('customer_id'),
-                       session_id=_session_id())
+    cid = session.get('customer_id')
+    sid = _session_id()
+    if customers.is_liked(product_id, customer_id=cid, session_id=sid):
+        customers.remove_like(product_id, customer_id=cid, session_id=sid)
+        liked = False
+    else:
+        price = data.get('price')
+        try:
+            price = int(round(float(price)))
+        except (TypeError, ValueError):
+            price = 0
+        snapshot = {
+            'name': product_name,
+            'price': max(0, price),
+            'photo': (data.get('photo') or '').strip()[:1000],
+            'url': (data.get('url') or '').strip()[:500],
+            'source': (data.get('source') or '').strip()[:20],
+        }
+        customers.add_like(product_id, product_name,
+                           customer_id=cid, session_id=sid, snapshot=snapshot)
+        liked = True
     invalidate_site_cache()
-    return jsonify({'success': True, 'likes': customers.get_like_counts().get(product_id, 0)})
+    return jsonify({'success': True, 'liked': liked,
+                    'likes': customers.get_like_counts().get(product_id, 0)})
 
 
 @app.route('/api/recommendations')

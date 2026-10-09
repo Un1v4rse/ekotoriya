@@ -216,7 +216,7 @@ def update_order_status(order_id, status):
 
 
 def add_event(etype, product_id=None, product_name='', customer_id=None,
-              session_id='', query=''):
+              session_id='', query='', payload=''):
     """Записать событие (RS-1): view|like|order|favorite|search."""
     db.session.add(Event(
         type=etype,
@@ -225,30 +225,74 @@ def add_event(etype, product_id=None, product_name='', customer_id=None,
         product_id=_coerce_product_id(product_id),
         product_name=product_name or '',
         query=query or '',
+        payload=payload or '',
     ))
     db.session.commit()
 
 
-def add_like(product_id, product_name='', customer_id=None, session_id=''):
+def add_like(product_id, product_name='', customer_id=None, session_id='',
+             snapshot=None):
     """Публичный лайк товара (как раньше, плюс событие).
 
-    Дедупликация: повторный лайк того же товара от того же клиента
-    (или той же сессии) не создаёт новое событие — иначе публичный
-    счётчик накручивался неограниченно одним пользователем.
+    Дедупликация: повторный лайк того же товара от того же посетителя
+    (по аккаунту ИЛИ по сессии — что известно) не создаёт новое событие,
+    иначе публичный счётчик накручивался бы неограниченно одним пользователем.
     Возвращает True, если лайк записан, False — если уже был.
+    snapshot: dict с ценой/фото/ссылкой товара (JSON в events.payload).
     """
+    import json as _json
     pid = _coerce_product_id(product_id)
     if customer_id or session_id:
         q = db.session.query(Event).filter_by(type='like', product_id=pid)
+        cond = []
         if customer_id:
-            q = q.filter_by(customer_id=customer_id)
-        else:
-            q = q.filter_by(session_id=session_id)
-        if q.first() is not None:
-            return False  # уже лайкнуто этим клиентом/сессией
+            cond.append(Event.customer_id == customer_id)
+        if session_id:
+            cond.append(Event.session_id == session_id)
+        if q.filter(db.or_(*cond)).first() is not None:
+            return False  # уже лайкнуто этим посетителем
+    payload = ''
+    if snapshot:
+        try:
+            payload = _json.dumps(snapshot, ensure_ascii=False)[:4000]
+        except (TypeError, ValueError):
+            payload = ''
     add_event('like', product_id=pid, product_name=product_name,
-              customer_id=customer_id, session_id=session_id)
+              customer_id=customer_id, session_id=session_id, payload=payload)
     return True
+
+
+def remove_like(product_id, customer_id=None, session_id=''):
+    """Снять лайк посетителя (toggle). Удаляет события like товара, у которых
+    совпадает аккаунт или сессия. Возвращает число удалённых событий."""
+    pid = _coerce_product_id(product_id)
+    q = db.session.query(Event).filter_by(type='like', product_id=pid)
+    cond = []
+    if customer_id:
+        cond.append(Event.customer_id == customer_id)
+    if session_id:
+        cond.append(Event.session_id == session_id)
+    if not cond:
+        return 0
+    rows = q.filter(db.or_(*cond)).all()
+    for e in rows:
+        db.session.delete(e)
+    db.session.commit()
+    return len(rows)
+
+
+def is_liked(product_id, customer_id=None, session_id=''):
+    """Лайкнул ли текущий посетитель товар (по аккаунту или сессии)."""
+    pid = _coerce_product_id(product_id)
+    q = db.session.query(Event).filter_by(type='like', product_id=pid)
+    cond = []
+    if customer_id:
+        cond.append(Event.customer_id == customer_id)
+    if session_id:
+        cond.append(Event.session_id == session_id)
+    if not cond:
+        return False
+    return q.filter(db.or_(*cond)).first() is not None
 
 
 def _int_key(pid):
@@ -282,18 +326,11 @@ def get_like_counts():
 
 
 def get_customer_likes(customer_id):
-    """Лайкнутые товары клиента (LC-3)."""
+    """Лайкнутые товары клиента (LC-3), с снапшотом из события если есть."""
     rows = (db.session.query(Event)
             .filter_by(type='like', customer_id=customer_id)
             .order_by(Event.id.desc()).all())
-    seen, result = set(), []
-    for e in rows:
-        pid = _int_key(e.product_id)
-        if pid in seen:
-            continue
-        seen.add(pid)
-        result.append({'product_id': pid, 'product_name': e.product_name or ''})
-    return result
+    return _likes_rows_to_dicts(rows)
 
 
 def get_visitor_likes(customer_id=None, session_id=''):
@@ -307,13 +344,26 @@ def get_visitor_likes(customer_id=None, session_id=''):
         q = q.filter_by(customer_id=customer_id)
     else:
         q = q.filter_by(customer_id=None, session_id=session_id or '')
+    return _likes_rows_to_dicts(q.all())
+
+
+def _likes_rows_to_dicts(rows):
+    """Дедуп по product_id + разбор JSON-снапшота (events.payload)."""
+    import json as _json
     seen, result = set(), []
-    for e in q.all():
+    for e in rows:
         pid = _int_key(e.product_id)
         if pid in seen:
             continue
         seen.add(pid)
-        result.append({'product_id': pid, 'product_name': e.product_name or ''})
+        snap = {}
+        if e.payload:
+            try:
+                snap = _json.loads(e.payload) or {}
+            except (TypeError, ValueError):
+                snap = {}
+        result.append({'product_id': pid, 'product_name': e.product_name or '',
+                       'snapshot': snap})
     return result
 
 

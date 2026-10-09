@@ -37,6 +37,7 @@
     .lk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
     .lk-product { border: 1px solid #eee; border-radius: var(--theme-border-radius, 8px); overflow: hidden; background: #fff; }
     .lk-product img { width: 100%; height: 160px; object-fit: cover; display: block; }
+    .lk-product .lk-noimg { width: 100%; height: 160px; display: flex; align-items: center; justify-content: center; background: #f3f0ec; color: #b9ad9d; font-size: 2.4rem; font-weight: 700; }
     .lk-product .body { padding: 0.7rem 0.8rem; }
     .lk-product .name { font-size: 0.88rem; min-height: 2.4em; }
     .lk-product .name a { color: var(--theme-text, #333); text-decoration: none; }
@@ -72,6 +73,7 @@
 <footer class="lk-footer">
     {{ site.name or 'Экотория' }}{% if site.phone %} · {{ site.phone }}{% endif %}{% if site.email %} · {{ site.email }}{% endif %}
 </footer>
+<script src="/static/js/wb-actions.js"></script>
 <script>
 document.getElementById('lk-logout')?.addEventListener('click', async function(e) {
     e.preventDefault();

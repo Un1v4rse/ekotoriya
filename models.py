@@ -251,6 +251,9 @@ class Event(db.Model):
     product_id = db.Column(db.String(60), default='', index=True)
     product_name = db.Column(db.String(1000), default='')
     query = db.Column(db.String(500), default='')
+    # JSON-снапшот товара на момент лайка (цена/фото/ссылка) — избранное
+    # показываем из лайков, даже если товара нет в каталоге сайта.
+    payload = db.Column(db.Text, default='')
     created_at = db.Column(db.DateTime, default=utcnow, index=True)
 
 
