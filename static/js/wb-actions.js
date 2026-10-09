@@ -4,11 +4,12 @@
  * несколькими шаблонами — глобальный флаг защищает от двойного навешивания.
  *
  * Помимо собственных .wb-* кнопок перехватываются «мёртвые» кнопки клона
- * aspro-шаблона: сердечко .js-item-action[data-action="favorite» и
- * .one_click («Купить в 1 клик»). Их обработчики шлют ajax на несуществующие
- * bitrix-эндпоинты (405 → тост «Ошибка. Error network connection»), поэтому
- * клик перехватывается в capture-фазе — jQuery-делегированные обработчики
- * aspro живут в bubble-фазе на document и до них событие не доходит. */
+ * aspro-шаблона: сердечко .js-item-action[data-action="favorite»,
+ * .one_click («Купить в 1 клик») и .to-cart («В корзину»). Их обработчики
+ * шлют ajax на несуществующие bitrix-эндпоинты (405 → тост «Ошибка. Error
+ * network connection», 404 → вечный спиннер кнопки), поэтому клик
+ * перехватывается в capture-фазе — jQuery-делегированные обработчики aspro
+ * живут в bubble-фазе на document и до них событие не доходит. */
 (function() {
     if (window.__wbActions) return;
     window.__wbActions = true;
@@ -109,12 +110,13 @@
     }
 
     /* Разметить/снять разметку ВСЕХ кнопок избранного товара на странице
-     * (у одного товара может быть несколько карточек). */
+     * (у одного товара может быть несколько карточек). Состояние — только
+     * CSS-класс .wb-liked-btn (цвета в LIKED_BTN_CSS, инжект app.py):
+     * inline-стили затирали цвета темы и не восстанавливались. */
     function markProductLiked(pid, liked, likes) {
         document.querySelectorAll('.wb-like-btn[data-id="' + pid + '"]').forEach(function(b) {
             b.textContent = liked ? '❤ В избранном' + (typeof likes === 'number' ? ' (' + likes + ')' : '') : '❤ В избранное';
-            b.style.borderColor = liked ? '#999' : '';
-            b.style.color = liked ? '#999' : '';
+            b.classList.toggle('wb-liked-btn', liked);
         });
         document.querySelectorAll('.js-item-action[data-action="favorite"]').forEach(function(b) {
             if (staticCardProductId(b) !== String(pid)) return;
@@ -247,8 +249,57 @@
             e.stopPropagation();
             var pid2 = staticCardProductId(oc) || oc.getAttribute('data-item');
             if (pid2) buyOneClick(pid2, 'wb', staticCardName(oc), staticCardPrice(oc));
+            return;
+        }
+        /* Мёртвая кнопка «В корзину» aspro-карточек (.to-cart): aspro шлёт
+         * POST /ajax/item.php (эндпоинта нет → 404), кнопка вешается в
+         * спиннер и товар не добавляется — воспринимается как зависание.
+         * Перехватываем: добавляем через /api/cart/add (имя/цена из карточки
+         * уходят в cart_meta для товаров вне каталога) и ведём в корзину. */
+        var toCart = e.target.closest && e.target.closest('.to-cart[data-item]');
+        if (toCart) {
+            e.preventDefault();
+            e.stopPropagation();
+            addStaticToCart(toCart);
         }
     }, true);
+
+    /* Счётчик корзины в шапке (aspro-разметка, a.basket-link.basket). */
+    function setCartCounter(n) {
+        document.querySelectorAll('a.basket-link.basket .js-count').forEach(function(c) {
+            c.textContent = String(n);
+            c.classList.toggle('empted', n === 0);
+        });
+    }
+
+    function addStaticToCart(btn) {
+        var bid = btn.getAttribute('data-item');
+        var pid = staticCardProductId(btn) || bid;
+        if (!pid) return;
+        var name = '';
+        var block = btn.closest('.button_block, .buy_block, .footer_button') || btn.parentElement;
+        var nameEl = block && block.querySelector('[data-js-item-name]');
+        if (nameEl) name = (nameEl.getAttribute('data-js-item-name') || '').trim();
+        if (!name) name = staticCardName(btn);
+        var price = parseInt(btn.getAttribute('data-value'), 10) || staticCardPrice(btn) || 0;
+        fetch('/api/cart/add', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({product_id: pid, source: 'aspro',
+                                      product_name: name, price: price})})
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.success) return;
+                setCartCounter(data.count);
+                /* Нативный фидбэк aspro: «В корзину» → «В корзине». */
+                document.querySelectorAll('.to-cart[data-item="' + bid + '"]').forEach(function(b) {
+                    b.style.display = 'none';
+                });
+                document.querySelectorAll('.in-cart[data-item="' + bid + '"]').forEach(function(a) {
+                    a.style.display = '';
+                });
+                setTimeout(function() { location.href = '/basket/'; }, 500);
+            })
+            .catch(function(err) { console.error('cart error', err); });
+    }
 
     /* Инлайн-форма заявки .wb-order-form — прежнее поведение. */
     document.addEventListener('submit', function(e) {

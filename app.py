@@ -1055,6 +1055,21 @@ def api_cart_add():
     except (TypeError, ValueError):
         qty = 1
     key = f'{source}:{pid}'
+    # Товара нет в каталоге (карточки aspro-клона): имя/цена от клиента
+    # сохраняются в cart_meta — та же механика, что в /api/cart/buy-one-click.
+    known = any(f"{p.get('source', 'wb')}:{p.get('nm_id') or p.get('id')}" == key
+                for p in get_products())
+    meta = session.get('cart_meta') or {}
+    if not known and data.get('product_name'):
+        try:
+            price = int(float(data.get('price') or 0))
+        except (TypeError, ValueError):
+            price = 0
+        meta[key] = {'name': str(data.get('product_name'))[:1000],
+                     'price': max(0, price)}
+    else:
+        meta.pop(key, None)
+    session['cart_meta'] = meta
     cart = session.get('cart') or {}
     cart[key] = int(cart.get(key, 0)) + qty
     session['cart'] = cart
@@ -2067,6 +2082,34 @@ _HOVER_CSS = (
     '</style>'
 )
 
+# Состояния кнопки избранного: только CSS-класс (без inline-стилей из JS —
+# они затирали цвета темы, и после снятия лайка кнопка оставалась чёрной).
+# «Не в избранном» — контур акцентного цвета; «в избранном» — заливка акцентом.
+LIKED_BTN_CSS = (
+    '<style>'
+    '.wb-like-btn{color:#c00 !important;border:1px solid #c00 !important;'
+    'background:#fff !important;}'
+    '.wb-like-btn.wb-liked-btn{background:#c00 !important;'
+    'color:#fff !important;border-color:#c00 !important;}'
+    '</style>'
+)
+
+# Левое меню категорий (.left_block, разметка bitrix-клона): у страницы нет
+# колонки-контейнера (body без block_side_WIDE/side_LEFT), поэтому
+# sticky-sidebar прибивал меню к левому краю viewport и выпадашка «Каталог»
+# висела поверх контента. Список свёрнут по умолчанию (раскрытие — hover
+# или клик по шапке, см. инжект-скрипт), приклеивание отключено.
+LEFTMENU_CSS = (
+    '<style>'
+    '.left_block .menu_top_block .slide-block__body{display:none !important;}'
+    '.left_block .menu_top_block.opened .slide-block__body,'
+    '.left_block .menu_top_block:hover .slide-block__body{display:block !important;}'
+    '.left_block .menu_top_block .slide-block__head{cursor:pointer;}'
+    '.left_block.is-affixed .sticky-sidebar__inner{position:static !important;'
+    'transform:none !important;top:auto !important;left:auto !important;}'
+    '</style>'
+)
+
 
 def _inject_lazyload_fix(html):
     """Инжект полифилла Bitrix-lazyload (static/js/lazyload-fix.js) перед </body>.
@@ -2084,7 +2127,14 @@ def _inject_lazyload_fix(html):
       (bubble) не успел отработать;
     — состояние избранного посетителя (window.__likedIds/__likesCount) для
       восстановления кнопок и счётчика после перезагрузки;
-    — переопределение ховер-блока карточек (см. _HOVER_CSS).
+    — переопределение ховер-блока карточек (см. _HOVER_CSS);
+    — мёртвый bitrix-фильтр категорий (form.smartfilter): «Показать»/submit/
+      сортировка перенаправляют в единый каталог с рабочими параметрами
+      (price_from/price_to/sort, category раздела из B), а не в ajax-заглушку
+      ?ajax=y, отвечающую json_failure;
+    — левое меню категорий (.left_block): список свёрнут по умолчанию,
+      раскрытие по клику по шапке (.opened) или наведению, приклеивание
+      sticky-sidebar отключено — меню не перекрывает контент.
     """
     if 'lazyload-fix.js' in html or '</body>' not in html:
         return html
@@ -2097,6 +2147,8 @@ def _inject_lazyload_fix(html):
               f'<script>window.__likedIds={liked};'
               f'window.__likesCount={len(liked_ids)};</script>\n'
               + _HOVER_CSS + '\n'
+              + LIKED_BTN_CSS + '\n'
+              + LEFTMENU_CSS + '\n'
               # Мёртвая пагинация категорий: «Показать ещё» → все товары раздела
               # одним списком, номера страниц → тот же список (?page=N игнорируется
               # в режиме per_page=all).
@@ -2110,6 +2162,45 @@ def _inject_lazyload_fix(html):
               'if(a){e.preventDefault();e.stopPropagation();'
               "var m=(a.getAttribute('href')||'').match(/PAGEN_\\d+=(\\d+)/);"
               "go(B+(B.indexOf('?')>-1?'&':'?')+'page='+(m?m[1]:1));}"
+              '},true);'
+              # Мёртвый bitrix-фильтр категорий (form.smartfilter): «Показать»
+              # уходит в ajax-заглушку (?ajax=y) и json_failure — фильтр как будто
+              # сбрасывается. Перенаправляем в единый каталог с рабочими
+              # параметрами: цена из полей фильтра, сортировка из sort_btn.
+              'function sfUrl(sort){'
+              'var u=new URL(B,location.origin);'
+              "var f=document.querySelector('form.smartfilter');"
+              'if(f){'
+              "var mn=f.querySelector('#MAX_SMART_FILTER_P1_MIN');"
+              "var mx=f.querySelector('#MAX_SMART_FILTER_P1_MAX');"
+              'if(mn&&mn.value)u.searchParams.set(\'price_from\',mn.value.replace(/\\D/g,\'\'));'
+              'if(mx&&mx.value)u.searchParams.set(\'price_to\',mx.value.replace(/\\D/g,\'\'));'
+              '}'
+              'if(sort)u.searchParams.set(\'sort\',sort);'
+              'return u.pathname+u.search;'
+              '}'
+              "document.addEventListener('click',function(e){"
+              "var p=e.target.closest&&e.target.closest("
+              "'#set_filter1,.bx_filter_search_button,.bx_filter_popup_result a');"
+              'if(p&&p.closest&&p.closest(\'form.smartfilter\')){'
+              'e.preventDefault();e.stopPropagation();go(sfUrl(\'\'));return;}'
+              "var s=e.target.closest&&e.target.closest('a.sort_btn');"
+              'if(s){e.preventDefault();e.stopPropagation();'
+              "var c=s.className;var sort='popular';"
+              "if(c.indexOf('PRICE')>-1){sort=c.indexOf('desc')>-1?'price_desc':'price_asc';}"
+              "go(sfUrl(sort));}"
+              '},true);'
+              "document.addEventListener('submit',function(e){"
+              "if(e.target&&e.target.classList&&e.target.classList.contains('smartfilter')){"
+              'e.preventDefault();go(sfUrl(\'\'));}'
+              '},true);'
+              # Левое меню категорий: свёрнуто по умолчанию (LEFTMENU_CSS),
+              # клик по шапке «Каталог» переключает .opened — раскрытие без
+              # наезда на контент; обработчик aspro на шапке не нужен.
+              "document.addEventListener('click',function(e){"
+              "var h=e.target.closest&&e.target.closest('.left_block .slide-block__head');"
+              'if(h){var m=h.closest(\'.menu_top_block\');'
+              'if(m){e.preventDefault();e.stopPropagation();m.classList.toggle(\'opened\');}}'
               '},true);'
               "document.addEventListener('DOMContentLoaded',function(){"
               "document.querySelectorAll('.ajax_load_btn').forEach(function(btn){"

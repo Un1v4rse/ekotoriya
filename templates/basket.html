@@ -2,6 +2,23 @@
 {% block title %}Корзина — {{ site.name or 'Экотория' }}{% endblock %}
 {% block extra %}{{ blocks_html | safe }}{% endblock %}
 {% block content %}
+<style>
+/* Мобильная адаптация корзины: таблица превращается в вертикальный стек
+ * карточек, поля и кнопки — во всю ширину и не меньше 44px для пальца. */
+@media (max-width: 640px) {
+    .lk-main { padding: 1rem 0.8rem 2rem; }
+    .lk-main h1 { font-size: 1.35rem; }
+    .lk-card { padding: 0.9rem 1rem; }
+    table.lk-table, .lk-table tbody, .lk-table tr, .lk-table td { display: block; width: 100%; }
+    .lk-table thead { display: none; }
+    .lk-table tr { border: 1px solid #eee; border-radius: var(--theme-border-radius, 8px); padding: 0.5rem 0.8rem 0.7rem; margin-bottom: 0.9rem; }
+    .lk-table td { border-bottom: 0; padding: 0.3rem 0; }
+    .lk-table td[data-label]::before { content: attr(data-label); display: block; font-size: 0.7rem; color: #888; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.1rem; }
+    .lk-table input[type="number"] { width: 100% !important; min-height: 44px; margin-bottom: 0; }
+    .lk-table td:last-child button { width: 100%; min-height: 44px; padding: 0.55rem; }
+    .lk-btn { width: 100%; min-height: 44px; padding: 0.7rem 1rem; font-size: 1rem; }
+}
+</style>
 <h1>Корзина</h1>
 
 {% if items %}
@@ -18,7 +35,7 @@
         <tbody>
             {% for it in items %}
             <tr>
-                <td>
+                <td data-label="Товар">
                     {% if it.product.get('nm_id') %}
                     <a href="/catalog/{{ it.product.get('source', 'wb') }}/{{ it.product.get('nm_id') or it.product.get('id') }}/" style="color:inherit;text-decoration:none;">
                         {{ it.product.get('name', 'Товар') }}
@@ -27,13 +44,13 @@
                     {{ it.product.get('name', 'Товар') }}
                     {% endif %}
                 </td>
-                <td>{{ it.price }} ₽</td>
-                <td>
+                <td data-label="Цена">{{ it.price }} ₽</td>
+                <td data-label="Количество">
                     <input type="number" min="0" value="{{ it.qty }}" style="width:70px;margin:0;"
                            onchange="updateQty('{{ it.key }}', this.value)">
                 </td>
-                <td><strong>{{ it.price * it.qty }} ₽</strong></td>
-                <td><button class="lk-btn secondary" style="padding:0.3rem 0.7rem;" onclick="updateQty('{{ it.key }}', 0)">✕</button></td>
+                <td data-label="Сумма"><strong>{{ it.price * it.qty }} ₽</strong></td>
+                <td><button class="lk-btn secondary" style="padding:0.3rem 0.7rem;" onclick="updateQty('{{ it.key }}', 0)">✕ Удалить</button></td>
             </tr>
             {% endfor %}
         </tbody>

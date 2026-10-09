@@ -1,0 +1,135 @@
+# -*- coding: utf-8 -*-
+"""Фильтры каталога (CT-1/CT-5): рабочая панель единого каталога сохраняет
+применённые значения и пагинация не теряет параметры; мёртвый bitrix-
+smartfilter категорийных страниц перехвачен и ведёт в единый каталог;
+левое меню категорий свёрнуто по умолчанию (не перекрывает контент)."""
+
+import copy
+
+import pytest
+
+import app as app_module
+import storage
+from db import db
+from models import Product
+
+# Минимальная разметка bitrix-клона для категорийной страницы: левое меню
+# (.left_block) и мёртвый фильтр (form.smartfilter). В тестовом контенте
+# content_html пуст, поэтому сидим её явно (в продовых данных/*.json она есть).
+_SECTION_MARKUP = (
+    '<div class="left_block sticky-sidebar"><div class="sticky-sidebar__inner">'
+    '<div class="menu_top_block catalog_block"><div class="slide-block">'
+    '<div class="slide-block__head">Каталог</div>'
+    '<div class="slide-block__body"><ul class="menu dropdown">'
+    '<li>Наматрасники</li><li>Одеяла</li><li>Наперники</li></ul></div>'
+    '</div></div></div></div>'
+    '<form action="/catalog/namatrasniki/" class="smartfilter" method="get">'
+    '<input id="MAX_SMART_FILTER_P1_MIN" name="MAX_SMART_FILTER_P1_MIN" type="text" value=""/>'
+    '<button id="set_filter1" type="button">Показать</button></form>'
+)
+
+
+@pytest.fixture()
+def client():
+    return app_module.app.test_client()
+
+
+def _seed_products():
+    import wb_sync
+    wb_sync.sync(token=None, demo=True)
+    app_module.invalidate_site_cache()
+
+
+def _add_products(n, start=900000000):
+    for i in range(n):
+        db.session.add(Product(source='wb', nm_id=start + i,
+                               name=f'Товар тестовый {i}', price=1000 + i,
+                               visible=True, stock=5))
+    db.session.commit()
+    app_module.invalidate_site_cache()
+
+
+def _seed_section_markup():
+    """Проставить content_html категорийной страницы (left_block + smartfilter)."""
+    content = copy.deepcopy(storage.load_content())
+    for p in content.get('pages', []):
+        if p.get('slug') == 'catalog__namatrasniki':
+            p['content_html'] = _SECTION_MARKUP
+    storage.save_content(content)
+    app_module.invalidate_site_cache()
+
+
+def test_catalog_filter_values_restored(client):
+    """Панель фильтров показывает применённые значения после перезагрузки."""
+    _seed_products()
+    r = client.get('/catalog/?price_from=1000&price_to=5000&sort=price_asc&in_stock=1')
+    assert r.status_code == 200
+    body = r.data.decode('utf-8')
+    assert 'name="price_from" value="1000"' in body
+    assert 'name="price_to" value="5000"' in body
+    assert 'value="price_asc" selected' in body
+    assert 'name="in_stock" value="1" checked' in body
+
+
+def test_catalog_filter_applies_to_results(client):
+    _seed_products()
+    r = client.get('/catalog/?price_from=3000&price_to=4000')
+    body = r.data.decode('utf-8')
+    assert 'Найдено товаров:' in body
+    # только товары с final_price в диапазоне 3000..4000 (3052 и 3321)
+    assert body.count('wb-product-card') == 2
+
+
+def test_catalog_pagination_keeps_filters(client):
+    """Ссылки пагинации сохраняют параметры фильтра."""
+    _seed_products()
+    _add_products(20)  # 8 demo + 20 = 28 (> 24 на страницу)
+    r = client.get('/catalog/?source=wb&sort=price_desc')
+    assert r.status_code == 200
+    body = r.data.decode('utf-8')
+    assert 'wb-catalog-pagination' in body
+    assert 'source=wb' in body
+    assert 'sort=price_desc' in body
+    # ссылки вида /catalog/?q=&amp;source=wb...&amp;page=2 (Jinja эскейпит &)
+    assert 'page=2' in body
+    assert '/catalog/?q=&amp;source=wb' in body
+
+
+def test_section_page_smartfilter_intercepted_namtrasniki(client):
+    """Мёртвый bitrix-фильтр категорий: в HTML есть форма smartfilter, но
+    клики/сабмит перехватываются инжект-скриптом и ведут в единый каталог
+    с параметрами price_from/price_to/sort."""
+    _seed_products()
+    _seed_section_markup()
+    r = client.get('/catalog/namatrasniki/')
+    assert r.status_code == 200
+    body = r.data.decode('utf-8')
+    # разметка фильтра — из content_html, а не только из инжект-скрипта
+    assert 'name="MAX_SMART_FILTER_P1_MIN"' in body
+    assert 'id="set_filter1"' in body
+    # инжект перехвата: оба обработчика (клик по «Показать» и submit формы)
+    assert 'sfUrl' in body
+    assert 'bx_filter_search_button' in body
+    assert "classList.contains('smartfilter')" in body
+
+
+# ---------- левое меню категорий: свёрнуто по умолчанию ----------
+
+
+def test_section_leftmenu_collapsed_by_default(client):
+    """Выпадашка левого меню (.left_block .slide-block__body) свёрнута
+    по умолчанию и раскрывается по .opened/ховеру; приклеивание
+    sticky-sidebar отключено — меню не перекрывает контент."""
+    _seed_products()
+    _seed_section_markup()
+    r = client.get('/catalog/namatrasniki/')
+    assert r.status_code == 200
+    body = r.data.decode('utf-8')
+    # разметка левого меню — из content_html
+    assert 'left_block sticky-sidebar' in body
+    assert 'slide-block__head' in body
+    # CSS-инжект: сворачивание + отключение affixed
+    assert '.left_block .menu_top_block .slide-block__body{display:none' in body
+    assert '.left_block.is-affixed .sticky-sidebar__inner{position:static' in body
+    # JS-инжект: клик по шапке переключает .opened
+    assert "classList.toggle('opened')" in body

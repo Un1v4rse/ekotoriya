@@ -73,6 +73,57 @@ def test_buy_one_click_requires_product(client):
     assert r.status_code == 400
 
 
+# ---------- «В корзину» мёртвых aspro-карточек (перехват .to-cart) ----------
+
+def test_cart_add_unknown_product_with_meta(client):
+    """Товара нет в каталоге (карточки aspro-клона): имя/цена от клиента
+    сохраняются в cart_meta — корзина показывает осмысленную позицию."""
+    _seed_products()
+    r = client.post('/api/cart/add', json={
+        'product_id': '1254', 'source': 'aspro',
+        'product_name': 'Одеяло евро всесезонное', 'price': 2390})
+    data = r.get_json()
+    assert data['success'] and data['count'] == 1
+    r = client.get('/basket/')
+    body = r.data.decode('utf-8')
+    assert 'Одеяло евро всесезонное' in body
+    assert '2 390' in body or '2390' in body
+
+
+def test_cart_add_known_product_ignores_meta(client):
+    """Для товаров каталога клиентские имя/цена игнорируются (как в 1-клике)."""
+    _seed_products()
+    r = client.post('/api/cart/add', json={
+        'product_id': '890129778', 'product_name': 'Подмена', 'price': 1})
+    assert r.get_json()['success']
+    r = client.get('/basket/')
+    body = r.data.decode('utf-8')
+    assert 'Непромокаемый наматрасник 200х200' in body
+    assert 'Подмена' not in body
+
+
+def test_cart_add_accumulates_qty(client):
+    _seed_products()
+    for _ in range(3):
+        r = client.post('/api/cart/add', json={'product_id': '67928567'})
+        assert r.get_json()['success']
+    assert r.get_json()['cart'] == {'wb:67928567': 3}
+
+
+def test_cart_add_after_register_session(client):
+    """Свежая регистрация не ломает добавление: сессия сохраняется,
+    корзина доступна сразу (сценарий «зависания после регистрации»)."""
+    _seed_products()
+    reg = client.post('/api/client/register', json={
+        'name': 'Новый клиент', 'phone': '+7 900 300-00-05', 'password': 'secret1'})
+    assert reg.get_json()['success']
+    r = client.post('/api/cart/add', json={'product_id': '890129778'})
+    assert r.get_json()['success']
+    r = client.get('/basket/')
+    assert r.status_code == 200
+    assert 'Непромокаемый наматрасник 200х200'.encode('utf-8') in r.data
+
+
 def test_buy_one_click_anonymous_empty_checkout_fields(client):
     """Без входа поля оформления просто пустые."""
     _seed_products()
