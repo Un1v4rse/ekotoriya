@@ -256,6 +256,23 @@ def _int_key(pid):
     return int(s) if s.isdigit() else s
 
 
+def bind_session_likes(customer_id, session_id=''):
+    """При входе/регистрации переписываем анонимные лайки сессии на клиента (LC-3).
+
+    Иначе товары, лайкнутые до входа, не попадали в избранное /personal/favorite/.
+    """
+    if not customer_id or not session_id:
+        return 0
+    rows = (db.session.query(Event)
+            .filter_by(type='like', session_id=session_id, customer_id=None)
+            .all())
+    for e in rows:
+        e.customer_id = customer_id
+    if rows:
+        db.session.commit()
+    return len(rows)
+
+
 def get_like_counts():
     """{product_id: count} — ключи int, где возможно (совместимость)."""
     rows = (db.session.query(Event.product_id, db.func.count(Event.id))

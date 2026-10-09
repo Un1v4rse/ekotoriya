@@ -933,8 +933,13 @@ def favicon():
 
 
 def _cart_items():
-    """Корзина из сессии: [{key, product, qty, price}] (LC-4)."""
+    """Корзина из сессии: [{key, product, qty, price}] (LC-4).
+
+    Позиции, которых нет в каталоге (например, товар из статичной aspro-карточки
+    клона), достаются из cart_meta — клиент передаёт имя/цену с кнопки
+    «Купить в 1 клик» (как /api/order, где цена тоже приходит от клиента)."""
     cart = session.get('cart') or {}
+    meta = session.get('cart_meta') or {}
     products = get_products()
     by_key = {f"{p.get('source', 'wb')}:{p.get('nm_id') or p.get('id')}": p
               for p in products}
@@ -942,7 +947,13 @@ def _cart_items():
     for key, qty in cart.items():
         p = by_key.get(key)
         if p is None:
-            continue
+            m = meta.get(key)
+            if not m:
+                continue
+            src, _, pid = key.partition(':')
+            p = {'id': pid, 'nm_id': int(pid) if str(pid).isdigit() else 0,
+                 'source': src, 'name': m.get('name') or f'Товар {pid}',
+                 'final_price': int(m.get('price') or 0)}
         qty = max(1, int(qty or 1))
         price = int(p.get('final_price') or p.get('price') or 0)
         items.append({'key': key, 'product': p, 'qty': qty, 'price': price})
@@ -1044,6 +1055,42 @@ def api_cart_add():
     return jsonify({'success': True, 'cart': cart, 'count': sum(cart.values())})
 
 
+@app.route('/api/cart/buy-one-click', methods=['POST'])
+def api_cart_buy_one_click():
+    """«Купить в 1 клик»: корзина очищается и в неё кладётся только этот товар,
+    клиент идёт на /basket/ (оформление) — поля контактов там предзаполнены
+    из профиля залогиненного клиента, но редактируемые."""
+    data = request.get_json() or request.form.to_dict() or {}
+    source = data.get('source') or 'wb'
+    pid = str(data.get('product_id') or data.get('nm_id') or '').strip()
+    if not pid:
+        return jsonify({'success': False, 'error': 'product_id обязателен'}), 400
+    try:
+        qty = max(1, int(data.get('qty') or 1))
+    except (TypeError, ValueError):
+        qty = 1
+    key = f'{source}:{pid}'
+    # Товаров нет в каталоге (статичные aspro-карточки клона): сохраняем
+    # имя/цену от клиента, чтобы корзина и заявка выглядели осмысленно.
+    known = any(f"{p.get('source', 'wb')}:{p.get('nm_id') or p.get('id')}" == key
+                for p in get_products())
+    meta = session.get('cart_meta') or {}
+    if not known and data.get('product_name'):
+        try:
+            price = int(float(data.get('price') or 0))
+        except (TypeError, ValueError):
+            price = 0
+        meta[key] = {'name': str(data.get('product_name'))[:1000],
+                     'price': max(0, price)}
+    else:
+        meta.pop(key, None)
+    session['cart_meta'] = meta
+    session['cart'] = {key: qty}
+    session.modified = True
+    return jsonify({'success': True, 'cart': session['cart'],
+                    'redirect': '/basket/?oneclick=1'})
+
+
 @app.route('/api/cart/update', methods=['POST'])
 def api_cart_update():
     """Изменить количество / удалить позицию (qty=0 — удалить)."""
@@ -1091,6 +1138,7 @@ def api_cart_checkout():
             consent_pd=bool(data.get('consent_pd')))
         orders.append(order)
     session['cart'] = {}
+    session['cart_meta'] = {}
     session.modified = True
     invalidate_site_cache()
     return jsonify({'success': True, 'orders': orders})
@@ -1191,6 +1239,7 @@ def api_client_register():
     if data.get('remember'):
         session.permanent = True
     session['customer_id'] = customer['id']
+    customers.bind_session_likes(customer['id'], _session_id())
     return jsonify({'success': True, 'customer': customer})
 
 
@@ -1206,6 +1255,7 @@ def api_client_login():
     if data.get('remember'):
         session.permanent = True
     session['customer_id'] = customer['id']
+    customers.bind_session_likes(customer['id'], _session_id())
     return jsonify({'success': True, 'customer': customer})
 
 
@@ -1917,6 +1967,29 @@ def admin_full_content():
     return jsonify(load_content())
 
 
+def _section_catalog_base():
+    """Базовый URL «все товары этого типа» для фикса пагинации категорий.
+
+    Кнопка «Показать ещё» и номера страниц bitrix-пагинации на категорийных
+    страницах (/catalog/<раздел>/) ведут на единый каталог /catalog/ с фильтром
+    category раздела (если товары раздела с категорией), а не подгружают
+    ajax'ом целую следующую страницу — bitrix section_pagination.js вставляет
+    в DOM весь документ, включая шапку и подвал.
+    """
+    from collections import Counter
+    from urllib.parse import quote
+    m = re.match(r'^/catalog/([a-z0-9-]+)/', request.path or '')
+    section = m.group(1) if m else ''
+    products = list(get_products())
+    if section:
+        products = [p for p in products
+                    if not p.get('site_section') or p.get('site_section') == section]
+    cats = [str(p.get('category')) for p in products if p.get('category')]
+    if cats:
+        return '/catalog/?category=' + quote(Counter(cats).most_common(1)[0][0])
+    return '/catalog/'
+
+
 def _inject_lazyload_fix(html):
     """Инжект полифилла Bitrix-lazyload (static/js/lazyload-fix.js) перед </body>.
 
@@ -1924,15 +1997,37 @@ def _inject_lazyload_fix(html):
     а плагин ls.unveilhooks загружается раньше lazysizes и не регистрируется —
     картинки не подгружались, оставался спиннер и пустые колонки.
     Скрипт вставляется всем посетителям (проблема у всех, не только у админа).
+
+    Дополнительно — инлайн-фикс мёртвой bitrix-пагинации категорий: клик по
+    «Показать ещё» (.ajax_load_btn) и по номерам страниц (.module-pagination,
+    ?PAGEN_1=N) перенаправляет на единый каталог. Перехват в capture-фазе,
+    чтобы jQuery-делегированный обработчик aspro (bubble) не успел отработать.
     """
     if 'lazyload-fix.js' in html or '</body>' not in html:
         return html
     fix_ver = int(os.path.getmtime(os.path.join(BASE_DIR, 'static', 'js', 'lazyload-fix.js')))
+    base = json.dumps(_section_catalog_base())
     inject = (f'<script src="/static/js/lazyload-fix.js?v={fix_ver}" defer></script>\n'
-              # Мёртвые кнопки оригинального шаблона («Купить в 1 клик», сравнение):
-              # onclick ссылается на несуществующие bitrix-функции (oneClickBuy/jqm) —
-              # прячем, чтобы клик не давал JS-ошибку и не путал посетителя.
-              '<style>.one_click{display:none !important;}</style>\n'
+              # Мёртвая пагинация категорий: «Показать ещё» → весь каталог раздела,
+              # номера страниц → /catalog/?page=N (24 товара/стр., рабочие фильтры).
+              '<script>(function(){'
+              f'var B={base};'
+              'function go(u){location.href=u;}'
+              "document.addEventListener('click',function(e){"
+              "var b=e.target.closest&&e.target.closest('.ajax_load_btn');"
+              'if(b){e.preventDefault();e.stopPropagation();go(B);return;}'
+              'var a=e.target.closest&&e.target.closest(\'.module-pagination a[href*="PAGEN_"]\');'
+              'if(a){e.preventDefault();e.stopPropagation();'
+              "var m=(a.getAttribute('href')||'').match(/PAGEN_\\d+=(\\d+)/);"
+              "go(B+(B.indexOf('?')>-1?'&':'?')+'page='+(m?m[1]:1));}"
+              '},true);'
+              "document.addEventListener('DOMContentLoaded',function(){"
+              "document.querySelectorAll('.ajax_load_btn').forEach(function(btn){"
+              'if(btn.tagName==="A")return;'
+              "var a=document.createElement('a');a.href=B;a.className=btn.className;"
+              "a.setAttribute('style','display:block;text-align:center;text-decoration:none;color:inherit;');"
+              'a.innerHTML=btn.innerHTML;btn.parentNode.replaceChild(a,btn);});'
+              '});})();</script>\n'
               '</body>')
     return html.replace('</body>', inject, 1)
 
@@ -3435,7 +3530,8 @@ def _product_page(source, nm_id):
         {'name': 'Каталог', 'url': request.host_url.rstrip('/') + '/catalog/'},
         {'name': product.get('name', ''), 'url': product_url},
     ]
-    return render_template('pages/catalog__namatrasniki.html', **ctx, wb_product=product)
+    return Response(_inject_lazyload_fix(
+        render_template('pages/catalog__namatrasniki.html', **ctx, wb_product=product)))
 
 
 def _seo_product(product, host_url):

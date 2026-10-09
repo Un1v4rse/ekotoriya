@@ -5,6 +5,11 @@
 <h1>Корзина</h1>
 
 {% if items %}
+{% if request.args.get('oneclick') %}
+<div class="lk-card">
+    <p style="margin:0;">Оформление товара, выбранного через «Купить в 1 клик». Контактные данные подставлены из вашего профиля — проверьте их и нажмите «Оформить заявку».</p>
+</div>
+{% endif %}
 <div class="lk-card">
     <table class="lk-table">
         <thead>
@@ -14,9 +19,13 @@
             {% for it in items %}
             <tr>
                 <td>
+                    {% if it.product.get('nm_id') %}
                     <a href="/catalog/{{ it.product.get('source', 'wb') }}/{{ it.product.get('nm_id') or it.product.get('id') }}/" style="color:inherit;text-decoration:none;">
                         {{ it.product.get('name', 'Товар') }}
                     </a>
+                    {% else %}
+                    {{ it.product.get('name', 'Товар') }}
+                    {% endif %}
                 </td>
                 <td>{{ it.price }} ₽</td>
                 <td>
