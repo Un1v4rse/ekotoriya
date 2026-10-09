@@ -296,6 +296,27 @@ def get_customer_likes(customer_id):
     return result
 
 
+def get_visitor_likes(customer_id=None, session_id=''):
+    """Лайкнутые товары текущего посетителя: по аккаунту, иначе по анонимной
+    сессии (та же логика привязки, что в /api/like). Для разметки уже
+    лайкнутых кнопок и счётчика в шапке при серверном рендере."""
+    q = (db.session.query(Event)
+         .filter_by(type='like')
+         .order_by(Event.id.desc()))
+    if customer_id:
+        q = q.filter_by(customer_id=customer_id)
+    else:
+        q = q.filter_by(customer_id=None, session_id=session_id or '')
+    seen, result = set(), []
+    for e in q.all():
+        pid = _int_key(e.product_id)
+        if pid in seen:
+            continue
+        seen.add(pid)
+        result.append({'product_id': pid, 'product_name': e.product_name or ''})
+    return result
+
+
 def _product_key(p):
     """Универсальный id товара из dict (WB nm_id или Ozon offer_id)."""
     return p.get('nm_id') or p.get('offer_id') or p.get('id') or 0

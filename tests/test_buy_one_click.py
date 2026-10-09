@@ -117,12 +117,13 @@ def test_bind_session_likes_idempotent():
 
 def test_category_pagination_fix_injected(client):
     """Кнопка «Показать ещё» больше не подгружает страницу целиком:
-    инлайн-фикс ведёт на единый каталог, мёртвые .one_click не прячутся."""
+    инлайн-фикс ведёт на каталог в режиме «все товары», мёртвые .one_click
+    не прячутся."""
     _seed_products()
     r = client.get('/catalog/namatrasniki/')
     assert r.status_code == 200
     html = r.data.decode('utf-8')
-    assert 'var B="/catalog/";' in html
+    assert 'var B="/catalog/?per_page=all";' in html
     assert '.one_click{display:none' not in html
 
 
@@ -137,4 +138,6 @@ def test_category_pagination_fix_uses_category_filter(client):
     app_module.invalidate_site_cache()
     r = client.get('/catalog/namatrasniki/')
     assert r.status_code == 200
-    assert 'var B="/catalog/?category=' in r.data.decode('utf-8')
+    html = r.data.decode('utf-8')
+    assert 'var B="/catalog/?category=' in html
+    assert 'per_page=all' in html

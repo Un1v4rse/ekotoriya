@@ -175,4 +175,45 @@
      * С делегированием ничего привязывать не нужно — функция остаётся
      * как безопасный no-op. */
     window.initWbActions = function() {};
+
+    /* Персистентность избранного: сервер размечает лайкнутые id посетителя
+     * (window.__likedIds) и их количество (__likesCount) — восстанавливаем
+     * состояние кнопок и счётчика в шапке после перезагрузки страницы. */
+    function applyLikedState() {
+        var likedRaw = window.__likedIds || [];
+        var liked = {};
+        likedRaw.forEach(function(id) { liked[String(id)] = true; });
+        if (likedRaw.length) {
+            document.querySelectorAll('.wb-like-btn').forEach(function(btn) {
+                if (!liked[String(btn.dataset.id)]) return;
+                btn.textContent = '❤ В избранном';
+                btn.style.borderColor = '#999';
+                btn.style.color = '#999';
+            });
+            document.querySelectorAll('.js-item-action[data-action="favorite"]').forEach(function(btn) {
+                var pid = staticCardProductId(btn);
+                if (!pid || !liked[pid]) return;
+                btn.title = 'В избранном';
+                btn.setAttribute('data-title', 'В избранном');
+                btn.classList.add('added', 'wb-liked');
+            });
+        }
+        if (typeof window.__likesCount === 'number') {
+            document.querySelectorAll('a.basket-link.delay .js-count').forEach(function(c) {
+                c.textContent = String(window.__likesCount);
+                c.classList.toggle('empted', window.__likesCount === 0);
+            });
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyLikedState);
+    } else {
+        applyLikedState();
+    }
+    /* Aspro при загрузке перезаписывает счётчики шапки из захардкоженного
+     * arBasketAspro (FAVORITE.COUNT='0') — применяем состояние повторно
+     * после полной загрузки и с небольшой задержкой. Функция идемпотентна. */
+    window.addEventListener('load', applyLikedState);
+    setTimeout(applyLikedState, 1200);
 })();

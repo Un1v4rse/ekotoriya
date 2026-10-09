@@ -1986,8 +1986,55 @@ def _section_catalog_base():
                     if not p.get('site_section') or p.get('site_section') == section]
     cats = [str(p.get('category')) for p in products if p.get('category')]
     if cats:
-        return '/catalog/?category=' + quote(Counter(cats).most_common(1)[0][0])
-    return '/catalog/'
+        return ('/catalog/?category=' + quote(Counter(cats).most_common(1)[0][0])
+                + '&per_page=all')
+    return '/catalog/?per_page=all'
+
+
+def _visitor_liked_ids():
+    """Лайкнутые id товаров текущего посетителя (аккаунт или анонимная
+    сессия — та же логика, что в /api/like). Передаются на клиент, чтобы
+    после перезагрузки страницы кнопки «В избранное» и счётчик в шапке
+    показывали актуальное состояние, а не захардкоженные нули."""
+    try:
+        likes = customers.get_visitor_likes(
+            customer_id=session.get('customer_id'),
+            session_id='' if session.get('customer_id') else _session_id())
+        return [str(l['product_id']) for l in likes]
+    except Exception:
+        return []
+
+
+# Ховер-блок карточек каталога («− 1 + В корзину»): оригинальный aspro выводил
+# .footer_button абсолютом ниже карточки (top:100%) — блок наезжал на товары
+# следующего ряда и появлялся мгновенно. Переопределение: полоса под кнопкой
+# резервируется внутри карточки (компенсируем штатный padding-bottom 29px),
+# блок плавно проявляется в границах карточки и не перекрывает соседние товары.
+_HOVER_CSS = (
+    '<style>'
+    '@media (min-width:601px){'
+    'html:not(.mobile) .catalog_block .item_block .catalog_item:not(.big) '
+    '.inner_wrap>.item_info{padding-bottom:0 !important;}'
+    'html:not(.mobile) .catalog_block .item_block .catalog_item:not(.big) '
+    '.inner_wrap{padding-bottom:56px !important;}'
+    'html:not(.mobile) .catalog_block .item_block .catalog_item:not(.big) '
+    '.footer_button{position:absolute !important;left:0 !important;'
+    'right:0 !important;top:auto !important;bottom:0 !important;'
+    'display:block !important;height:auto !important;'
+    'opacity:0 !important;visibility:hidden !important;'
+    'transform:translateY(8px);'
+    'transition:opacity .25s ease,transform .25s ease,'
+    'visibility 0s linear .25s !important;'
+    'box-shadow:none !important;z-index:3;}'
+    'html:not(.mobile) .catalog_block .item_block .catalog_item:not(.big):hover '
+    '.footer_button,'
+    'html:not(.mobile) .catalog_block .item_block .catalog_item.hover '
+    '.footer_button{opacity:1 !important;visibility:visible !important;'
+    'transform:translateY(0);'
+    'transition:opacity .25s ease,transform .25s ease,visibility 0s !important;}'
+    '}'
+    '</style>'
+)
 
 
 def _inject_lazyload_fix(html):
@@ -1998,18 +2045,30 @@ def _inject_lazyload_fix(html):
     картинки не подгружались, оставался спиннер и пустые колонки.
     Скрипт вставляется всем посетителям (проблема у всех, не только у админа).
 
-    Дополнительно — инлайн-фикс мёртвой bitrix-пагинации категорий: клик по
-    «Показать ещё» (.ajax_load_btn) и по номерам страниц (.module-pagination,
-    ?PAGEN_1=N) перенаправляет на единый каталог. Перехват в capture-фазе,
-    чтобы jQuery-делегированный обработчик aspro (bubble) не успел отработать.
+    Дополнительно в том же блоке:
+    — инлайн-фикс мёртвой bitrix-пагинации категорий: клик по «Показать ещё»
+      (.ajax_load_btn) и по номерам страниц (.module-pagination, ?PAGEN_1=N)
+      перенаправляет на единый каталог в режиме «все товары» (per_page=all);
+      перехват в capture-фазе, чтобы jQuery-делегированный обработчик aspro
+      (bubble) не успел отработать;
+    — состояние избранного посетителя (window.__likedIds/__likesCount) для
+      восстановления кнопок и счётчика после перезагрузки;
+    — переопределение ховер-блока карточек (см. _HOVER_CSS).
     """
     if 'lazyload-fix.js' in html or '</body>' not in html:
         return html
     fix_ver = int(os.path.getmtime(os.path.join(BASE_DIR, 'static', 'js', 'lazyload-fix.js')))
     base = json.dumps(_section_catalog_base())
+    liked_ids = _visitor_liked_ids()
+    liked = json.dumps(liked_ids)
     inject = (f'<script src="/static/js/lazyload-fix.js?v={fix_ver}" defer></script>\n'
-              # Мёртвая пагинация категорий: «Показать ещё» → весь каталог раздела,
-              # номера страниц → /catalog/?page=N (24 товара/стр., рабочие фильтры).
+              # Избранное посетителя: wb-actions.js размечает кнопки и счётчик.
+              f'<script>window.__likedIds={liked};'
+              f'window.__likesCount={len(liked_ids)};</script>\n'
+              + _HOVER_CSS + '\n'
+              # Мёртвая пагинация категорий: «Показать ещё» → все товары раздела
+              # одним списком, номера страниц → тот же список (?page=N игнорируется
+              # в режиме per_page=all).
               '<script>(function(){'
               f'var B={base};'
               'function go(u){location.href=u;}'
@@ -3410,7 +3469,7 @@ def catalog_page():
         # Контент для iframe редактора: с маркерами блоков, без кнопки админа.
         return Response(_inject_lazyload_fix(
             _render_page_html_marked(content, page, {'catalog_view': ctx['catalog_view']})))
-    return render_template(page['template'], **ctx)
+    return Response(_inject_lazyload_fix(render_template(page['template'], **ctx)))
 
 
 def _filtered_catalog(args):
@@ -3454,15 +3513,23 @@ def _filtered_catalog(args):
         score_by_key = {(_product_key(e['product'])): e['score'] for e in popular}
         products.sort(key=lambda p: score_by_key.get(_product_key(p), 0), reverse=True)
 
-    per_page = 24
-    try:
-        page_num = max(1, int(args.get('page') or 1))
-    except ValueError:
-        page_num = 1
     total = len(products)
-    pages = max(1, _math.ceil(total / per_page))
-    page_num = min(page_num, pages)
-    items = products[(page_num - 1) * per_page: page_num * per_page]
+    if args.get('per_page') == 'all':
+        # режим «все товары сразу» (кнопка «Показать ещё» на категориях):
+        # одна страница без пагинации, порядок сортировки сохраняется
+        per_page = max(1, total)
+        page_num = 1
+        pages = 1
+        items = products
+    else:
+        per_page = 24
+        try:
+            page_num = max(1, int(args.get('page') or 1))
+        except ValueError:
+            page_num = 1
+        pages = max(1, _math.ceil(total / per_page))
+        page_num = min(page_num, pages)
+        items = products[(page_num - 1) * per_page: page_num * per_page]
 
     categories = sorted({p.get('category') for p in get_products() if p.get('category')})
     return {
@@ -3470,6 +3537,7 @@ def _filtered_catalog(args):
         'total': total,
         'page': page_num,
         'pages': pages,
+        'per_page': 'all' if args.get('per_page') == 'all' else per_page,
         'categories': categories,
         'applied': {
             'q': args.get('q') or '', 'source': source, 'category': category,
