@@ -142,6 +142,9 @@ class Product(db.Model):
             'stock': self.stock or 0,
             'visible': bool(self.visible),
             'site_section': self.site_section or '',
+            # описание для сайта — редактируется в админке, хранится в extra
+            'description': (self.extra or {}).get('description', '')
+                if isinstance(self.extra, dict) else '',
             'updated_at': self.updated_at.isoformat() if self.updated_at else '',
         }
         if self.rating:

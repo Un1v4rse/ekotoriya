@@ -184,6 +184,29 @@
         .prod-card .field-label { font-size: 0.75rem; color: #888; margin-bottom: 0.25rem; }
         .prod-card .sect-row { margin-top: 0.45rem; }
         .prod-card .sect-row select { width: 100%; padding: 0.4rem 0.45rem; font-size: 0.85rem; }
+        .prod-card .edit-row { margin-top: 0.45rem; }
+        .prod-card .edit-row button { width: 100%; padding: 0.45rem 0.85rem; font-size: 0.85rem; }
+
+        /* Модалка редактирования товара */
+        #product-edit-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 900;
+                                display: none; align-items: flex-start; justify-content: center; padding: 3vh 12px; overflow-y: auto; }
+        #product-edit-overlay.open { display: flex; }
+        #product-edit-modal { background: #fff; border-radius: 10px; max-width: 640px; width: 100%;
+                              padding: 1.2rem 1.3rem 1.3rem; position: relative; box-shadow: 0 14px 44px rgba(0,0,0,.3); }
+        #product-edit-modal h3 { margin: 0 0 0.9rem; font-size: 1.1rem; }
+        #product-edit-modal .pe-close { position: absolute; top: 8px; right: 12px; border: none; background: none;
+                                        font-size: 1.6rem; line-height: 1; cursor: pointer; color: #999; }
+        #product-edit-modal .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+        #product-edit-modal label { display: block; font-size: 0.8rem; color: #666; margin-bottom: 0.2rem; }
+        #product-edit-modal input[type=text], #product-edit-modal input[type=number], #product-edit-modal textarea, #product-edit-modal select {
+            width: 100%; padding: 0.45rem 0.55rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.92rem; box-sizing: border-box; }
+        #product-edit-modal textarea { min-height: 110px; resize: vertical; }
+        #product-edit-modal .pe-field { margin-bottom: 0.7rem; }
+        #product-edit-modal .pe-photo-preview { max-height: 120px; max-width: 100%; object-fit: contain; background: #f8f8f8;
+                                                border-radius: 6px; display: block; margin-top: 0.35rem; }
+        #product-edit-modal .pe-actions { display: flex; gap: 0.6rem; margin-top: 1rem; }
+        #product-edit-modal .pe-actions button { flex: 1; padding: 0.6rem; font-size: 0.95rem; }
+        #product-edit-modal .pe-visibility { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; margin-bottom: 0.7rem; }
 
         table.adm { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
         table.adm th { background: #f4f4f8; padding: 0.45rem 0.6rem; border: 1px solid var(--border); text-align: left; }
@@ -1651,7 +1674,13 @@
                     <select class="sect-select" title="Раздел сайта, где показывается товар">
                         ${siteSectionsOptions(p.site_section)}
                     </select>
+                </div>
+                <div class="edit-row">
+                    <button type="button" class="secondary">✏️ Редактировать</button>
                 </div>`;
+            card.querySelector('.edit-row button').addEventListener('click', () => {
+                openProductEditor(p);
+            });
             card.querySelector('.disc-row button').addEventListener('click', () => {
                 setProductDiscount(p.source, p.nm_id,
                     parseInt(card.querySelector('.disc-input').value || 0, 10),
@@ -2851,6 +2880,153 @@
             setDeep(data, 'site.ozon_autosync.light_minutes', 30);
             $('ozon-autosync-light-minutes').value = 30;
         }
+
+        /* ================= Редактирование товара (полное) ================= */
+        function openProductEditor(p) {
+            const ov = $('product-edit-overlay');
+            $('pe-title').textContent = 'Товар: ' + (p.name || '').slice(0, 80);
+            $('pe-source').value = p.source || 'wb';
+            $('pe-id').value = p.nm_id || p.id || '';
+            $('pe-name').value = p.name || '';
+            $('pe-description').value = p.description || '';
+            $('pe-price').value = p.price || 0;
+            const discType = p.admin_discount_type === 'amount' ? 'amount' : 'percent';
+            $('pe-discount-type').value = discType;
+            $('pe-discount-value').value = discType === 'amount'
+                ? (p.admin_discount_amount || 0) : (p.admin_discount_percent || 0);
+            $('pe-photo').value = p.photo || '';
+            $('pe-photo-preview').src = p.photo || '';
+            $('pe-photo-preview').style.display = p.photo ? 'block' : 'none';
+            $('pe-category').value = p.category || '';
+            $('pe-visible').checked = p.visible !== false;
+            $('pe-section').innerHTML = siteSectionsOptions(p.site_section || '');
+            $('pe-msg').textContent = '';
+            ov.classList.add('open');
+        }
+
+        function closeProductEditor() {
+            $('product-edit-overlay').classList.remove('open');
+        }
+
+        async function saveProductEditor() {
+            const body = {
+                source: $('pe-source').value,
+                product_id: $('pe-id').value,
+                name: $('pe-name').value,
+                description: $('pe-description').value,
+                price: parseFloat($('pe-price').value || 0),
+                discount_type: $('pe-discount-type').value,
+                discount_value: parseInt($('pe-discount-value').value || 0, 10),
+                photo: $('pe-photo').value.trim(),
+                category: $('pe-category').value.trim(),
+                visible: $('pe-visible').checked,
+            };
+            const btn = $('pe-save');
+            btn.disabled = true;
+            $('pe-msg').textContent = 'Сохраняем…';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/product-update`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify(body)
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    $('pe-msg').textContent = 'Сохранено. Изменения уже на сайте.';
+                    showMsg('Товар сохранён', true);
+                    setTimeout(() => { closeProductEditor(); reloadProducts(); }, 600);
+                } else {
+                    $('pe-msg').textContent = 'Ошибка: ' + (result.error || '');
+                }
+            } catch (e) {
+                $('pe-msg').textContent = 'Ошибка сети: ' + e.message;
+            }
+            btn.disabled = false;
+        }
+
+        async function uploadProductPhoto() {
+            const input = $('pe-photo-file');
+            if (!input.files.length) { $('pe-msg').textContent = 'Сначала выберите файл'; return; }
+            const fd = new FormData();
+            fd.append('file', input.files[0]);
+            $('pe-msg').textContent = 'Загрузка фото…';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/upload`, {
+                    method: 'POST', body: fd, headers: {'X-CSRF-Token': window.CSRF_TOKEN}});
+                const result = await resp.json();
+                if (result.success) {
+                    $('pe-photo').value = result.url;
+                    $('pe-photo-preview').src = result.url;
+                    $('pe-photo-preview').style.display = 'block';
+                    $('pe-msg').textContent = 'Фото загружено. Нажмите «Сохранить товар».';
+                } else {
+                    $('pe-msg').textContent = 'Ошибка: ' + (result.error || '');
+                }
+            } catch (e) {
+                $('pe-msg').textContent = 'Ошибка сети: ' + e.message;
+            }
+        }
     </script>
+
+    <!-- Модалка полного редактирования товара -->
+    <div id="product-edit-overlay">
+        <div id="product-edit-modal" role="dialog" aria-modal="true">
+            <button type="button" class="pe-close" aria-label="Закрыть" onclick="closeProductEditor()">&times;</button>
+            <h3 id="pe-title">Товар</h3>
+            <input type="hidden" id="pe-source">
+            <input type="hidden" id="pe-id">
+            <div class="pe-field">
+                <label for="pe-name">Название</label>
+                <input type="text" id="pe-name">
+            </div>
+            <div class="pe-field">
+                <label for="pe-description">Описание (текст, показывается на странице товара)</label>
+                <textarea id="pe-description"></textarea>
+            </div>
+            <div class="row2">
+                <div class="pe-field">
+                    <label for="pe-price">Базовая цена, ₽</label>
+                    <input type="number" id="pe-price" min="0" step="1">
+                </div>
+                <div class="pe-field">
+                    <label>Скидка для сайта</label>
+                    <div style="display:flex;gap:0.4rem;">
+                        <input type="number" id="pe-discount-value" min="0" max="99" step="1" style="flex:1;">
+                        <select id="pe-discount-type" style="width:4.2rem;">
+                            <option value="percent">%</option>
+                            <option value="amount">₽</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="pe-field">
+                <label for="pe-photo">Фото (URL или загрузите файл)</label>
+                <input type="text" id="pe-photo" placeholder="https://… или /static/uploads/…">
+                <div style="display:flex;gap:0.5rem;margin-top:0.35rem;align-items:center;">
+                    <input type="file" id="pe-photo-file" accept="image/*" style="font-size:0.82rem;">
+                    <button type="button" class="secondary" onclick="uploadProductPhoto()">Загрузить</button>
+                </div>
+                <img class="pe-photo-preview" id="pe-photo-preview" alt="" style="display:none;">
+            </div>
+            <div class="row2">
+                <div class="pe-field">
+                    <label for="pe-category">Категория</label>
+                    <input type="text" id="pe-category" placeholder="Например: Наматрасники">
+                </div>
+                <div class="pe-field">
+                    <label for="pe-section">Раздел сайта</label>
+                    <select id="pe-section"></select>
+                </div>
+            </div>
+            <label class="pe-visibility">
+                <input type="checkbox" id="pe-visible"> Показывать товар на сайте
+            </label>
+            <div class="pe-actions">
+                <button type="button" class="secondary" onclick="closeProductEditor()">Отмена</button>
+                <button type="button" id="pe-save" onclick="saveProductEditor()">Сохранить товар</button>
+            </div>
+            <div class="help" id="pe-msg" style="margin-top:0.6rem;"></div>
+        </div>
+    </div>
 </body>
 </html>

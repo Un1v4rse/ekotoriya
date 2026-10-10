@@ -156,3 +156,60 @@ def test_catalog_tiles_row_centered_layout_css(client):
     assert '@media (min-width:1409px)' in body
     assert 'padding-left:16px !important' in body
     assert 'padding-right:16px !important' in body
+
+
+# ---------- вёрстка категорийных страниц: фильтр/сортировка не full-bleed ----------
+
+
+def test_section_filter_panel_centered_layout_css(client):
+    """Строка сортировки и панель smartfilter (.filter-panel-wrapper) на
+    категорийных страницах тянулись во всю ширину экрана и «прилипали» к
+    краям. CSS-инжект ограничивает их тем же контейнером 1408px, что и
+    контент /catalog/; padding — только ≥1409px (мобильная вёрстка не
+    трогается). Скоуп .with_left_block есть только у категорийных страниц:
+    на /catalog/ этот класса у wrapper1 нет (и самой панели там нет)."""
+    _seed_products()
+    r = client.get('/catalog/namatrasniki/')
+    assert r.status_code == 200
+    body = r.data.decode('utf-8')
+    assert '.wrapper1.with_left_block .filter-panel-wrapper{' in body
+    assert 'max-width:1408px !important' in body
+    assert 'margin-left:auto !important' in body
+    assert 'margin-right:auto !important' in body
+    assert '@media (min-width:1409px)' in body
+    assert 'padding-left:16px !important' in body
+    assert 'padding-right:16px !important' in body
+
+
+# ---------- соцкнопки мобильной панели: стиль футерных кнопок ----------
+
+
+def test_mobilemenu_socials_match_footer_style_css(client):
+    """Иконки соцсетей в выдвижной мобильной панели (#mobilemenu, «сайдбар»
+    на мобильных) шли общими aspro-правилами: квадратные (3px), без обводки,
+    белые иконки, hover opacity:.8 — визуально не совпадали с круглыми
+    обведёнными кнопками футера. CSS-инжект приводит панель к футерному
+    стилю (круг 50%, обводка, покой opacity:.5 → hover 1 и брендовый ряд
+    спрайта). Панель белая, поэтому используется «тёмный» ряд спрайта и
+    обводка rgba(51,51,51,.2) (вариант footer .light) — прямой перенос
+    светлого ряда с тёмного футера делал бы кнопки невидимыми. Скоуп
+    #mobilemenu: футер и шапка не затрагиваются. Инжект — на всех страницах.
+    """
+    _seed_products()
+    for url in ('/', '/catalog/', '/catalog/namatrasniki/'):
+        r = client.get(url)
+        assert r.status_code == 200
+        body = r.data.decode('utf-8')
+        assert '#mobilemenu .social-icons ul li a{' in body
+        assert 'border-radius:50% !important' in body
+        assert 'opacity:.5 !important' in body
+        assert 'border:1px solid rgba(51,51,51,0.2) !important' in body
+        assert '#mobilemenu .social-icons ul li a:hover{' in body
+        assert 'opacity:1 !important' in body
+        # сети, настроенные в админке (vk, telegram) + позиции спрайта
+        assert '#mobilemenu .social-icons ul li.vk a{' in body
+        assert 'background-position:0px -565px !important' in body
+        assert '#mobilemenu .social-icons ul li.vk a:hover{background-position:0px -188px !important;}' in body
+        assert '#mobilemenu .social-icons ul li.telegram a{' in body
+        assert 'background-position:-330px -706px !important' in body
+        assert '#mobilemenu .social-icons ul li.telegram a:hover{background-position:-329px -329px !important;}' in body

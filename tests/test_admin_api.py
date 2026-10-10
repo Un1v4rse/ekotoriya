@@ -124,3 +124,101 @@ def test_csrf_required_on_admin_post(admin_client):
                           json={'source': 'wb', 'product_id': nm,
                                 'discount_type': 'percent', 'value': 50})
     assert r.status_code == 403
+
+
+# --- /admin/api/product-update (управление товарами) ---
+
+def test_product_update_all_fields(admin_client):
+    wb_sync.sync(token=None, demo=True)
+    app_module.invalidate_site_cache()
+    nm = wb_sync.load_products()[0]['nm_id']
+
+    r = admin_client.post('/admin/api/product-update', json={
+        'source': 'wb', 'nm_id': nm,
+        'name': 'Новое имя товара <b>с тегом</b>',
+        'description': 'Описание товара.<br>Вторая строка.',
+        'price': 5555,
+        'discount_type': 'amount', 'discount_value': 500,
+        'photo': 'https://example.com/photo.jpg',
+        'category': 'Наматрасники',
+        'visible': False,
+    }, headers=_csrf(admin_client))
+    assert r.get_json()['success']
+
+    p = next(p for p in wb_sync.load_products() if p['nm_id'] == nm)
+    assert p['name'] == 'Новое имя товара <b>с тегом</b>'
+    assert p['price'] == 5555
+    assert p['admin_discount_type'] == 'amount' and p['admin_discount_amount'] == 500
+    assert p['admin_discount_percent'] == 0
+    assert p['photo'] == 'https://example.com/photo.jpg'
+    assert p['category'] == 'Наматрасники'
+    assert p['visible'] is False
+    # описание хранится в extra (HTML-теги вырезаются) и отдаётся наружу
+    assert p['extra'].get('description') == 'Описание товара.Вторая строка.'
+
+    api = admin_client.get('/admin/api/wb-products').get_json()
+    row = next(x for x in api['products'] if x['nm_id'] == nm)
+    assert row['name'] == p['name'] and row['description'] == 'Описание товара.Вторая строка.'
+    assert row['visible'] is False
+
+
+def test_product_update_visible_on_site_page(admin_client):
+    wb_sync.sync(token=None, demo=True)
+    nm = 890129778
+    admin_client.post('/admin/api/product-update', json={
+        'source': 'wb', 'nm_id': nm,
+        'name': 'Товар для проверки страницы',
+        'description': 'Описание для страницы товара.',
+        'price': 4321,
+        'discount_type': 'percent', 'discount_value': 10,
+    }, headers=_csrf(admin_client))
+    r = admin_client.get(f'/catalog/wb/{nm}/')
+    assert r.status_code == 200
+    body = r.data.decode('utf-8')
+    assert 'Товар для проверки страницы' in body
+    assert 'Описание для страницы товара.' in body
+    assert '4321' in body
+
+
+def test_product_update_auth_required():
+    wb_sync.sync(token=None, demo=True)
+    client = app_module.app.test_client()
+    r = client.post('/admin/api/product-update',
+                    json={'source': 'wb', 'nm_id': 1, 'name': 'x'})
+    assert r.status_code in (401, 403)  # CSRF (403) срабатывает раньше admin_required (401)
+
+
+def test_product_update_not_found(admin_client):
+    wb_sync.sync(token=None, demo=True)
+    r = admin_client.post('/admin/api/product-update',
+                          json={'source': 'wb', 'nm_id': 999999999, 'name': 'x'},
+                          headers=_csrf(admin_client))
+    assert r.status_code == 404
+
+
+def test_product_update_validation_errors(admin_client):
+    wb_sync.sync(token=None, demo=True)
+    nm = wb_sync.load_products()[0]['nm_id']
+
+    r = admin_client.post('/admin/api/product-update',
+                          json={'source': 'wb', 'nm_id': nm,
+                                'discount_type': 'bogus', 'discount_value': 10},
+                          headers=_csrf(admin_client))
+    assert r.status_code == 400
+
+    r = admin_client.post('/admin/api/product-update',
+                          json={'source': 'wb', 'nm_id': nm,
+                                'discount_type': 'percent', 'discount_value': 'abc'},
+                          headers=_csrf(admin_client))
+    assert r.status_code == 400
+
+    r = admin_client.post('/admin/api/product-update',
+                          json={'source': 'wb', 'nm_id': nm,
+                                'photo': 'javascript:alert(1)'},
+                          headers=_csrf(admin_client))
+    assert r.status_code == 400
+
+    r = admin_client.post('/admin/api/product-update',
+                          json={'source': 'wb', 'nm_id': nm, 'price': 'не число'},
+                          headers=_csrf(admin_client))
+    assert r.status_code == 400

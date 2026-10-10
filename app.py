@@ -1953,6 +1953,15 @@ def page_route(path):
     # Fallback: if a parent path exists (e.g. product detail link under /catalog/namatrasniki/),
     # redirect to the nearest parent page to avoid 404s from original product cards.
     parts = path.split('/')
+    # Битрикс-URL товара с артикулом на конце (-<nm_id>): если такой товар есть
+    # в живом каталоге — 301 на его рабочую страницу вместо «мёртвого» редиректа
+    # на родительский раздел (закладки/прямые заходы/индексация).
+    nid = re.search(r'(\d{6,})$', parts[-1])
+    if nid:
+        _by_nm, _ = _legacy_catalog_index()
+        _src = _by_nm.get(nid.group(1))
+        if _src:
+            return redirect(f'/catalog/{_src}/{nid.group(1)}/', code=301)
     for i in range(len(parts) - 1, 0, -1):
         parent_url = '/' + '/'.join(parts[:i]) + '/'
         parent_page = get_page_by_url(content, parent_url)
@@ -2130,7 +2139,328 @@ CATALOG_LAYOUT_CSS = (
     '</style>'
 )
 
-# Живой перехват «В корзину» (.wb-cart-btn и мёртвые aspro .to-cart) —
+# Вёрстка категорийных страниц (/catalog/<раздел>/): строка сортировки и
+# панель bitrix-smartfilter (.filter-panel-wrapper) были full-bleed и
+# «прилипали» к краям (x=0 без боковых отступов). Тот же контейнер 1408px,
+# что и на /catalog/: max-width/margin — самоактивны только >1408px, padding
+# — только на широких экранах. Скоуп .with_left_block есть только у
+# категорийных страниц (на /catalog/ его нет — главная каталога не трогается).
+SECTION_FILTER_CSS = (
+    '<style>'
+    '.wrapper1.with_left_block .filter-panel-wrapper{'
+    'max-width:1408px !important;margin-left:auto !important;'
+    'margin-right:auto !important;}'
+    '@media (min-width:1409px){'
+    '.wrapper1.with_left_block .filter-panel-wrapper{'
+    'padding-left:16px !important;padding-right:16px !important;}'
+    '}'
+    '</style>'
+)
+
+# Иконки соцсетей в выдвижной мобильной панели (#mobilemenu, «сайдбар» на
+# мобильных) шли общими aspro-правилами .social-icons li a: квадратные
+# (border-radius:3px), без обводки, всегда белые иконки (верхняя строка
+# спрайта) и hover opacity:.8. Футерные кнопки (footer .social-icons) —
+# круглые (50%), с обводкой, приглушены до opacity:.5 и при наведении
+# полностью проявляются (opacity:1, обводка исчезает, иконка переключается
+# на «брендовый» ряд спрайта). Панель мобильного меню БЕЛАЯ (у футера тёмный
+# фон), поэтому прямой перенос футерных правил делает кнопки невидимыми
+# (светлый ряд спрайта на белом). Берём aspro-вариант «light» того же
+# футерного стиля: те же круги/обводка/поведение, но тёмный ряд спрайта
+# (-565/-612/-659/-706, см. footer .light ... в template-стилях) и обводка
+# rgba(51,51,51,.2) — видно на белой панели. Позиции для всех сетей, которые
+# может добавить админка (шаблон site_socials.html). Скоуп #mobilemenu:
+# футер, шапка и прочие .social-icons не затрагиваются.
+_SOCIAL_POS = {
+    # name: (покой — «тёмный» ряд спрайта для светлого фона, hover — «брендовый» ряд)
+    'vk': ('0px -565px', '0px -188px'),
+    'facebook': ('-95px -565px', '-94px -188px'),
+    'twitter': ('0px -612px', '0px -235px'),
+    'instagram': ('-142px -706px', '-141px -329px'),
+    'telegram': ('-330px -706px', '-329px -329px'),
+    'ytb': ('-95px -706px', '-94px -329px'),
+    'rtb': ('-613px -564px', '-611px -188px'),
+    'max': ('-614px -611px', '-611px -234px'),
+    'odn': ('-48px -565px', '-47px -188px'),
+    'gplus': ('-48px -706px', '-47px -329px'),
+    'mail': ('-377px -612px', '-376px -235px'),
+    'viber': ('-330px -565px', '-329px -188px'),
+    'whats': ('-330px -612px', '-329px -235px'),
+    'zen': ('-471px -706px', '-470px -329px'),
+    'tiktok': ('-518px -706px', '-517px -329px'),
+    'pinterest': ('-189px -565px', '-188px -188px'),
+    'snapchat': ('-518px -659px', '-517px -282px'),
+    'linkedin': ('-95px -659px', '-94px -282px'),
+}
+SOCIALS_CSS = (
+    '<style>'
+    '#mobilemenu .social-icons ul li a{'
+    'width:43px !important;border-radius:50% !important;'
+    'opacity:.5 !important;border:1px solid rgba(51,51,51,0.2) !important;'
+    'transition:opacity .3s ease !important;}'
+    '#mobilemenu .social-icons ul li a:hover{'
+    'opacity:1 !important;border:none !important;}'
+    + ''.join(
+        '#mobilemenu .social-icons ul li.{0} a{{background-position:{1} !important;}}'
+        '#mobilemenu .social-icons ul li.{0} a:hover{{background-position:{2} !important;}}'.format(
+            name, rest, hover)
+        for name, (rest, hover) in _SOCIAL_POS.items()
+    )
+    + '</style>'
+)
+
+# ---------- наследие битрикс-каталога: мёртвые ссылки карточек ----------
+
+# Статичные aspro-карточки на категорийных страницах (снимок дизайна
+# оригинального магазина) ссылаются на битрикс-URL товаров, которых в этом
+# каталоге нет: клик уходил в page_route и 302-редиректил на родительский
+# раздел — страница просто обновлялась. Два уровня починки:
+#  1) Серверный рерайт HTML (_rewrite_legacy_product_links, ниже): ссылка
+#     с артикулом на конце (-<nm_id>) ведёт на рабочую страницу товара
+#     /catalog/<source>/<nm_id>/; ссылка без артикула сопоставляется по
+#     имени карточки с товарами каталога (нормализация + стемминг + доля
+#     совпавших токенов); совпала — тоже рерайт. Не совпала — href="#"
+#     + data-legacy-product (открывает быструю карточку-модалку, JS ниже).
+#  2) 301-редирект в page_route для прямых заходов/закладок на -<nm_id>.
+_LEGACY_LINK_RE = re.compile(
+    r'<a\b[^>]*?\shref="(/catalog/[^"#?]+/)"[^>]*>(.*?)</a>',
+    re.IGNORECASE | re.DOTALL)
+# Консервативный стеммер: срезаем одно характерное русское окончание
+# («резинке»/«резинках» → «резинк»), чтобы имена битрикс-карточек и товаров
+# каталога («на резинке» vs «на резинках») давали совпадения.
+_STEM_SUFFIXES = ('ами', 'ями', 'ах', 'ях', 'ого', 'ому', 'ого', 'ыми',
+                  'ов', 'ев', 'ей', 'ий', 'ый', 'ой', 'ая', 'ое', 'ие',
+                  'ые', 'ую', 'юю', 'ам', 'ям', 'ем', 'ом', 'ью',
+                  'у', 'е', 'и', 'а', 'я', 'о', 'й', 'ю')
+_TOKEN_RE = re.compile(r'[a-zа-яё0-9]+')
+
+
+def _stem(tok):
+    for suf in _STEM_SUFFIXES:
+        if tok.endswith(suf) and len(tok) - len(suf) >= 4:
+            return tok[:-len(suf)]
+    return tok
+
+
+def _norm_tokens(text):
+    # '160x200' (латинская x) и '160х200' (кириллическая) — одно и то же
+    text = re.sub(r'(?<=\d)[xX×](?=\d)', 'х', (text or '').lower())
+    return [_stem(t) for t in _TOKEN_RE.findall(text)
+            if len(t) > 2 or t.isdigit()]
+
+
+def _tok_weight(tokens):
+    # Токены с цифрами (размеры 140х200, высота 21) — главные дискриминаторы.
+    return sum(2 if any(ch.isdigit() for ch in t) else 1 for t in tokens)
+
+
+@cache.memoize(timeout=300)
+def _legacy_catalog_index():
+    """{nm_id: source} + [(nm_id, source, stemmed-name-token-set)] для
+    сопоставления мёртвых ссылок с живым каталогом (WB/Ozon)."""
+    by_nm, names = {}, []
+    for p in get_products():
+        nm = str(p.get('nm_id') or p.get('id') or '')
+        src = p.get('source') or 'wb'
+        if not nm:
+            continue
+        by_nm[nm] = src
+        tk = set(_norm_tokens(p.get('name') or ''))
+        if tk:
+            names.append((nm, src, tk))
+    return by_nm, names
+
+
+@cache.memoize(timeout=300)
+def _page_url_set():
+    """Множество URL существующих страниц: ссылки-подразделы (/catalog/<раздел>/
+    <подраздел>/) существуют и рерайтить их нельзя."""
+    urls = set()
+    for p in load_content().get('pages', []):
+        u = p.get('url')
+        if u:
+            urls.add(u if u.endswith('/') else u + '/')
+    return urls
+
+
+def _match_legacy_product(tokens, names):
+    """Лучший товар каталога для набора токенов имени карточки.
+
+    Доля веса совпавших токенов во весе запроса; токены с цифрами (размеры)
+    весят вдвое больше — иначе все карточки «непромокаемых на молнии»
+    схлопывались в один товар. Нужно ≥2 общих токена и ≥0.5 веса.
+    """
+    if not tokens:
+        return None
+    ts = set(tokens)
+    qw = _tok_weight(ts) or 1
+    best, best_score = None, 0.0
+    for nm, src, pset in names:
+        inter = ts & pset
+        if len(inter) < 2:
+            continue
+        score = _tok_weight(inter) / float(qw)
+        if score > best_score:
+            best, best_score = (nm, src), score
+    if best and best_score >= 0.5:
+        return best
+    return None
+
+
+def _rewrite_legacy_product_links(html):
+    """Рерайт мёртвых битрикс-ссылок карточек (см. пояснение у _LEGACY_LINK_RE)."""
+    by_nm, names = _legacy_catalog_index()
+    if not by_nm:
+        return html
+    page_urls = _page_url_set()
+    out = html
+    for m in reversed(list(_LEGACY_LINK_RE.finditer(html))):
+        href = m.group(1)
+        if href.startswith('/catalog/wb/') or href.startswith('/catalog/ozon/'):
+            continue
+        if href in page_urls:
+            continue
+        seg = [s for s in href.split('/') if s]
+        if len(seg) < 3:
+            continue
+        new_href, legacy = None, False
+        nid = re.search(r'(\d{6,})$', seg[-1])
+        if nid and nid.group(1) in by_nm:
+            new_href = '/catalog/{}/{}/'.format(by_nm[nid.group(1)], nid.group(1))
+        else:
+            text = re.sub(r'<[^>]+>', ' ', m.group(2))
+            hit = _match_legacy_product(_norm_tokens(text), names)
+            if hit:
+                new_href = '/catalog/{}/{}/'.format(hit[1], hit[0])
+            else:
+                new_href, legacy = '#', True
+        whole = m.group(0)
+        gt = whole.find('>')
+        open_tag = whole[:gt + 1]
+        fixed = re.sub(r'(\shref=")[^"]*(")',
+                       lambda mm: mm.group(1) + new_href + mm.group(2),
+                       open_tag, count=1)
+        if legacy:
+            fixed = (fixed[:-1] + ' data-legacy-product="1"'
+                     + ' data-legacy-href="' + href + '">')
+        out = out[:m.start()] + fixed + whole[gt + 1:] + out[m.end():]
+    return out
+
+
+# Быстрая карточка (модалка) для мёртвой ссылки, которую не удалось
+# сопоставить с каталогом: фото/имя/цена берутся из DOM-карточки, «В корзину»
+# и «Купить в 1 клик» живут на INLINE-перехвате (страницы не gzip'уются и
+# доходят целиком; внешние JS у части клиентов обрезаны — см. CART_INTERCEPT_JS).
+LEGACY_MODAL_CSS = (
+    '<style>'
+    '#legacy-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);'
+    'z-index:10050;display:none;align-items:center;justify-content:center;'
+    'padding:16px;}'
+    '#legacy-modal-overlay.open{display:flex;}'
+    '#legacy-modal{background:#fff;max-width:420px;width:100%;border-radius:8px;'
+    'padding:28px 24px 24px;position:relative;text-align:center;'
+    'box-shadow:0 12px 40px rgba(0,0,0,.25);}'
+    '#legacy-modal .lm-close{position:absolute;top:8px;right:12px;border:none;'
+    'background:none;font-size:26px;line-height:1;cursor:pointer;color:#999;}'
+    '#legacy-modal .lm-img{max-width:220px;max-height:220px;object-fit:contain;'
+    'margin:0 auto 14px;display:block;}'
+    '#legacy-modal .lm-name{font-size:17px;font-weight:600;margin:0 0 8px;}'
+    '#legacy-modal .lm-price{font-size:20px;color:#b49d84;font-weight:700;'
+    'margin:0 0 18px;}'
+    '#legacy-modal .lm-actions{display:flex;flex-direction:column;gap:10px;}'
+    '#legacy-modal .lm-btn{display:block;padding:13px 18px;border-radius:4px;'
+    'font-size:14px;font-weight:600;text-decoration:none;cursor:pointer;'
+    'border:none;width:100%;box-sizing:border-box;}'
+    '#legacy-modal .lm-cart{background:#b49d84;color:#fff;}'
+    '#legacy-modal .lm-oneclick{background:#fff;color:#b49d84;'
+    'border:1px solid #b49d84;}'
+    '#legacy-modal .lm-all{background:none;color:#666;font-weight:400;'
+    'text-decoration:underline;}'
+    '</style>'
+)
+
+LEGACY_MODAL_JS = (
+    '<script>(function(){'
+    "if(window.__legacyModal)return;window.__legacyModal=true;"
+    'function cardOf(a){return a.closest?a.closest('
+    "'.catalog_item_wrapp,.item_block,.item_wrap,li,.product_image'):null;}"
+    'function nameOf(a,c){'
+    "var t=c&&c.querySelector('.item-title a');"
+    'var n=(t&&t.textContent.trim())||a.textContent.trim()||"Товар Экотория";'
+    'return n.slice(0,200);}'
+    'function imgOf(c){var im=c&&c.querySelector("img");'
+    'if(!im)return "";'
+    "return im.currentSrc||im.src||im.getAttribute('data-src')||'';}"
+    'function priceOf(c){if(!c)return 0;'
+    "var p=c.querySelector('.cost .price[data-value]:not(.discount)')"
+    "||c.querySelector('.cost .price[data-value]');"
+    'if(p){var v=parseFloat(p.getAttribute("data-value"));'
+    'if(!isNaN(v))return Math.round(v);}'
+    "var t=c.querySelector('.price');"
+    'if(t){var d=parseFloat(t.textContent.replace(/[^\\d.]/g,""));'
+    'if(!isNaN(d))return Math.round(d);}return 0;}'
+    'function fmt(n){return n>0?String(n).replace(/\\B(?=(\\d{3})+(?!\\d))/g," ")+" ₽":"Цену уточняйте";}'
+    'function setCounter(n){'
+    "document.querySelectorAll('a.basket-link.basket .js-count')"
+    '.forEach(function(x){x.textContent=String(n);'
+    "x.classList.toggle('empted',n===0);});}"
+    'function post(url,body,done,btn,orig){'
+    'var ctrl=new AbortController();'
+    'var timer=setTimeout(function(){ctrl.abort();},10000);'
+    "fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},"
+    'body:JSON.stringify(body),signal:ctrl.signal})'
+    '.then(function(r){clearTimeout(timer);if(!r.ok)throw 0;return r.json();})'
+    '.then(function(d){if(!d.success)throw 0;done(d);})'
+    '.catch(function(){clearTimeout(timer);'
+    "btn.textContent='Не удалось, повторите';"
+    'setTimeout(function(){btn.textContent=orig;},3000);});}'
+    'function openModal(a){'
+    'var c=cardOf(a);'
+    'var name=nameOf(a,c),img=imgOf(c),price=priceOf(c);'
+    'var old=document.getElementById("legacy-modal-overlay");'
+    'if(old)old.remove();'
+    'var ov=document.createElement("div");'
+    'ov.id="legacy-modal-overlay";ov.className="open";'
+    'ov.innerHTML='
+    "'<div id=\"legacy-modal\" role=\"dialog\" aria-modal=\"true\">'"
+    "+'<button class=\"lm-close\" type=\"button\" aria-label=\"Закрыть\">&times;</button>'"
+    "+(img?'<img class=\"lm-img\" src=\"'+img+'\" alt=\"\">':'')"
+    "+'<p class=\"lm-name\"></p>'"
+    "+'<p class=\"lm-price\">'+fmt(price)+'</p>'"
+    "+'<div class=\"lm-actions\">'"
+    "+'<button class=\"lm-btn lm-cart\" type=\"button\">В корзину</button>'"
+    "+'<button class=\"lm-btn lm-oneclick\" type=\"button\">Купить в 1 клик</button>'"
+    "+'<a class=\"lm-btn lm-all\" href=\"/catalog/\">Все товары каталога</a>'"
+    "+'</div></div>';"
+    'ov.querySelector(".lm-name").textContent=name;'
+    'ov.querySelector(".lm-close").onclick=function(){ov.remove();};'
+    'ov.addEventListener("click",function(e){if(e.target===ov)ov.remove();});'
+    'document.addEventListener("keydown",function esc(e){'
+    'if(e.key==="Escape"){ov.remove();'
+    'document.removeEventListener("keydown",esc);}});'
+    'var body={product_id:"legacy-"+encodeURIComponent(name).slice(0,60),'
+    "source:'wb',product_name:name,price:price};"
+    'var cart=ov.querySelector(".lm-cart");'
+    'cart.onclick=function(){'
+    "var orig=cart.textContent;cart.textContent='Добавляем…';"
+    "post('/api/cart/add',body,function(d){"
+    "cart.textContent='✓ В корзине ('+d.count+')';setCounter(d.count);},"
+    'cart,orig);};'
+    'var one=ov.querySelector(".lm-oneclick");'
+    'one.onclick=function(){'
+    "var orig=one.textContent;one.textContent='Оформляем…';"
+    "post('/api/cart/buy-one-click',body,function(d){"
+    'location.href=d.redirect||"/basket/";},one,orig);};'
+    'document.body.appendChild(ov);}'
+    "document.addEventListener('click',function(e){"
+    "var a=e.target.closest&&e.target.closest('a[data-legacy-product]');"
+    'if(!a)return;'
+    'e.preventDefault();e.stopPropagation();openModal(a);'
+    '},true);'
+    '})();</script>'
+)
+
+
 # INLINE в HTML, а не во внешнем wb-actions.js: страницы отдаются без gzip
 # (в отличие от статики) и доходят до клиента целиком, тогда как внешние
 # JS-файлы у части клиентов приходят обрезанными в конце (прокси/DPI портят
@@ -2267,9 +2597,12 @@ def _inject_lazyload_fix(html):
     — левое меню категорий (.left_block): список свёрнут по умолчанию,
       раскрытие по клику по шапке (.opened) или наведению, приклеивание
       sticky-sidebar отключено — меню не перекрывает контент.
+    — рерайт мёртвых битрикс-ссылок карточек + быстрая карточка-модалка
+      (см. _rewrite_legacy_product_links / LEGACY_MODAL_JS).
     """
     if 'lazyload-fix.js' in html or '</body>' not in html:
         return html
+    html = _rewrite_legacy_product_links(html)
     fix_ver = int(os.path.getmtime(os.path.join(BASE_DIR, 'static', 'js', 'lazyload-fix.js')))
     base = json.dumps(_section_catalog_base())
     liked_ids = _visitor_liked_ids()
@@ -2282,6 +2615,10 @@ def _inject_lazyload_fix(html):
               + LIKED_BTN_CSS + '\n'
               + LEFTMENU_CSS + '\n'
               + CATALOG_LAYOUT_CSS + '\n'
+              + SECTION_FILTER_CSS + '\n'
+              + SOCIALS_CSS + '\n'
+              + LEGACY_MODAL_CSS + '\n'
+              + LEGACY_MODAL_JS + '\n'
               # Мёртвая пагинация категорий: «Показать ещё» → все товары раздела
               # одним списком, номера страниц → тот же список (?page=N игнорируется
               # в режиме per_page=all).
@@ -3507,6 +3844,82 @@ def _set_product_discount(source, product_id, discount_type, value):
     return True
 
 
+@app.route('/admin/api/product-update', methods=['POST'])
+@admin_required
+def admin_product_update():
+    """Полное редактирование товара (замечание «управление товарами»):
+    название, описание, базовая цена, скидка для сайта, фото (URL),
+    категория, видимость. Скидка задаётся теми же полями admin_discount_*,
+    что и /admin/api/product-discount. Изменения сразу видны на сайте —
+    invalidate_site_cache() сбрасывает кэш каталога и страниц.
+    """
+    from db import db as _db
+    from models import Product as _Product
+
+    data = request.get_json() or {}
+    source = data.get('source', 'wb')
+    pid = data.get('product_id') or data.get('nm_id')
+    if not pid:
+        return jsonify({'success': False, 'error': 'product_id required'}), 400
+    prod = _db.session.query(_Product).filter_by(
+        source=source, nm_id=int(pid)).first()
+    if prod is None:
+        return jsonify({'success': False, 'error': 'Товар не найден'}), 404
+
+    changes = {}
+    if 'name' in data:
+        prod.name = str(data.get('name') or '').strip()[:1000]
+        changes['name'] = prod.name
+    if 'description' in data:
+        # описание храним plaintext (без HTML) — в extra['description']
+        desc = re.sub(r'<[^>]+>', '', str(data.get('description') or ''))[:5000]
+        extra = dict(prod.extra) if isinstance(prod.extra, dict) else {}
+        if desc:
+            extra['description'] = desc.strip()
+        else:
+            extra.pop('description', None)
+        prod.extra = extra
+        changes['description'] = desc.strip()
+    if 'price' in data:
+        try:
+            prod.price = max(0, min(10**7, int(float(data.get('price') or 0))))
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'price must be a number'}), 400
+        changes['price'] = prod.price
+    if 'discount_type' in data or 'discount_value' in data:
+        dtype = data.get('discount_type', prod.admin_discount_type or 'percent')
+        if dtype not in ('percent', 'amount'):
+            return jsonify({'success': False, 'error': 'discount_type must be percent|amount'}), 400
+        try:
+            val = int(float(data.get('discount_value', 0) or 0))
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'discount_value must be a number'}), 400
+        if dtype == 'amount':
+            prod.admin_discount_type, prod.admin_discount_amount = 'amount', max(0, val)
+            prod.admin_discount_percent = 0
+        else:
+            prod.admin_discount_type, prod.admin_discount_percent = 'percent', max(0, min(99, val))
+            prod.admin_discount_amount = 0
+        changes['discount'] = f'{dtype}:{val}'
+    if 'photo' in data:
+        photo = str(data.get('photo') or '').strip()[:2000]
+        if photo and not (photo.startswith(('http://', 'https://', '/static/', '/proxy/', '/upload/'))):
+            return jsonify({'success': False, 'error': 'photo must be an URL or /static/... path'}), 400
+        prod.photo = photo
+        changes['photo'] = photo[:120]
+    if 'category' in data:
+        prod.category = str(data.get('category') or '').strip()[:300]
+        changes['category'] = prod.category
+    if 'visible' in data:
+        prod.visible = bool(data.get('visible'))
+        changes['visible'] = prod.visible
+
+    _db.session.commit()
+    _audit_log('product.update', 'product', f'{source}:{pid}', changes)
+    invalidate_site_cache()
+    return jsonify({'success': True})
+
+
 @app.route('/admin/api/wb-discount-bulk', methods=['POST'])
 @admin_required
 def admin_wb_discount_bulk():
@@ -3842,6 +4255,10 @@ def _product_page(source, nm_id):
     page = dict(get_page_by_slug(content, 'catalog__namatrasniki'))
     page['title'] = _render_meta_template(seo.get('product_title_template'), product, content.get('site', {})) or page.get('title', '')
     page['meta_description'] = _render_meta_template(seo.get('product_description_template'), product, content.get('site', {})) or page.get('meta_description', '')
+    # Детальный блок товара вместо статичной ленты раздела: страница товара
+    # показывает сам товар (фото, имя, цена, описание, кнопки) — иначе по
+    # карточке WB/Ozon отдавалась просто категорийная вёрстка без данных.
+    page['content_html'] = _product_detail_html(product)
 
     ctx = make_context(content, page)
     ctx['seo_product'] = _seo_product(product, request.host_url)
@@ -3856,6 +4273,107 @@ def _product_page(source, nm_id):
     ]
     return Response(_inject_lazyload_fix(
         render_template('pages/catalog__namatrasniki.html', **ctx, wb_product=product)))
+
+
+def _product_detail_html(product):
+    """Детальный блок карточки товара для /catalog/<source>/<nm_id>/.
+    Раньше страница товара отдавала категорийную вёрстку без данных товара.
+    Кнопки — те же классы, что в сетке каталога (wb-like-btn/wb-cart-btn/
+    wb-buy-btn + форма .wb-order-form): обработчики уже живут на страницах.
+    """
+    from markupsafe import escape as _esc
+    import urllib.parse as _uparse
+
+    name = str(product.get('name') or 'Товар')
+    src = product.get('source') or 'wb'
+    pid = product.get('nm_id') or product.get('id') or ''
+    photo = product.get('photo') or ''
+    if photo and photo.startswith(('http://', 'https://')):
+        photo = '/proxy/image?url=' + _uparse.quote(photo, safe='')
+    price = int(product.get('price') or 0)
+    discount_price = int(product.get('discount_price') or 0)
+    final_price = int(product.get('final_price') or price or 0)
+    stock = int(product.get('stock') or 0)
+    brand = str(product.get('brand') or 'Экотория')
+    base = discount_price if discount_price and discount_price < price else price
+    desc = str(product.get('description') or '').strip()
+    site_badge = product.get('site_discount_badge')
+
+    if stock <= 0:
+        stock_html = '<span style="color:#c00;font-weight:600;">Нет в наличии</span>'
+    elif stock <= 5:
+        stock_html = '<span style="color:#b26a00;font-weight:600;">Осталось мало</span>'
+    else:
+        stock_html = '<span style="color:#137333;font-weight:600;">В наличии</span>'
+
+    price_html = ''
+    if base and final_price < base:
+        price_html = (f'<span style="text-decoration:line-through;color:#bbb;font-size:1.05rem;">'
+                      f'{base} ₽</span> '
+                      f'<span style="color:#c00;font-weight:700;font-size:1.7rem;">{final_price} ₽</span>')
+        if site_badge:
+            price_html += (f' <span style="background:#137333;color:#fff;font-size:.78rem;'
+                           f'padding:.2rem .6rem;border-radius:4px;">скидка {site_badge}% на сайте</span>')
+    else:
+        price_html = f'<span style="color:#c00;font-weight:700;font-size:1.7rem;">{final_price or base} ₽</span>'
+
+    img_html = (f'<img src="{_esc(photo)}" alt="{_esc(name)}" '
+                f'style="width:100%;max-width:480px;object-fit:contain;display:block;margin:0 auto;">'
+                if photo else '')
+    desc_html = ''
+    if desc:
+        desc_html = ('<h2 style="font-size:1.15rem;margin:26px 0 10px;">Описание</h2>'
+                     f'<div style="line-height:1.65;color:#333;white-space:pre-line;">{_esc(desc)}</div>')
+
+    disabled = stock <= 0
+    buy_style = ('margin-top:.6rem;width:100%;background:#ccc;color:#fff;border:0;padding:.7rem;'
+                 'border-radius:6px;cursor:not-allowed;font-weight:600;' if disabled else
+                 'margin-top:.6rem;width:100%;background:#b49d84;color:#fff;border:0;padding:.7rem;'
+                 'border-radius:6px;cursor:pointer;font-weight:600;')
+    order_form = ''
+    if not disabled:
+        order_form = (
+            f'<form class="wb-order-form" data-id="{_esc(str(pid))}" style="display:none;margin-top:.75rem;'
+            'padding:.75rem;background:#f9f9f9;border-radius:6px;">'
+            '<input type="text" name="name" placeholder="Ваше имя" required style="width:100%;margin-bottom:.4rem;padding:.4rem;border:1px solid #ddd;border-radius:4px;">'
+            '<input type="tel" name="phone" placeholder="Телефон" required style="width:100%;margin-bottom:.4rem;padding:.4rem;border:1px solid #ddd;border-radius:4px;">'
+            '<input type="email" name="email" placeholder="Email (необязательно)" style="width:100%;margin-bottom:.4rem;padding:.4rem;border:1px solid #ddd;border-radius:4px;">'
+            '<label style="display:flex;align-items:flex-start;gap:.35rem;font-size:.75rem;color:#666;margin-bottom:.5rem;cursor:pointer;">'
+            '<input type="checkbox" name="consent_pd" value="1" required style="margin-top:.1rem;">'
+            '<span>Соглашаюсь с обработкой персональных данных</span></label>'
+            '<button type="submit" style="width:100%;background:#137333;color:#fff;border:0;padding:.5rem;border-radius:4px;cursor:pointer;font-weight:600;">Оформить заявку</button>'
+            '<div class="wb-order-result" style="margin-top:.4rem;font-size:.8rem;"></div></form>')
+
+    return (
+        '<div class="wb-detail" style="max-width:1200px;margin:0 auto;padding:28px 16px 48px;">'
+        '<div style="font-size:.85rem;color:#888;margin-bottom:18px;">'
+        '<a href="/" style="color:#888;text-decoration:none;">Главная</a> / '
+        '<a href="/catalog/" style="color:#888;text-decoration:none;">Каталог</a> / '
+        f'<span>{_esc(name)}</span></div>'
+        '<div style="display:grid;grid-template-columns:minmax(280px,480px) 1fr;gap:36px;align-items:start;">'
+        f'<div>{img_html}</div>'
+        '<div>'
+        f'<h1 style="font-size:1.6rem;line-height:1.3;margin:0 0 14px;">{_esc(name)}</h1>'
+        f'<div style="font-size:.88rem;color:#777;margin-bottom:14px;">Артикул: {_esc(str(pid))}'
+        f'&nbsp;&nbsp;Бренд: {_esc(brand)}&nbsp;&nbsp;{stock_html}</div>'
+        f'<div style="margin:6px 0 20px;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">{price_html}</div>'
+        '<div style="max-width:420px;">'
+        f'<button type="button" class="wb-cart-btn" data-id="{_esc(str(pid))}" data-source="{_esc(src)}" '
+        'style="width:100%;background:#fff;color:#333;border:1px solid #999;padding:.7rem;border-radius:6px;cursor:pointer;font-weight:600;">🛒 В корзину</button>'
+        f'<button type="button" class="wb-buy-btn" data-id="{_esc(str(pid))}" data-name="{_esc(name)}" '
+        f'data-price="{final_price}" data-stock="{stock}"{(" disabled" if disabled else "")} '
+        f'style="{buy_style}">Купить в 1 клик</button>'
+        f'{order_form}'
+        f'<button type="button" class="wb-like-btn" data-id="{_esc(str(pid))}" data-name="{_esc(name)}" '
+        f'data-price="{final_price}" data-photo="{_esc(str(product.get("photo") or ""))}" '
+        f'data-url="/catalog/{_esc(src)}/{_esc(str(pid))}/" data-source="{_esc(src)}" '
+        'style="margin-top:.6rem;width:100%;background:#fff;color:#c00;border:1px solid #c00;padding:.7rem;'
+        'border-radius:6px;cursor:pointer;font-weight:600;">❤ В избранное</button>'
+        '</div></div></div>'
+        f'{desc_html}'
+        '<div style="margin-top:30px;"><a href="/catalog/" style="color:#b49d84;text-decoration:underline;">← Все товары каталога</a></div>'
+        '</div>'
+    )
 
 
 def _seo_product(product, host_url):
