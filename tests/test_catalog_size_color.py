@@ -139,6 +139,8 @@ def test_pagination_keeps_size_color(client):
     _seed()
     r = client.get('/catalog/?size=140x200&color=серый&page=2')
     body = r.data.decode('utf-8')
-    if 'wb-catalog-pagination' in body:
+    # class живого фильтра встречается и в инжектируемом JS — проверяем
+    # именно разметку пагинации
+    if 'class="wb-catalog-pagination"' in body:
         assert 'size=140x200' in body
         assert 'color=' in body

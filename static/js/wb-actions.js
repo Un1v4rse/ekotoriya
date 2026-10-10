@@ -333,4 +333,10 @@
         applyLikedState();
         addFavoriteBuyButtons();
     }, 1200);
+    /* Живой каталог (/api/catalog) перерисовывает сетку ajax'ом — кнопки
+     * избранного новых карточек размечаем заново. */
+    document.addEventListener('wb:results-updated', function() {
+        applyLikedState();
+        addFavoriteBuyButtons();
+    });
 })();

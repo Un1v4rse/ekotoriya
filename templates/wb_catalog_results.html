@@ -1,0 +1,96 @@
+<!-- Результаты каталога (сетка + счётчик + пагинация): рендерятся внутри
+     страницы и отдельно отдаются /api/catalog для живых фильтров/пагинации.
+     Контейнер .wb-catalog-results живёт в wb_catalog_block.html. -->
+{% if catalog_view.show_filters %}
+<div class="wb-catalog-count" style="margin-bottom:1rem; color:#666; font-size:0.9rem;">Найдено товаров: {{ catalog_view.total }}</div>
+{% endif %}
+
+{% if catalog_view.products %}
+<div class="wb-products-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.5rem;">
+    {% for p in catalog_view.products %}
+    {% set st = p.get('stock', 10) %}
+    <a href="/catalog/{{ p.source }}/{{ p.id }}/" class="wb-product-card" style="display: block; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; background: #fff; text-decoration: none; color: inherit; transition: box-shadow 0.2s;">
+        <div style="padding: 1rem; background: #f9f9f9; position:relative;">
+            {% if p.source == 'ozon' %}
+            <span style="position:absolute; top:0.6rem; left:0.6rem; background:#005bff; color:#fff; font-size:0.68rem; padding:0.12rem 0.45rem; border-radius:4px;">Ozon</span>
+            {% else %}
+            <span style="position:absolute; top:0.6rem; left:0.6rem; background:#c81f9b; color:#fff; font-size:0.68rem; padding:0.12rem 0.45rem; border-radius:4px;">WB</span>
+            {% endif %}
+            <img src="{% if p.photo.startswith('/') %}{{ p.photo }}{% else %}/proxy/image?url={{ p.photo | urlencode }}{% endif %}" alt="{{ p.name }}" style="width: 100%; height: 220px; object-fit: contain; display: block;" {% if loop.index0 > 3 %}loading="lazy"{% endif %}>
+        </div>
+        <div style="padding: 1rem;">
+            <div data-name="{{ p.name }}" style="font-weight: 600; font-size: 0.95rem; line-height: 1.35; min-height: 3.9em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;">{{ p.name }}</div>
+            <div style="margin-top: 0.75rem; display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;">
+                {% if p.discount_price and p.discount_price < p.price %}
+                <span style="text-decoration: line-through; color: #bbb; font-size: 0.85rem;">{{ p.price }} ₽</span>
+                <span style="color: #333; font-size: 0.95rem;">{{ p.discount_price }} ₽</span>
+                {% else %}
+                <span style="color: #333; font-size: 0.95rem;">{{ p.price }} ₽</span>
+                {% endif %}
+            </div>
+            <div style="margin-top: 0.15rem; display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;">
+                {% if p.final_price < (p.discount_price if p.discount_price and p.discount_price < p.price else p.price) %}
+                <span style="color: #c00; font-weight: 700; font-size: 1.2rem;">{{ p.final_price }} ₽</span>
+                {% if p.site_discount_badge %}
+                <span style="background: #137333; color: #fff; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px;">скидка {{ p.site_discount_badge }}% на сайте</span>
+                {% endif %}
+                {% else %}
+                <span style="color: #c00; font-weight: 700; font-size: 1.2rem;">{{ p.final_price }} ₽</span>
+                {% endif %}
+            </div>
+            {% if st <= 0 %}
+            <div class="wb-stock-badge" style="margin-top: 0.5rem; font-size: 0.82rem; font-weight: 600; color: #c00;">Нет в наличии</div>
+            {% elif st <= 5 %}
+            <div class="wb-stock-badge" style="margin-top: 0.5rem; font-size: 0.82rem; font-weight: 600; color: #b26a00;">Осталось мало</div>
+            {% else %}
+            <div class="wb-stock-badge" style="margin-top: 0.5rem; font-size: 0.82rem; font-weight: 600; color: #137333;">В наличии</div>
+            {% endif %}
+            <div style="margin-top: 0.75rem; font-size: 0.85rem; color: #666;">Артикул: {{ p.id }}</div>
+            <button type="button" class="wb-like-btn" data-id="{{ p.id }}" data-name="{{ p.name }}" data-price="{{ p.final_price }}" data-photo="{{ p.photo or '' }}" data-url="/catalog/{{ p.source }}/{{ p.id }}/" data-source="{{ p.source or 'wb' }}" style="margin-top: 0.75rem; width: 100%; background: #fff; color: #c00; border: 1px solid #c00; padding: 0.5rem; border-radius: 6px; cursor: pointer; font-weight: 600;">❤ В избранное</button>
+            <button type="button" class="wb-cart-btn" data-id="{{ p.id }}" data-source="{{ p.source or 'wb' }}" style="margin-top: 0.5rem; width: 100%; background: #fff; color: #333; border: 1px solid #999; padding: 0.5rem; border-radius: 6px; cursor: pointer; font-weight: 600;">🛒 В корзину</button>
+            <button type="button" class="wb-buy-btn" data-id="{{ p.id }}" data-name="{{ p.name }}" data-price="{{ p.final_price }}" data-stock="{{ st }}"{% if st <= 0 %} disabled style="margin-top: 0.5rem; width: 100%; background: #ccc; color: #fff; border: 0; padding: 0.6rem; border-radius: 6px; cursor: not-allowed; font-weight: 600;"{% else %} style="margin-top: 0.5rem; width: 100%; background: #b49d84; color: #fff; border: 0; padding: 0.6rem; border-radius: 6px; cursor: pointer; font-weight: 600;"{% endif %}>Купить в 1 клик</button>
+            <form class="wb-order-form" data-id="{{ p.id }}" style="display:none; margin-top: 0.75rem; padding: 0.75rem; background: #f9f9f9; border-radius: 6px;">
+                <input type="text" name="name" placeholder="Ваше имя" required style="width:100%; margin-bottom:0.4rem; padding:0.4rem; border:1px solid #ddd; border-radius:4px;">
+                <input type="tel" name="phone" placeholder="Телефон" required style="width:100%; margin-bottom:0.4rem; padding:0.4rem; border:1px solid #ddd; border-radius:4px;">
+                <input type="email" name="email" placeholder="Email (необязательно)" style="width:100%; margin-bottom:0.4rem; padding:0.4rem; border:1px solid #ddd; border-radius:4px;">
+                <label style="display:flex; align-items:flex-start; gap:0.35rem; font-size:0.75rem; color:#666; margin-bottom:0.5rem; cursor:pointer;">
+                    <input type="checkbox" name="consent_pd" value="1" required style="margin-top:0.1rem;">
+                    <span>Соглашаюсь с обработкой персональных данных</span>
+                </label>
+                <button type="submit" style="width:100%; background:#137333; color:#fff; border:0; padding:0.5rem; border-radius:4px; cursor:pointer; font-weight:600;">Оформить заявку</button>
+                <div class="wb-order-result" style="margin-top:0.4rem; font-size:0.8rem;"></div>
+            </form>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="wb-empty-result" style="padding:2rem 1rem; text-align:center; color:#888;">По выбранным фильтрам ничего не найдено. Попробуйте изменить условия поиска.</div>
+{% endif %}
+
+{% if catalog_view.pages > 1 %}
+<div class="wb-catalog-pagination" style="margin-top: 1.5rem; display: flex; gap: 0.4rem; justify-content: center; flex-wrap: wrap;">
+    {% set qs = catalog_view.qs %}
+    {% set cur = catalog_view.page %}
+    {% set last_page = catalog_view.pages %}
+    {% if cur > 1 %}
+    <a href="{{ catalog_view.base }}?{% if qs %}{{ qs }}&{% endif %}page={{ cur - 1 }}" rel="prev" style="padding: 0.4rem 0.8rem; border: 1px solid #ddd; border-radius: 6px; color: #333; text-decoration: none;">‹</a>
+    {% endif %}
+    {% set ns = namespace(shown=0) %}
+    {% for pn in range(1, last_page + 1) %}
+        {% set vis = last_page <= 7 or pn <= 2 or pn > last_page - 2 or (pn >= cur - 1 and pn <= cur + 1) %}
+        {% if vis %}
+            {% if ns.shown and pn - ns.shown > 1 %}<span style="padding: 0.4rem 0.3rem; color: #999;">…</span>{% endif %}
+            {% set ns.shown = pn %}
+            {% if pn == cur %}
+    <span style="padding: 0.4rem 0.8rem; background: #b49d84; color: #fff; border-radius: 6px; font-weight: 600;">{{ pn }}</span>
+            {% else %}
+    <a href="{{ catalog_view.base }}?{% if qs %}{{ qs }}&{% endif %}page={{ pn }}" style="padding: 0.4rem 0.8rem; border: 1px solid #ddd; border-radius: 6px; color: #333; text-decoration: none;">{{ pn }}</a>
+            {% endif %}
+        {% endif %}
+    {% endfor %}
+    {% if cur < last_page %}
+    <a href="{{ catalog_view.base }}?{% if qs %}{{ qs }}&{% endif %}page={{ cur + 1 }}" rel="next" style="padding: 0.4rem 0.8rem; border: 1px solid #ddd; border-radius: 6px; color: #333; text-decoration: none;">›</a>
+    {% endif %}
+</div>
+{% endif %}

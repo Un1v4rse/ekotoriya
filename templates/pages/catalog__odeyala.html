@@ -1492,6 +1492,8 @@
 
 		<div class="wraps hover_shine" id="content">
 		<div class="middle">
+{% if not is_product_page %}{% include 'section_header.html' %}{% endif %}
+{% if not is_product_page %}{% include 'wb_catalog_block.html' %}{% endif %}
 {{ page.content_html | safe }}
 		</div>
 </div> 					</div>
@@ -1962,7 +1964,7 @@
 
 <!-- marketnig popups -->
 
-<!--'start_frame_cache_cdmcEY'-->	<!--'end_frame_cache_cdmcEY'--><!-- /marketnig popups -->				{% include 'wb_catalog_block.html' %}
+<!--'start_frame_cache_cdmcEY'-->	<!--'end_frame_cache_cdmcEY'--><!-- /marketnig popups -->
 </footer>
 
 		<div class="bx_areas">

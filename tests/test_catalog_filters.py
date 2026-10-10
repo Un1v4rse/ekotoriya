@@ -87,12 +87,13 @@ def test_catalog_pagination_keeps_filters(client):
     r = client.get('/catalog/?source=wb&sort=price_desc')
     assert r.status_code == 200
     body = r.data.decode('utf-8')
-    assert 'wb-catalog-pagination' in body
+    assert 'class="wb-catalog-pagination"' in body
     assert 'source=wb' in body
     assert 'sort=price_desc' in body
-    # ссылки вида /catalog/?q=&amp;source=wb...&amp;page=2 (Jinja эскейпит &)
+    # ссылки вида /catalog/?source=wb&amp;sort=price_desc&page=2 —
+    # пустые параметры в URL не попадают (& внутри qs эскейпится Jinja)
     assert 'page=2' in body
-    assert '/catalog/?q=&amp;source=wb' in body
+    assert '/catalog/?source=wb&amp;sort=price_desc&page=2' in body
 
 
 def test_section_page_smartfilter_intercepted_namtrasniki(client):

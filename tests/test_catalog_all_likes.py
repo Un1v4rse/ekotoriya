@@ -40,8 +40,9 @@ def test_catalog_per_page_all_renders_everything(client):
     assert r.status_code == 200
     body = r.data.decode('utf-8')
     assert body.count('wb-product-card') == 28
-    # пагинация не рендерится
-    assert 'wb-catalog-pagination' not in body
+    # пагинация не рендерится (class встречается и в инжектируемом JS —
+    # проверяем именно разметку)
+    assert 'class="wb-catalog-pagination"' not in body
 
 
 def test_catalog_default_still_paginates(client):
@@ -50,7 +51,7 @@ def test_catalog_default_still_paginates(client):
     r = client.get('/catalog/')
     body = r.data.decode('utf-8')
     assert body.count('wb-product-card') == 24
-    assert 'wb-catalog-pagination' in body
+    assert 'class="wb-catalog-pagination"' in body
 
 
 def test_catalog_per_page_all_keeps_filters(client):

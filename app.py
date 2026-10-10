@@ -878,6 +878,20 @@ def make_context(content, page):
             ctx['personal_products'] = _rec_block_items(personal)
         except Exception:
             ctx['personal_products'] = []
+    # Каталог-представление для главной и разделов каталога: единый блок
+    # маркетплейса получает пагинацию (главная — по 12 товаров) и живую
+    # панель фильтров (разделы — с предфильтром товаров раздела). Полный
+    # каталог /catalog/ формирует своё представление в catalog_page().
+    try:
+        if page_section:
+            ctx['catalog_view'] = _filtered_catalog(
+                request.args, section=page_section, base=request.path,
+                show_filters=True)
+        elif (page.get('url') or '') == '/':
+            ctx['catalog_view'] = _filtered_catalog(
+                request.args, per_page=12, base='/', show_filters=False)
+    except Exception:
+        pass
     return ctx
 
 
@@ -2157,6 +2171,18 @@ SECTION_FILTER_CSS = (
     '</style>'
 )
 
+# Категорийные страницы: мёртвый bitrix-листинг скрыт — вместо него над снапшотом
+# выводится живой блок маркетплейс (панель /api/catalog + сетка товаров раздела).
+# .section-content-wrapper есть только в снапшотах страниц разделов; рабочие
+# элементы (левое меню, SEO-тексты под листингом) не затрагиваются.
+SECTION_LISTING_HIDE_CSS = (
+    '<style>'
+    '.section-content-wrapper .filter-panel-wrapper{display:none !important;}'
+    '.section-content-wrapper .catalog_block{display:none !important;}'
+    '.section-content-wrapper .bottom_nav{display:none !important;}'
+    '</style>'
+)
+
 # Иконки соцсетей в выдвижной мобильной панели (#mobilemenu, «сайдбар» на
 # мобильных) шли общими aspro-правилами .social-icons li a: квадратные
 # (border-radius:3px), без обводки, всегда белые иконки (верхняя строка
@@ -2573,6 +2599,96 @@ CART_INTERCEPT_JS = (
 )
 
 
+# Спиннер и состояние загрузки живого каталога: на время ajax-запроса сетка
+# затемняется и поверх крутится индикатор (CATALOG_LIVE_JS добавляет/снимает
+# .wb-loading на контейнере .wb-catalog-results).
+CATALOG_LIVE_CSS = (
+    '<style>'
+    '.wb-catalog-results{position:relative;min-height:120px;}'
+    '.wb-catalog-results.wb-loading{opacity:.45;pointer-events:none;}'
+    '.wb-catalog-results.wb-loading::after{'
+    'content:"";position:absolute;top:2rem;left:50%;width:34px;height:34px;'
+    'margin-left:-17px;border:3px solid #d8cfc4;border-top-color:#b49d84;'
+    'border-radius:50%;animation:wb-spin .8s linear infinite;}'
+    '@keyframes wb-spin{to{transform:rotate(360deg);}}'
+    '</style>'
+)
+
+# Живые фильтры каталога и ajax-пагинация блока маркетплейс: изменение любого
+# контрола form.wb-catalog-filters (с дебаунсом 400 мс для текстовых полей)
+# перезапрашивает частичный HTML через /api/catalog и подменяет контейнер
+# .wb-catalog-results без перезагрузки страницы; URL обновляется pushState.
+# Клики по пагинации перехватываются и уходят тем же путём. В iframe редактора
+# pushState отключён. После подмены разметки кидается событие
+# wb:results-updated — wb-actions.js восстанавливает состояние кнопок.
+CATALOG_LIVE_JS = (
+    '<script>(function(){'
+    'if(window.__wbCatalogLive)return;window.__wbCatalogLive=1;'
+    'var timers=new WeakMap();'
+    'function resultsBox(f){return f.parentNode?'
+    'f.parentNode.querySelector(".wb-catalog-results"):null;}'
+    'function formParams(f){'
+    'var u=new URLSearchParams(),fd=new FormData(f);'
+    'fd.forEach(function(v,key){if(v!=="")u.append(key,v);});'
+    'u.delete("page");return u;}'
+    'function load(u,box,push){'
+    'if(!box)return;'
+    'box.classList.add("wb-loading");'
+    'fetch(u,{headers:{"X-Requested-With":"fetch"}})'
+    '.then(function(r){return r.json();})'
+    '.then(function(d){'
+    'if(!d||!d.success)throw new Error("bad response");'
+    'box.innerHTML=d.html;'
+    'box.classList.remove("wb-loading");'
+    'if(push&&window.self===window.top){'
+    'try{history.pushState({wb:1},"",push);}catch(e){}}'
+    'document.dispatchEvent(new CustomEvent("wb:results-updated"));'
+    '})'
+    '.catch(function(){box.classList.remove("wb-loading");});'
+    '}'
+    'function applyFilters(f){'
+    'var box=resultsBox(f);if(!box)return;'
+    'var u=formParams(f),qs=u.toString();'
+    'var base=f.getAttribute("data-base")||box.getAttribute("data-base")||"/catalog/";'
+    'var api="/api/catalog?"+qs+(qs?"&":"")+"base="+encodeURIComponent(base);'
+    'load(api,box,base+(qs?"?"+qs:""));'
+    '}'
+    'function schedule(f,delay){'
+    'clearTimeout(timers.get(f));'
+    'timers.set(f,setTimeout(function(){applyFilters(f);},delay));'
+    '}'
+    'document.addEventListener("change",function(e){'
+    'var f=e.target.closest&&e.target.closest("form.wb-catalog-filters");'
+    'if(f)schedule(f,0);'
+    '});'
+    'document.addEventListener("input",function(e){'
+    'var f=e.target.closest&&e.target.closest("form.wb-catalog-filters");'
+    'if(!f)return;'
+    'if(e.target.tagName==="SELECT"||e.target.type==="checkbox")return;'
+    'schedule(f,400);'
+    '});'
+    'document.addEventListener("click",function(e){'
+    'if(e.shiftKey||e.metaKey||e.ctrlKey||e.altKey)return;'
+    'var a=e.target.closest&&'
+    'e.target.closest(".wb-catalog-results .wb-catalog-pagination a");'
+    'if(!a)return;'
+    'var box=a.closest(".wb-catalog-results");'
+    'if(!box)return;'
+    'e.preventDefault();e.stopPropagation();'
+    'var href=a.getAttribute("href")||"";'
+    'var q=href.split("?")[1]||"";'
+    'var base=box.getAttribute("data-base")||"/catalog/";'
+    'load("/api/catalog?"+q+(q?"&":"")+"base="+encodeURIComponent(base),box,href);'
+    'var y=box.getBoundingClientRect().top+window.pageYOffset-80;'
+    'window.scrollTo(0,y<0?0:y);'
+    '},true);'
+    'window.addEventListener("popstate",function(e){'
+    'if(e.state&&e.state.wb)location.reload();'
+    '});'
+    '})();</script>'
+)
+
+
 def _inject_lazyload_fix(html):
     """Инжект полифилла Bitrix-lazyload (static/js/lazyload-fix.js) перед </body>.
 
@@ -2616,9 +2732,14 @@ def _inject_lazyload_fix(html):
               + LEFTMENU_CSS + '\n'
               + CATALOG_LAYOUT_CSS + '\n'
               + SECTION_FILTER_CSS + '\n'
+              + (SECTION_LISTING_HIDE_CSS if re.match(
+                  r'^/catalog/(?:namatrasniki|odeyala|naperniki)/$',
+                  request.path or '') else '') + '\n'
               + SOCIALS_CSS + '\n'
               + LEGACY_MODAL_CSS + '\n'
               + LEGACY_MODAL_JS + '\n'
+              + CATALOG_LIVE_CSS + '\n'
+              + CATALOG_LIVE_JS + '\n'
               # Мёртвая пагинация категорий: «Показать ещё» → все товары раздела
               # одним списком, номера страниц → тот же список (?page=N игнорируется
               # в режиме per_page=all).
@@ -4255,7 +4376,31 @@ def catalog_page():
     return Response(_inject_lazyload_fix(render_template(page['template'], **ctx)))
 
 
-def _filtered_catalog(args):
+@app.route('/api/catalog')
+def api_catalog():
+    """Частичный HTML результатов каталога (сетка + счётчик + пагинация).
+
+    Живые фильтры и ajax-пагинация блока маркетплейс запрашивают этот
+    endpoint и подменяют контейнер .wb-catalog-results без перезагрузки.
+    Параметры — те же, что у /catalog/ (q, category, size, color, цена,
+    sort, page), плюс section (предфильтр раздела) и base (URL страницы,
+    для ссылок пагинации и history.pushState).
+    """
+    section = (request.args.get('section') or '').strip()
+    base = (request.args.get('base') or '').strip()
+    if not base.startswith('/') or base.startswith('//'):
+        base = ''
+    if not base:
+        base = ('/catalog/' + section + '/') if section else '/catalog/'
+    view = _filtered_catalog(request.args, section=section, base=base,
+                             show_filters=True)
+    html = render_template('wb_catalog_results.html', catalog_view=view)
+    return jsonify({'success': True, 'html': html, 'total': view['total'],
+                    'page': view['page'], 'pages': view['pages']})
+
+
+def _filtered_catalog(args, section='', per_page=None, base='/catalog/',
+                      show_filters=True):
     """Фильтрация/сортировка/пагинация каталога (CT-1, CT-5).
 
     Фильтры: q, source, category, in_stock, price_from/to, sort, size, color.
@@ -4264,10 +4409,19 @@ def _filtered_catalog(args):
     («17-20», «Высота борта, см») — по вхождению любого числа имени в
     диапазон. Несколько значений (повторные/через запятую) — логика ИЛИ.
     color — подстрока в имени (цвета WB/Ozon живут в названии карточки).
+
+    section — предфильтр раздела каталога (напр. 'namatrasniki'): товары без
+    назначенного раздела + товары этого раздела (правило совпадает с
+    wb_products в make_context). per_page — переопределение размера страницы
+    (главная показывает по 12). base/show_filters/section попадают в
+    представление для шаблона (пагинация, data-атрибуты живого фильтра).
     """
     import math as _math
     import re as _re
     products = list(get_products())
+    if section:
+        products = [p for p in products
+                    if not p.get('site_section') or p.get('site_section') == section]
 
     def _arg_list(key):
         if hasattr(args, 'getlist'):
@@ -4345,7 +4499,8 @@ def _filtered_catalog(args):
         products.sort(key=lambda p: score_by_key.get(_product_key(p), 0), reverse=True)
 
     total = len(products)
-    if args.get('per_page') == 'all':
+    pp_arg = args.get('per_page')
+    if pp_arg == 'all':
         # режим «все товары сразу» (кнопка «Показать ещё» на категориях):
         # одна страница без пагинации, порядок сортировки сохраняется
         per_page = max(1, total)
@@ -4353,7 +4508,11 @@ def _filtered_catalog(args):
         pages = 1
         items = products
     else:
-        per_page = 24
+        if per_page is None:
+            try:
+                per_page = max(1, int(pp_arg)) if pp_arg else 24
+            except (TypeError, ValueError):
+                per_page = 24
         try:
             page_num = max(1, int(args.get('page') or 1))
         except ValueError:
@@ -4376,6 +4535,34 @@ def _filtered_catalog(args):
             color_tokens.add(c)
     applied_sizes = sizes
     applied_colors = _arg_list('color')
+    # Готовая querystring (без page) для ссылок пагинации: пустые значения
+    # не включаем — URL остаётся чистым.
+    from urllib.parse import urlencode as _urlencode
+    qs_parts = {}
+    if args.get('q'):
+        qs_parts['q'] = args.get('q')
+    if source:
+        qs_parts['source'] = source
+    if category:
+        qs_parts['category'] = category
+    if args.get('in_stock'):
+        qs_parts['in_stock'] = '1'
+    if price_from:
+        qs_parts['price_from'] = price_from
+    if price_to:
+        qs_parts['price_to'] = price_to
+    if sort != 'popular':
+        qs_parts['sort'] = sort
+    if applied_sizes:
+        qs_parts['size'] = applied_sizes[0]
+    if applied_colors:
+        qs_parts['color'] = applied_colors[0]
+    if section:
+        qs_parts['section'] = section
+    if args.get('per_page') == 'all':
+        qs_parts['per_page'] = 'all'
+    elif per_page and per_page != 24:
+        qs_parts['per_page'] = str(per_page)
     return {
         'products': items,
         'total': total,
@@ -4385,6 +4572,10 @@ def _filtered_catalog(args):
         'categories': categories,
         'sizes': sorted(size_tokens),
         'colors': sorted(color_tokens),
+        'base': base,
+        'show_filters': show_filters,
+        'section': section,
+        'qs': _urlencode(qs_parts),
         'applied': {
             'q': args.get('q') or '', 'source': source, 'category': category,
             'in_stock': bool(args.get('in_stock')),
@@ -4449,6 +4640,9 @@ def _product_page(source, nm_id):
     ctx = make_context(content, page)
     ctx['seo_product'] = _seo_product(product, request.host_url)
     ctx['seo_og_image'] = _absolute_url(product.get('photo'), request.host_url) or ctx['seo_og_image']
+    # Страница товара рендерится шаблоном раздела: заголовок раздела и блок
+    # каталога на ней не нужны — только карточка товара и рекомендации.
+    ctx['is_product_page'] = True
     # Крошки и canonical карточки: Главная → Каталог → товар (SEO-1/SEO-4)
     product_url = request.host_url.rstrip('/') + request.path
     ctx['seo_canonical'] = product_url
@@ -4461,14 +4655,73 @@ def _product_page(source, nm_id):
         render_template('pages/catalog__namatrasniki.html', **ctx, wb_product=product)))
 
 
+def _product_size_siblings(product):
+    """Товары-«соседи» того же типа в других размерах.
+
+    Размеры у WB/Ozon живут в названии («Наматрасник 200х200 …»), каждый
+    размер — отдельный товар. Для переключателя размеров на карточке
+    (как на оригинальном сайте) ищем товары того же источника, у которых
+    имя совпадает после удаления токена размера NxM. Возвращает список
+    (размер, товар), отсортированный по числовому размеру; пустой — если
+    соседей нет (размерный ряд из одного товара).
+    """
+    import re as _re
+
+    def _norm(s):
+        s = str(s or '').lower()
+        for ch in ('х', '*', '×'):
+            s = s.replace(ch, 'x')
+        return _re.sub(r'\s+', ' ', s).strip()
+
+    def _strip_size(s):
+        # размерный ряд определяем по «стволу» имени: без токена NxM и без
+        # фразы «высота N-M см» (она отличается у разных карточек ряда)
+        s = _re.sub(r'высота\s*\d+(?:-\d+)?\s*см', '', _norm(s))
+        s = _re.sub(r'\d{2,3}x\d{2,3}(?:x\d{2,3})?(?:\s*см)?', '', s)
+        return _re.sub(r'\s+', ' ', s).strip()
+
+    key = _strip_size(product.get('name'))
+    if not key:
+        return []
+    siblings = []
+    for p in get_products():
+        if p.get('source') != product.get('source'):
+            continue
+        if _strip_size(p.get('name')) != key:
+            continue
+        m = _re.search(r'(\d{2,3})x(\d{2,3})', _norm(p.get('name')))
+        if not m:
+            continue
+        siblings.append((int(m.group(1)) * int(m.group(2)),
+                         f'{m.group(1)}x{m.group(2)}', p))
+    if len(siblings) < 2:
+        return []
+    # один размер может встречаться в нескольких карточках ряда (с высотой
+    # борта и без) — в переключателе размер дублировать не нужно
+    seen = set()
+    unique = []
+    for _, size, p in sorted(siblings, key=lambda x: x[0]):
+        if size in seen:
+            continue
+        seen.add(size)
+        unique.append((size, p))
+    if len(unique) < 2:
+        return []
+    return unique
+
+
 def _product_detail_html(product):
     """Детальный блок карточки товара для /catalog/<source>/<nm_id>/.
-    Раньше страница товара отдавала категорийную вёрстку без данных товара.
-    Кнопки — те же классы, что в сетке каталога (wb-like-btn/wb-cart-btn/
-    wb-buy-btn + форма .wb-order-form): обработчики уже живут на страницах.
+
+    Вёрстка по оригинальному aspro-дизайну: слева галерея, справа — избранное,
+    артикул/бренд/наличие, переключатель размера (товары-соседи в других
+    размерах), ценовой блок, «В корзину» / «Купить в 1 клик» (те же классы
+    wb-cart-btn/wb-buy-btn/wb-like-btn + форма .wb-order-form — обработчики
+    уже живут на страницах), доставка и вкладки Описание/Характеристики.
     """
     from markupsafe import escape as _esc
     import urllib.parse as _uparse
+    import re as _re
 
     name = str(product.get('name') or 'Товар')
     src = product.get('source') or 'wb'
@@ -4494,22 +4747,96 @@ def _product_detail_html(product):
 
     price_html = ''
     if base and final_price < base:
-        price_html = (f'<span style="text-decoration:line-through;color:#bbb;font-size:1.05rem;">'
+        price_html = (f'<span style="text-decoration:line-through;color:#999;font-size:1rem;">'
                       f'{base} ₽</span> '
-                      f'<span style="color:#c00;font-weight:700;font-size:1.7rem;">{final_price} ₽</span>')
+                      f'<span style="color:#333;font-weight:700;font-size:1.9rem;">{final_price} ₽</span>'
+                      f'<span style="color:#777;font-size:.9rem;">/шт</span>')
         if site_badge:
             price_html += (f' <span style="background:#137333;color:#fff;font-size:.78rem;'
                            f'padding:.2rem .6rem;border-radius:4px;">скидка {site_badge}% на сайте</span>')
     else:
-        price_html = f'<span style="color:#c00;font-weight:700;font-size:1.7rem;">{final_price or base} ₽</span>'
+        price_html = (f'<span style="color:#333;font-weight:700;font-size:1.9rem;">'
+                      f'{final_price or base} ₽</span>'
+                      f'<span style="color:#777;font-size:.9rem;">/шт</span>')
 
     img_html = (f'<img src="{_esc(photo)}" alt="{_esc(name)}" '
-                f'style="width:100%;max-width:480px;object-fit:contain;display:block;margin:0 auto;">'
+                f'style="width:100%;max-width:460px;object-fit:contain;display:block;margin:0 auto;">'
                 if photo else '')
-    desc_html = ''
-    if desc:
-        desc_html = ('<h2 style="font-size:1.15rem;margin:26px 0 10px;">Описание</h2>'
-                     f'<div style="line-height:1.65;color:#333;white-space:pre-line;">{_esc(desc)}</div>')
+
+    # Переключатель размера: товары-соседи в других размерах (оригинальный
+    # сайт показывает размерный ряд чипсами; активный — подсвечен).
+    cur_pid = str(pid)
+    size_chips = ''
+    siblings = _product_size_siblings(product)
+    if siblings:
+        chips = []
+        for size, p in siblings:
+            spid = str(p.get('nm_id') or p.get('id') or '')
+            active = spid == cur_pid
+            if active:
+                chips.append(
+                    f'<span style="display:inline-block;padding:.45rem .9rem;border:1px solid #b49d84;'
+                    f'background:#b49d84;color:#fff;border-radius:4px;font-size:.85rem;">{size}</span>')
+            else:
+                chips.append(
+                    f'<a href="/catalog/{_esc(src)}/{_esc(spid)}/" '
+                    f'style="display:inline-block;padding:.45rem .9rem;border:1px solid #ddd;'
+                    f'color:#333;border-radius:4px;font-size:.85rem;text-decoration:none;">{size}</a>')
+        size_chips = (
+            '<div style="margin:0 0 18px;">'
+            '<div style="font-size:.85rem;color:#777;margin-bottom:.5rem;">Размер, см</div>'
+            f'<div style="display:flex;flex-wrap:wrap;gap:.4rem;">{"".join(chips)}</div></div>')
+
+    # Характеристики: размер и высота борта из имени, остальное из полей.
+    chars = [('Артикул', str(pid)), ('Бренд', brand),
+             ('Источник', 'Wildberries' if src == 'wb' else ('Ozon' if src == 'ozon' else 'Сайт Экотория'))]
+    nm_norm = name.lower().replace('х', 'x')
+    m = _re.search(r'(\d{2,3}x\d{2,3})', nm_norm)
+    if m:
+        chars.append(('Размер', m.group(1).replace('x', 'х') + ' см'))
+    m = _re.search(r'высота\s*(\d+(?:-\d+)?)\s*см', nm_norm)
+    if m:
+        chars.append(('Высота борта', m.group(1) + ' см'))
+    chars_rows = ''.join(
+        f'<div style="display:flex;gap:1rem;padding:.55rem 0;border-bottom:1px solid #f0f0f0;font-size:.92rem;">'
+        f'<div style="width:180px;color:#888;flex-shrink:0;">{_esc(k)}</div>'
+        f'<div>{_esc(v)}</div></div>'
+        for k, v in chars)
+    chars_html = f'<div>{chars_rows}</div>'
+
+    desc_html = (f'<div style="line-height:1.7;color:#333;white-space:pre-line;">{_esc(desc)}</div>'
+                 if desc else
+                 '<div style="color:#888;">Описание появится в ближайшее время.</div>')
+
+    tabs_html = (
+        '<div class="wb-detail-tabs" style="margin-top:36px;">'
+        '<div class="wb-detail-tabs__nav" style="display:flex;gap:.2rem;border-bottom:2px solid #eee;">'
+        '<button type="button" data-tab="desc" '
+        'style="padding:.7rem 1.2rem;border:0;background:none;font-size:1rem;font-weight:600;'
+        'color:#b49d84;border-bottom:2px solid #b49d84;margin-bottom:-2px;cursor:pointer;">Описание</button>'
+        '<button type="button" data-tab="chars" '
+        'style="padding:.7rem 1.2rem;border:0;background:none;font-size:1rem;color:#777;'
+        'cursor:pointer;">Характеристики</button>'
+        '</div>'
+        '<div class="wb-detail-tabs__pane" data-pane="desc" style="padding:1.2rem 0;">'
+        f'{desc_html}</div>'
+        f'<div class="wb-detail-tabs__pane" data-pane="chars" hidden '
+        f'style="padding:1.2rem 0;">{chars_html}</div>'
+        '<script>(function(){'
+        'if(window.__wbDetailTabs)return;window.__wbDetailTabs=1;'
+        "document.addEventListener('click',function(e){"
+        "var b=e.target.closest&&e.target.closest('.wb-detail-tabs__nav button');"
+        'if(!b)return;var t=b.closest(".wb-detail-tabs");'
+        't.querySelectorAll(".wb-detail-tabs__nav button").forEach(function(x){'
+        'var on=x===b;'
+        'x.style.color=on?"#b49d84":"#777";'
+        'x.style.borderBottom=on?"2px solid #b49d84":"none";'
+        'x.style.marginBottom="-2px";'
+        'x.style.fontWeight=on?"600":"400";});'
+        't.querySelectorAll(".wb-detail-tabs__pane").forEach(function(p){'
+        'p.hidden=p.getAttribute("data-pane")!==b.getAttribute("data-tab");});'
+        '});})();</script>'
+        '</div>')
 
     # Внешняя ссылка на маркетплейс — только второстепенная: основная покупка
     # (корзина/1 клик) происходит на сайте.
@@ -4524,10 +4851,10 @@ def _product_detail_html(product):
             f'Посмотреть на {mp_name} ↗</a></div>')
 
     disabled = stock <= 0
-    buy_style = ('margin-top:.6rem;width:100%;background:#ccc;color:#fff;border:0;padding:.7rem;'
+    buy_style = ('margin-top:.6rem;width:100%;background:#ccc;color:#fff;border:0;padding:.75rem;'
                  'border-radius:6px;cursor:not-allowed;font-weight:600;' if disabled else
-                 'margin-top:.6rem;width:100%;background:#b49d84;color:#fff;border:0;padding:.7rem;'
-                 'border-radius:6px;cursor:pointer;font-weight:600;')
+                 'margin-top:.6rem;width:100%;background:#b49d84;color:#fff;border:0;padding:.75rem;'
+                 'border-radius:6px;cursor:pointer;font-weight:600;text-transform:uppercase;letter-spacing:.4px;')
     order_form = ''
     if not disabled:
         order_form = (
@@ -4542,36 +4869,47 @@ def _product_detail_html(product):
             '<button type="submit" style="width:100%;background:#137333;color:#fff;border:0;padding:.5rem;border-radius:4px;cursor:pointer;font-weight:600;">Оформить заявку</button>'
             '<div class="wb-order-result" style="margin-top:.4rem;font-size:.8rem;"></div></form>')
 
+    section = str(product.get('site_section') or '').strip()
+    section_link = (f'<a href="/catalog/{_esc(section)}/" style="color:#888;text-decoration:none;">'
+                    f'{_esc(section)}</a> / ' if section else '')
+
     return (
-        '<div class="wb-detail" style="max-width:1200px;margin:0 auto;padding:28px 16px 48px;">'
+        '<div class="wb-detail" style="max-width:1408px;margin:0 auto;padding:24px 16px 48px;">'
         '<style>@media (max-width:768px){.wb-detail-grid{grid-template-columns:1fr !important;'
-        'gap:20px !important;}.wb-detail h1{font-size:1.35rem !important;}}</style>'
-        '<div style="font-size:.85rem;color:#888;margin-bottom:18px;">'
+        'gap:24px !important;}.wb-detail h1{font-size:1.3rem !important;}}</style>'
+        '<div style="font-size:.85rem;color:#888;margin-bottom:14px;">'
         '<a href="/" style="color:#888;text-decoration:none;">Главная</a> / '
         '<a href="/catalog/" style="color:#888;text-decoration:none;">Каталог</a> / '
-        f'<span>{_esc(name)}</span></div>'
-        '<div class="wb-detail-grid" style="display:grid;grid-template-columns:minmax(280px,480px) 1fr;gap:36px;align-items:start;">'
-        f'<div>{img_html}</div>'
+        f'{section_link}<span>{_esc(name)}</span></div>'
+        f'<h1 id="pagetitle" style="font-size:1.75rem;line-height:1.3;margin:0 0 24px;font-weight:600;">{_esc(name)}</h1>'
+        '<div class="wb-detail-grid" style="display:grid;grid-template-columns:minmax(280px,520px) 1fr;gap:48px;align-items:start;">'
+        f'<div style="border:1px solid #f0f0f0;border-radius:8px;padding:16px;background:#fff;">{img_html}</div>'
         '<div>'
-        f'<h1 style="font-size:1.6rem;line-height:1.3;margin:0 0 14px;">{_esc(name)}</h1>'
-        f'<div style="font-size:.88rem;color:#777;margin-bottom:14px;">Артикул: {_esc(str(pid))}'
+        '<div style="display:flex;justify-content:flex-end;margin-bottom:4px;">'
+        f'<button type="button" class="wb-like-btn" data-id="{_esc(str(pid))}" data-name="{_esc(name)}" '
+        f'data-price="{final_price}" data-photo="{_esc(str(product.get("photo") or ""))}" '
+        f'data-url="/catalog/{_esc(src)}/{_esc(str(pid))}/" data-source="{_esc(src)}" '
+        'style="background:none;border:0;color:#c00;cursor:pointer;font-size:.85rem;">♡ В избранное</button>'
+        '</div>'
+        f'<div style="font-size:.88rem;color:#777;margin-bottom:20px;">Артикул: {_esc(str(pid))}'
         f'&nbsp;&nbsp;Бренд: {_esc(brand)}&nbsp;&nbsp;{stock_html}</div>'
-        f'<div style="margin:6px 0 20px;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">{price_html}</div>'
-        '<div style="max-width:420px;">'
+        f'{size_chips}'
+        f'<div style="margin:0 0 22px;display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap;">{price_html}</div>'
+        '<div style="max-width:440px;">'
         f'<button type="button" class="wb-cart-btn" data-id="{_esc(str(pid))}" data-source="{_esc(src)}" '
-        'style="width:100%;background:#fff;color:#333;border:1px solid #999;padding:.7rem;border-radius:6px;cursor:pointer;font-weight:600;">🛒 В корзину</button>'
+        'style="width:100%;background:#fff;color:#333;border:1px solid #999;padding:.75rem;border-radius:6px;'
+        'cursor:pointer;font-weight:600;text-transform:uppercase;letter-spacing:.4px;">🛒 В корзину</button>'
         f'<button type="button" class="wb-buy-btn" data-id="{_esc(str(pid))}" data-name="{_esc(name)}" '
         f'data-price="{final_price}" data-stock="{stock}"{(" disabled" if disabled else "")} '
         f'style="{buy_style}">Купить в 1 клик</button>'
         f'{order_form}'
         f'{ext_html}'
-        f'<button type="button" class="wb-like-btn" data-id="{_esc(str(pid))}" data-name="{_esc(name)}" '
-        f'data-price="{final_price}" data-photo="{_esc(str(product.get("photo") or ""))}" '
-        f'data-url="/catalog/{_esc(src)}/{_esc(str(pid))}/" data-source="{_esc(src)}" '
-        'style="margin-top:.6rem;width:100%;background:#fff;color:#c00;border:1px solid #c00;padding:.7rem;'
-        'border-radius:6px;cursor:pointer;font-weight:600;">❤ В избранное</button>'
-        '</div></div></div>'
-        f'{desc_html}'
+        '</div>'
+        '<div style="margin-top:26px;font-size:.88rem;color:#555;line-height:1.6;">'
+        '🚚 Доставка по России — при оформлении заказа<br>'
+        '📦 Самовывоз: г. Череповец, ул. Гоголя 56</div>'
+        '</div></div>'
+        f'{tabs_html}'
         '<div style="margin-top:30px;"><a href="/catalog/" style="color:#b49d84;text-decoration:underline;">← Все товары каталога</a></div>'
         '</div>'
     )

@@ -789,10 +789,11 @@
 
 		<div class="wraps hover_shine" id="content">
 		<div class="middle">
+{% if not is_product_page %}{% include 'section_header.html' %}{% endif %}
+{% if not is_product_page %}{% include 'wb_catalog_block.html' %}{% endif %}
 {{ page.content_html | safe }}
 		</div>
 </div> 					</div>
-		{% include 'wb_catalog_block.html' %}
 {% include 'recommendations_block.html' %}
 <footer id="footer">
 				<!--'start_frame_cache_viewed-block'-->	<!--'end_frame_cache_viewed-block'-->
