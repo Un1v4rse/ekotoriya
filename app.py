@@ -2110,6 +2110,138 @@ LEFTMENU_CSS = (
     '</style>'
 )
 
+# Вёрстка главной страницы каталога (/catalog/): ряд плиток подкатегорий
+# (.catalog_section_list) был full-bleed и на широких экранах «прилипал»
+# к краям, тогда как фильтры, SEO-тексты и товарная сетка лежат в
+# .maxwidth-theme (max-width:1408px, по центру). Ограничиваем тот же ряд
+# тем же контейнером: max-width/margin срабатывают только когда viewport
+# шире 1408px, боковой padding — только на широких экранах, мобильная
+# вёрстка (≤1408px) не затрагивается. Скоуп .main-catalog-wrapper есть
+# только на /catalog/ (у категорийных страниц его нет).
+CATALOG_LAYOUT_CSS = (
+    '<style>'
+    '.catalog_page .main-catalog-wrapper .catalog_section_list{'
+    'max-width:1408px !important;margin-left:auto !important;'
+    'margin-right:auto !important;}'
+    '@media (min-width:1409px){'
+    '.catalog_page .main-catalog-wrapper .catalog_section_list{'
+    'padding-left:16px !important;padding-right:16px !important;}'
+    '}'
+    '</style>'
+)
+
+# Живой перехват «В корзину» (.wb-cart-btn и мёртвые aspro .to-cart) —
+# INLINE в HTML, а не во внешнем wb-actions.js: страницы отдаются без gzip
+# (в отличие от статики) и доходят до клиента целиком, тогда как внешние
+# JS-файлы у части клиентов приходят обрезанными в конце (прокси/DPI портят
+# gzip-поток: обрезанный файл = SyntaxError, весь wb-actions.js молча не
+# выполняется — aspro-кнопка уходила в вечный спиннер, товар не добавлялся,
+# ответа об ошибке нет). wb-actions.js при живом флаге window.__wbCartIntercept
+# свои обработчики корзины не регистрирует (двойного добавления нет).
+# Устойчивость: блокировка повторного клика, AbortController ~10 c с
+# понятным сообщением вместо вечного спиннера, проверка r.ok до r.json(),
+# редирект в /basket/ только при success.
+CART_INTERCEPT_JS = (
+    '<script>(function(){'
+    'if(window.__wbCartIntercept)return;'
+    'window.__wbCartIntercept=true;'
+    'function cardOf(el){return el.closest?el.closest('
+    "'.catalog_item_wrapp,.item_block,.catalog-block__item,.table-view__item,"
+    ".product-main,.product-container,.lk-product'):null;}"
+    'function pidOf(el){'
+    'var c=cardOf(el)||el.parentElement;'
+    "if(!c)return '';"
+    "var own=c.getAttribute('data-id')||c.getAttribute('data-product-id')||'';"
+    "if(own&&/^\\d+$/.test(own))return own;"
+    'var ls=c.querySelectorAll(\'a[href]\'),i,m;'
+    "for(i=0;i<ls.length;i++){m=(ls[i].pathname||'').match(/\\/catalog\\/[a-z]+\\/(\\d+)\\/?$/i);if(m)return m[1];}"
+    "for(i=0;i<ls.length;i++){m=(ls[i].pathname||'').match(/(\\d{6,})\\/?$/);if(m)return m[1];}"
+    "for(i=0;i<ls.length;i++){m=(ls[i].pathname||'').match(/(\\d+)\\/?$/);if(m)return m[1];}"
+    "return '';}"
+    'function nameOf(el){'
+    "var c=cardOf(el);if(!c)return '';"
+    "var sels=['.item-title','.product-title','h1','.lk-product .name'],i,j;"
+    'for(i=0;i<sels.length;i++){'
+    'var ns=c.querySelectorAll(sels[i]);'
+    'for(j=0;j<ns.length;j++){'
+    'var t=ns[j].textContent.trim();'
+    'if(t)return t.slice(0,200);}}'
+    "var dn=c.querySelector('[data-name]');"
+    "if(!dn)return '';"
+    "return (dn.getAttribute('data-name')||dn.textContent.trim()).slice(0,200);}"
+    'function priceOf(el){'
+    'var c=cardOf(el);if(!c)return 0;'
+    "var p=c.querySelector('.cost .price[data-value]:not(.discount)')"
+    "||c.querySelector('.cost .price[data-value]')"
+    "||c.querySelector('[data-value]');"
+    'if(p){var v=parseFloat(p.getAttribute(\'data-value\'));'
+    'if(!isNaN(v))return Math.round(v);}'
+    "var t=c.querySelector('.lk-product .price,.price');"
+    'if(t){var d=parseFloat(t.textContent.replace(/[^\\d.]/g,\'\'));'
+    'if(!isNaN(d))return Math.round(d);}'
+    'return 0;}'
+    'function setCounter(n){'
+    "document.querySelectorAll('a.basket-link.basket .js-count')"
+    '.forEach(function(x){x.textContent=String(n);'
+    "x.classList.toggle('empted',n===0);});}"
+    'function fail(btn,orig,msg){'
+    'btn.textContent=msg;btn.style.color=\'#c00\';'
+    'setTimeout(function(){btn.innerHTML=orig;btn.style.color=\'\';},3000);}'
+    'function add(btn,body,done){'
+    'if(btn.__cartBusy)return;'
+    'btn.__cartBusy=true;'
+    'var orig=btn.innerHTML;'
+    "btn.textContent='Добавляем…';"
+    'var ctrl=new AbortController();'
+    'var timer=setTimeout(function(){ctrl.abort();},10000);'
+    "fetch('/api/cart/add',{method:'POST',"
+    "headers:{'Content-Type':'application/json'},"
+    'body:JSON.stringify(body),signal:ctrl.signal})'
+    '.then(function(r){'
+    'clearTimeout(timer);'
+    "if(!r.ok)throw new Error('HTTP '+r.status);"
+    'return r.json();})'
+    '.then(function(d){'
+    "if(!d.success)throw new Error(d.error||'error');"
+    'done(d);})'
+    '.catch(function(err){'
+    'clearTimeout(timer);'
+    'btn.__cartBusy=false;'
+    "fail(btn,orig,err.name==='AbortError'?"
+    "'Нет ответа сервера, повторите':'Не удалось добавить');"
+    '});}'
+    "document.addEventListener('click',function(e){"
+    "var wb=e.target.closest&&e.target.closest('.wb-cart-btn');"
+    "var tc=e.target.closest&&e.target.closest('.to-cart');"
+    'if(!wb&&!tc)return;'
+    'e.preventDefault();e.stopPropagation();'
+    'if(wb){'
+    "add(wb,{product_id:wb.dataset.id,source:wb.dataset.source||'wb'},"
+    'function(d){'
+    "wb.textContent='✓ В корзине ('+d.count+')';"
+    "setTimeout(function(){location.href='/basket/';},500);});"
+    'return;}'
+    "var bid=tc.getAttribute('data-item');"
+    'var pid=pidOf(tc)||bid;'
+    "if(!pid){fail(tc,tc.innerHTML,'Товар не найден');return;}"
+    "var name='';"
+    "var block=tc.closest('.button_block,.buy_block,.footer_button')||tc.parentElement;"
+    "var ne=block&&block.querySelector('[data-js-item-name]');"
+    "if(ne)name=(ne.getAttribute('data-js-item-name')||'').trim();"
+    "if(!name)name=nameOf(tc);"
+    "var price=parseInt(tc.getAttribute('data-value'),10)||priceOf(tc)||0;"
+    "add(tc,{product_id:pid,source:'aspro',product_name:name,price:price},"
+    'function(d){'
+    'setCounter(d.count);'
+    'document.querySelectorAll(\'.to-cart[data-item="\'+bid+\'"]\')'
+    '.forEach(function(b){b.style.display=\'none\';});'
+    'document.querySelectorAll(\'.in-cart[data-item="\'+bid+\'"]\')'
+    '.forEach(function(a){a.style.display=\'\';});'
+    "setTimeout(function(){location.href='/basket/';},500);});"
+    '},true);'
+    '})();</script>'
+)
+
 
 def _inject_lazyload_fix(html):
     """Инжект полифилла Bitrix-lazyload (static/js/lazyload-fix.js) перед </body>.
@@ -2149,6 +2281,7 @@ def _inject_lazyload_fix(html):
               + _HOVER_CSS + '\n'
               + LIKED_BTN_CSS + '\n'
               + LEFTMENU_CSS + '\n'
+              + CATALOG_LAYOUT_CSS + '\n'
               # Мёртвая пагинация категорий: «Показать ещё» → все товары раздела
               # одним списком, номера страниц → тот же список (?page=N игнорируется
               # в режиме per_page=all).
@@ -2209,6 +2342,7 @@ def _inject_lazyload_fix(html):
               "a.setAttribute('style','display:block;text-align:center;text-decoration:none;color:inherit;');"
               'a.innerHTML=btn.innerHTML;btn.parentNode.replaceChild(a,btn);});'
               '});})();</script>\n'
+              + CART_INTERCEPT_JS + '\n'
               '</body>')
     return html.replace('</body>', inject, 1)
 

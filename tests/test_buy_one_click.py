@@ -192,3 +192,39 @@ def test_category_pagination_fix_uses_category_filter(client):
     html = r.data.decode('utf-8')
     assert 'var B="/catalog/?category=' in html
     assert 'per_page=all' in html
+
+
+# ---------- «В корзину»: инлайн-перехват (CART_INTERCEPT_JS) ----------
+
+def test_cart_intercept_inline_on_all_entry_pages(client):
+    """Перехват кнопок «В корзину» живёт INLINE в HTML (CART_INTERCEPT_JS),
+    а не во внешнем wb-actions.js: у части клиентов внешние JS-файлы
+    приходят обрезанными (прокси/DPI портят gzip-статику) — обрезанный файл
+    это SyntaxError и молча мёртвые кнопки. HTML страницы не gzip'уются.
+    Флаг гарантирует, что wb-actions.js не дублирует обработчики."""
+    _seed_products()
+    # /personal/favorite/ и /personal/ для анонима редиректят на вход.
+    pages = ['/', '/catalog/', '/catalog/namatrasniki/',
+             '/catalog/wb/890129778/', '/basket/']
+    for url in pages:
+        r = client.get(url)
+        assert r.status_code == 200, url
+        body = r.data.decode('utf-8')
+        assert 'window.__wbCartIntercept=true' in body, url
+        # оба типа кнопок + устойчивость (таймаут, r.ok, блокировка повтора)
+        assert "closest('.wb-cart-btn')" in body, url
+        assert "closest('.to-cart')" in body, url
+        assert 'AbortController' in body, url
+        assert "'/api/cart/add'" in body, url
+
+
+def test_wb_actions_js_has_no_cart_handlers():
+    """wb-actions.js больше не обрабатывает корзину (иначе при живом файле
+    запрос уходил бы дважды — инлайн-перехват + файл)."""
+    import os
+    path = os.path.join(os.path.dirname(app_module.__file__),
+                        'static', 'js', 'wb-actions.js')
+    with open(path, encoding='utf-8') as f:
+        js = f.read()
+    assert 'addStaticToCart' not in js
+    assert '/api/cart/add' not in js

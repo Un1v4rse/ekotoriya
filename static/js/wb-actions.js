@@ -1,15 +1,14 @@
-/* Действия карточек товаров: корзина, избранное, «купить в 1 клик».
+/* Действия карточек товаров: избранное и «купить в 1 клик».
  * Обработчики — делегированные (на document), поэтому работают для любых
  * карточек независимо от момента их появления в DOM. Файл может подключаться
  * несколькими шаблонами — глобальный флаг защищает от двойного навешивания.
  *
- * Помимо собственных .wb-* кнопок перехватываются «мёртвые» кнопки клона
- * aspro-шаблона: сердечко .js-item-action[data-action="favorite»,
- * .one_click («Купить в 1 клик») и .to-cart («В корзину»). Их обработчики
- * шлют ajax на несуществующие bitrix-эндпоинты (405 → тост «Ошибка. Error
- * network connection», 404 → вечный спиннер кнопки), поэтому клик
- * перехватывается в capture-фазе — jQuery-делегированные обработчики aspro
- * живут в bubble-фазе на document и до них событие не доходит. */
+ * Перехват «В корзину» (.wb-cart-btn и мёртвые aspro .to-cart) здесь НЕ
+ * живёт: он вынесен INLINE в HTML (инжект app.py, CART_INTERCEPT_JS) — у
+ * части клиентов внешние JS-файлы приходят обрезанными в конце (прокси/DPI
+ * портят gzip-поток), обрезанный файл это SyntaxError, и весь файл молча не
+ * выполняется. HTML-страницы отдаются без gzip и доходят целиком. Флаг
+ * window.__wbCartIntercept выставляет инлайн-скрипт; здесь он не нужен. */
 (function() {
     if (window.__wbActions) return;
     window.__wbActions = true;
@@ -200,18 +199,9 @@
 
         var cartBtn = e.target.closest && e.target.closest('.wb-cart-btn');
         if (cartBtn) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (cartBtn.disabled) return;
-            fetch('/api/cart/add', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({product_id: cartBtn.dataset.id, source: cartBtn.dataset.source || 'wb'})})
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (data.success) {
-                        cartBtn.textContent = '✓ В корзине (' + data.count + ')';
-                        setTimeout(function() { location.href = '/basket/'; }, 500);
-                    }
-                })
-                .catch(function(err) { console.error('cart error', err); });
+            /* Корзина обрабатывается инлайн-перехватом (CART_INTERCEPT_JS
+             * в app.py): внешний файл может прийти обрезанным и не
+             * выполниться, инлайн в HTML отрабатывает всегда. */
             return;
         }
 
@@ -251,55 +241,9 @@
             if (pid2) buyOneClick(pid2, 'wb', staticCardName(oc), staticCardPrice(oc));
             return;
         }
-        /* Мёртвая кнопка «В корзину» aspro-карточек (.to-cart): aspro шлёт
-         * POST /ajax/item.php (эндпоинта нет → 404), кнопка вешается в
-         * спиннер и товар не добавляется — воспринимается как зависание.
-         * Перехватываем: добавляем через /api/cart/add (имя/цена из карточки
-         * уходят в cart_meta для товаров вне каталога) и ведём в корзину. */
-        var toCart = e.target.closest && e.target.closest('.to-cart[data-item]');
-        if (toCart) {
-            e.preventDefault();
-            e.stopPropagation();
-            addStaticToCart(toCart);
-        }
+        /* «В корзину» (.to-cart) — см. CART_INTERCEPT_JS (инлайн в app.py):
+         * перехват там, этот файл может не выполниться у части клиентов. */
     }, true);
-
-    /* Счётчик корзины в шапке (aspro-разметка, a.basket-link.basket). */
-    function setCartCounter(n) {
-        document.querySelectorAll('a.basket-link.basket .js-count').forEach(function(c) {
-            c.textContent = String(n);
-            c.classList.toggle('empted', n === 0);
-        });
-    }
-
-    function addStaticToCart(btn) {
-        var bid = btn.getAttribute('data-item');
-        var pid = staticCardProductId(btn) || bid;
-        if (!pid) return;
-        var name = '';
-        var block = btn.closest('.button_block, .buy_block, .footer_button') || btn.parentElement;
-        var nameEl = block && block.querySelector('[data-js-item-name]');
-        if (nameEl) name = (nameEl.getAttribute('data-js-item-name') || '').trim();
-        if (!name) name = staticCardName(btn);
-        var price = parseInt(btn.getAttribute('data-value'), 10) || staticCardPrice(btn) || 0;
-        fetch('/api/cart/add', {method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({product_id: pid, source: 'aspro',
-                                      product_name: name, price: price})})
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (!data.success) return;
-                setCartCounter(data.count);
-                /* Нативный фидбэк aspro: «В корзину» → «В корзине». */
-                document.querySelectorAll('.to-cart[data-item="' + bid + '"]').forEach(function(b) {
-                    b.style.display = 'none';
-                });
-                document.querySelectorAll('.in-cart[data-item="' + bid + '"]').forEach(function(a) {
-                    a.style.display = '';
-                });
-                setTimeout(function() { location.href = '/basket/'; }, 500);
-            })
-            .catch(function(err) { console.error('cart error', err); });
-    }
 
     /* Инлайн-форма заявки .wb-order-form — прежнее поведение. */
     document.addEventListener('submit', function(e) {

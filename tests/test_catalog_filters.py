@@ -133,3 +133,26 @@ def test_section_leftmenu_collapsed_by_default(client):
     assert '.left_block.is-affixed .sticky-sidebar__inner{position:static' in body
     # JS-инжект: клик по шапке переключает .opened
     assert "classList.toggle('opened')" in body
+
+
+# ---------- вёрстка /catalog/: ряд плиток подкатегорий не full-bleed ----------
+
+
+def test_catalog_tiles_row_centered_layout_css(client):
+    """Ряд плиток подкатегорий (.catalog_section_list) на /catalog/ тянулся
+    во всю ширину экрана и на широких мониторах «прилипал» к краям, тогда
+    как фильтры/SEO-тексты/сетка лежат в .maxwidth-theme (max-width:1408px,
+    по центру). CSS-инжект ограничивает тот же ряд тем же контейнером;
+    боковой padding действует только ≥1409px — мобильная вёрстка не
+    затрагивается. Скоуп .main-catalog_wrapper/.catalog_section_list есть
+    только на /catalog/ (у категорийных страниц его нет)."""
+    r = client.get('/catalog/')
+    assert r.status_code == 200
+    body = r.data.decode('utf-8')
+    assert '.catalog_page .main-catalog-wrapper .catalog_section_list{' in body
+    assert 'max-width:1408px !important' in body
+    assert 'margin-left:auto !important' in body
+    assert 'margin-right:auto !important' in body
+    assert '@media (min-width:1409px)' in body
+    assert 'padding-left:16px !important' in body
+    assert 'padding-right:16px !important' in body
