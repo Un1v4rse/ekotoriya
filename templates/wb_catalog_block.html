@@ -5,7 +5,7 @@
 {% else %}
 {% set grid_items = wb_products %}
 {% endif %}
-{% if grid_items %}
+{% if grid_items or catalog_view is defined %}
 <div class="wb-catalog-wrapper" style="padding: 2rem 0;">
     <div class="maxwidth-theme">
         {% if catalog_view is not defined %}
@@ -18,7 +18,8 @@
         {% endif %}
 
         {% if catalog_view is defined %}
-        <!-- Панель фильтров каталога (CT-1, CT-5) -->
+        <!-- Панель фильтров каталога (CT-1, CT-5). Показывается всегда — даже
+             при пустой выборке, чтобы фильтр не «исчезал» после применения. -->
         <form method="get" action="/catalog/" class="wb-catalog-filters" style="background:#f7f7f7; border:1px solid #e5e5e5; border-radius:10px; padding:1rem; margin-bottom:1.5rem; display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;">
             <div style="flex:1 1 200px;">
                 <label style="font-size:0.8rem; color:#666; display:block; margin-bottom:0.2rem;">Поиск</label>
@@ -30,6 +31,7 @@
                     <option value=""{% if not catalog_view.applied.source %} selected{% endif %}>Все</option>
                     <option value="wb"{% if catalog_view.applied.source == 'wb' %} selected{% endif %}>Wildberries</option>
                     <option value="ozon"{% if catalog_view.applied.source == 'ozon' %} selected{% endif %}>Ozon</option>
+                    <option value="site"{% if catalog_view.applied.source == 'site' %} selected{% endif %}>Сайт</option>
                 </select>
             </div>
             {% if catalog_view.categories %}
@@ -39,6 +41,28 @@
                     <option value=""{% if not catalog_view.applied.category %} selected{% endif %}>Все</option>
                     {% for cat in catalog_view.categories %}
                     <option value="{{ cat }}"{% if catalog_view.applied.category == cat %} selected{% endif %}>{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            {% if catalog_view.sizes %}
+            <div>
+                <label style="font-size:0.8rem; color:#666; display:block; margin-bottom:0.2rem;">Размер</label>
+                <select name="size" style="padding:0.45rem; border:1px solid #ddd; border-radius:6px;">
+                    <option value=""{% if not catalog_view.applied.size %} selected{% endif %}>Все</option>
+                    {% for sz in catalog_view.sizes %}
+                    <option value="{{ sz }}"{% if catalog_view.applied.size == sz %} selected{% endif %}>{{ sz }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            {% if catalog_view.colors %}
+            <div>
+                <label style="font-size:0.8rem; color:#666; display:block; margin-bottom:0.2rem;">Цвет</label>
+                <select name="color" style="padding:0.45rem; border:1px solid #ddd; border-radius:6px;">
+                    <option value=""{% if not catalog_view.applied.color %} selected{% endif %}>Все</option>
+                    {% for col in catalog_view.colors %}
+                    <option value="{{ col }}"{% if catalog_view.applied.color == col %} selected{% endif %}>{{ col }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -69,6 +93,7 @@
         <div style="margin-bottom:1rem; color:#666; font-size:0.9rem;">Найдено товаров: {{ catalog_view.total }}</div>
         {% endif %}
 
+        {% if grid_items %}
         <div class="wb-products-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.5rem;">
             {% for p in grid_items %}
             {% set st = p.get('stock', 10) %}
@@ -127,10 +152,13 @@
             </a>
             {% endfor %}
         </div>
+        {% else %}
+        <div style="padding:2rem 1rem; text-align:center; color:#888;">По выбранным фильтрам ничего не найдено. Попробуйте изменить условия поиска.</div>
+        {% endif %}
 
         {% if catalog_view is defined and catalog_view.pages > 1 %}
         <div class="wb-catalog-pagination" style="margin-top: 1.5rem; display: flex; gap: 0.4rem; justify-content: center; flex-wrap: wrap;">
-            {% set qs = 'q=' ~ (catalog_view.applied.q | urlencode) ~ '&source=' ~ catalog_view.applied.source ~ '&category=' ~ (catalog_view.applied.category | urlencode) ~ '&price_from=' ~ catalog_view.applied.price_from ~ '&price_to=' ~ catalog_view.applied.price_to ~ '&sort=' ~ catalog_view.applied.sort ~ ('&in_stock=1' if catalog_view.applied.in_stock else '') %}
+            {% set qs = 'q=' ~ (catalog_view.applied.q | urlencode) ~ '&source=' ~ catalog_view.applied.source ~ '&category=' ~ (catalog_view.applied.category | urlencode) ~ '&price_from=' ~ catalog_view.applied.price_from ~ '&price_to=' ~ catalog_view.applied.price_to ~ '&sort=' ~ catalog_view.applied.sort ~ '&size=' ~ (catalog_view.applied.size | urlencode) ~ '&color=' ~ (catalog_view.applied.color | urlencode) ~ ('&in_stock=1' if catalog_view.applied.in_stock else '') %}
             {% for pn in range(1, catalog_view.pages + 1) %}
                 {% if pn == catalog_view.page %}
                 <span style="padding: 0.4rem 0.8rem; background: #b49d84; color: #fff; border-radius: 6px; font-weight: 600;">{{ pn }}</span>

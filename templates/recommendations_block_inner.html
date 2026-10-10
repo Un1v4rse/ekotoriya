@@ -3,7 +3,7 @@
 
             {% for item in recommended_products %}
             {% set p = item.product %}
-            <a href="{{ p.url }}" target="_blank" class="wb-product-card" style="display: block; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; background: #fff; text-decoration: none; color: inherit; transition: box-shadow 0.2s;">
+            <a href="/catalog/{{ p.source or 'wb' }}/{{ p.id }}/" class="wb-product-card" style="display: block; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; background: #fff; text-decoration: none; color: inherit; transition: box-shadow 0.2s;">
                 <div style="padding: 1rem; background: #f9f9f9;">
                     <img src="{% if p.photo.startswith('/') %}{{ p.photo }}{% else %}/proxy/image?url={{ p.photo | urlencode }}{% endif %}" alt="{{ p.name }}" style="width: 100%; height: 220px; object-fit: contain; display: block;" loading="lazy">
                 </div>
@@ -26,7 +26,7 @@
                         <span title="Лайков" style="margin-left: 0.5rem;">❤ {{ item.likes }}</span>
                     </div>
                     <div style="margin-top: 0.75rem; font-size: 0.85rem; color: #666;">Артикул: {{ p.id }}</div>
-                    <button type="button" class="wb-like-btn" data-id="{{ p.id }}" data-name="{{ p.name }}" data-price="{{ p.final_price }}" data-photo="{{ p.photo or '' }}" data-url="{{ p.url }}" data-source="{{ p.source or 'wb' }}" style="margin-top: 0.75rem; width: 100%; background: #fff; color: #c00; border: 1px solid #c00; padding: 0.5rem; border-radius: 6px; cursor: pointer; font-weight: 600;">❤ В избранное</button>
+                    <button type="button" class="wb-like-btn" data-id="{{ p.id }}" data-name="{{ p.name }}" data-price="{{ p.final_price }}" data-photo="{{ p.photo or '' }}" data-url="/catalog/{{ p.source or 'wb' }}/{{ p.id }}/" data-source="{{ p.source or 'wb' }}" style="margin-top: 0.75rem; width: 100%; background: #fff; color: #c00; border: 1px solid #c00; padding: 0.5rem; border-radius: 6px; cursor: pointer; font-weight: 600;">❤ В избранное</button>
                     <button type="button" class="wb-cart-btn" data-id="{{ p.id }}" data-source="{{ p.source or 'wb' }}" style="margin-top: 0.5rem; width: 100%; background: #fff; color: #333; border: 1px solid #999; padding: 0.5rem; border-radius: 6px; cursor: pointer; font-weight: 600;">🛒 В корзину</button>
                     <button type="button" class="wb-buy-btn" data-id="{{ p.id }}" data-name="{{ p.name }}" data-price="{{ p.final_price }}" style="margin-top: 0.5rem; width: 100%; background: #b49d84; color: #fff; border: 0; padding: 0.6rem; border-radius: 6px; cursor: pointer; font-weight: 600;">Купить в 1 клик</button>
                     <form class="wb-order-form" data-id="{{ p.id }}" style="display:none; margin-top: 0.75rem; padding: 0.75rem; background: #f9f9f9; border-radius: 6px;">

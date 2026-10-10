@@ -2316,7 +2316,7 @@ def _rewrite_legacy_product_links(html):
     out = html
     for m in reversed(list(_LEGACY_LINK_RE.finditer(html))):
         href = m.group(1)
-        if href.startswith('/catalog/wb/') or href.startswith('/catalog/ozon/'):
+        if re.match(r'^/catalog/(wb|ozon|site)/\d+/?$', href):
             continue
         if href in page_urls:
             continue
@@ -2636,7 +2636,16 @@ def _inject_lazyload_fix(html):
               # Мёртвый bitrix-фильтр категорий (form.smartfilter): «Показать»
               # уходит в ajax-заглушку (?ajax=y) и json_failure — фильтр как будто
               # сбрасывается. Перенаправляем в единый каталог с рабочими
-              # параметрами: цена из полей фильтра, сортировка из sort_btn.
+              # параметрами: цена из полей фильтра, сортировка из sort_btn,
+              # размеры (группы sizes/razmernamatrasnika/razmerpostelnogobelya/
+              # board_height) → size, цвет (radio, группа color) → color.
+              'function sfVals(f,cb){'
+              'var g=cb.closest("[data-prop_code]");if(!g)return null;'
+              'var code=g.getAttribute("data-prop_code");'
+              'var lab=f.querySelector("label[for=\\""+cb.id+"\\"]");'
+              'var t=lab?lab.textContent:"";'
+              't=t.replace(/\\s*\\(\\s*\\d+\\s*\\)\\s*$/,"").trim();'
+              'return t?{code:code,v:t}:null;}'
               'function sfUrl(sort){'
               'var u=new URL(B,location.origin);'
               "var f=document.querySelector('form.smartfilter');"
@@ -2645,6 +2654,15 @@ def _inject_lazyload_fix(html):
               "var mx=f.querySelector('#MAX_SMART_FILTER_P1_MAX');"
               'if(mn&&mn.value)u.searchParams.set(\'price_from\',mn.value.replace(/\\D/g,\'\'));'
               'if(mx&&mx.value)u.searchParams.set(\'price_to\',mx.value.replace(/\\D/g,\'\'));'
+              'var sizes=[],color="";'
+              'f.querySelectorAll("input[type=checkbox]:checked").forEach(function(cb){'
+              'var x=sfVals(f,cb);if(!x)return;'
+              'if(x.code==="color"){color=x.v;}'
+              'else{sizes.push(x.v);}});'
+              'f.querySelectorAll("input[type=radio]:checked").forEach(function(r){'
+              'var x=sfVals(f,r);if(x&&x.code==="color"&&!color)color=x.v;});'
+              'if(sizes.length)u.searchParams.set("size",sizes.join(","));'
+              'if(color)u.searchParams.set("color",color);'
               '}'
               'if(sort)u.searchParams.set(\'sort\',sort);'
               'return u.pathname+u.search;'
@@ -3910,12 +3928,108 @@ def admin_product_update():
     if 'category' in data:
         prod.category = str(data.get('category') or '').strip()[:300]
         changes['category'] = prod.category
+    if 'stock' in data:
+        try:
+            prod.stock = max(0, int(float(data.get('stock') or 0)))
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'stock must be a number'}), 400
+        changes['stock'] = prod.stock
     if 'visible' in data:
         prod.visible = bool(data.get('visible'))
         changes['visible'] = prod.visible
 
     _db.session.commit()
     _audit_log('product.update', 'product', f'{source}:{pid}', changes)
+    invalidate_site_cache()
+    return jsonify({'success': True})
+
+
+@app.route('/admin/api/product-create', methods=['POST'])
+@admin_required
+def admin_product_create():
+    """Создание товара в админке (замечание «свои товары»): товар сайта
+    без привязки к WB/Ozon. Появляется в общем каталоге и получает свою
+    страницу /catalog/site/<id>/. nm_id приравниваем id — чтобы схема
+    url товара и редактирование (product-update по source+nm_id) были
+    единообразными для всех источников.
+    """
+    from db import db as _db
+    from models import Product as _Product
+
+    data = request.get_json() or {}
+    name = str(data.get('name') or '').strip()[:1000]
+    if not name:
+        return jsonify({'success': False, 'error': 'name required'}), 400
+    price = data.get('price', 0)
+    try:
+        price = max(0, min(10**7, int(float(price or 0))))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'price must be a number'}), 400
+    dtype = data.get('discount_type', 'percent')
+    if dtype not in ('percent', 'amount'):
+        return jsonify({'success': False, 'error': 'discount_type must be percent|amount'}), 400
+    try:
+        dval = int(float(data.get('discount_value', 0) or 0))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'discount_value must be a number'}), 400
+    photo = str(data.get('photo') or '').strip()[:2000]
+    if photo and not (photo.startswith(('http://', 'https://', '/static/', '/proxy/', '/upload/'))):
+        return jsonify({'success': False, 'error': 'photo must be an URL or /static/... path'}), 400
+    try:
+        stock = max(0, int(float(data.get('stock', 0) or 0)))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'stock must be a number'}), 400
+
+    desc = re.sub(r'<[^>]+>', '', str(data.get('description') or ''))[:5000].strip()
+    extra = {'description': desc} if desc else None
+
+    prod = _Product(source='site', nm_id=0, name=name,
+                    brand=str(data.get('brand') or 'Экотория')[:300],
+                    category=str(data.get('category') or '').strip()[:300],
+                    price=price, photo=photo,
+                    url=str(data.get('url') or '').strip()[:2000],
+                    stock=stock,
+                    admin_discount_type=dtype,
+                    admin_discount_percent=max(0, min(99, dval)) if dtype == 'percent' else 0,
+                    admin_discount_amount=max(0, dval) if dtype == 'amount' else 0,
+                    extra=extra,
+                    site_section=str(data.get('site_section') or '').strip()[:60],
+                    visible=bool(data.get('visible', True)))
+    _db.session.add(prod)
+    _db.session.flush()
+    prod.nm_id = prod.id  # уникален в рамках source='site'
+    _db.session.commit()
+    _audit_log('product.create', 'product', f'site:{prod.id}',
+               {'name': name, 'price': price})
+    invalidate_site_cache()
+    return jsonify({'success': True, 'product_id': prod.id,
+                    'url': f'/catalog/site/{prod.id}/'})
+
+
+@app.route('/admin/api/product-delete', methods=['POST'])
+@admin_required
+def admin_product_delete():
+    """Удаление товара (в первую очередь созданных вручную, source='site';
+    для WB/Ozon товаров удаление тоже допустимо — при следующей синхронизации
+    они вернутся из API маркетплейса)."""
+    from db import db as _db
+    from models import Product as _Product
+
+    data = request.get_json() or {}
+    source = data.get('source', 'site')
+    if source not in ('site', 'wb', 'ozon'):
+        return jsonify({'success': False, 'error': 'bad source'}), 400
+    pid = data.get('product_id') or data.get('nm_id')
+    if not pid:
+        return jsonify({'success': False, 'error': 'product_id required'}), 400
+    prod = _db.session.query(_Product).filter_by(
+        source=source, nm_id=int(pid)).first()
+    if prod is None:
+        return jsonify({'success': False, 'error': 'Товар не найден'}), 404
+    _audit_log('product.delete', 'product', f'{source}:{pid}',
+               {'name': prod.name})
+    _db.session.delete(prod)
+    _db.session.commit()
     invalidate_site_cache()
     return jsonify({'success': True})
 
@@ -4142,9 +4256,28 @@ def catalog_page():
 
 
 def _filtered_catalog(args):
-    """Фильтрация/сортировка/пагинация каталога (CT-1, CT-5)."""
+    """Фильтрация/сортировка/пагинация каталога (CT-1, CT-5).
+
+    Фильтры: q, source, category, in_stock, price_from/to, sort, size, color.
+    size — размер из имени товара (нормализация x/х/*); значение вида
+    «200x200» ищется подстрокой в нормализованном имени, значение-диапазон
+    («17-20», «Высота борта, см») — по вхождению любого числа имени в
+    диапазон. Несколько значений (повторные/через запятую) — логика ИЛИ.
+    color — подстрока в имени (цвета WB/Ozon живут в названии карточки).
+    """
     import math as _math
+    import re as _re
     products = list(get_products())
+
+    def _arg_list(key):
+        if hasattr(args, 'getlist'):
+            vals = args.getlist(key)
+        else:
+            vals = [args.get(key)] if args.get(key) else []
+        out = []
+        for v in vals:
+            out.extend(str(v or '').split(','))
+        return [v.strip() for v in out if v and v.strip()]
 
     q = (args.get('q') or '').strip().lower()
     if q:
@@ -4153,7 +4286,7 @@ def _filtered_catalog(args):
                     or q in str(p.get('vendor_code') or '').lower()
                     or q in str(p.get('nm_id') or '')]
     source = args.get('source') or ''
-    if source in ('wb', 'ozon'):
+    if source in ('wb', 'ozon', 'site'):
         products = [p for p in products if p.get('source') == source]
     category = args.get('category') or ''
     if category:
@@ -4169,6 +4302,35 @@ def _filtered_catalog(args):
         products = [p for p in products if (p.get('final_price') or 0) >= price_from]
     if price_to:
         products = [p for p in products if (p.get('final_price') or 0) <= price_to]
+
+    def _norm_text(s):
+        s = str(s or '').lower()
+        for ch in ('х', '*', '×', 'х'):
+            s = s.replace(ch, 'x')
+        return s.replace('см', '').replace(' ', '')
+
+    def _size_match(name_norm, wanted):
+        w = _norm_text(wanted)
+        if not w:
+            return False
+        m = _re.fullmatch(r'(\d+)-(\d+)', w)
+        if m:
+            lo, hi = int(m.group(1)), int(m.group(2))
+            nums = [int(n) for n in _re.findall(r'\d+', name_norm)]
+            return any(lo <= n <= hi for n in nums)
+        if any(c.isdigit() for c in w):
+            return w in name_norm
+        # слово без цифр («Полуторный», «Евро») — корень первых 6 букв
+        return w[:6] in name_norm
+
+    sizes = _arg_list('size')
+    if sizes:
+        products = [p for p in products
+                    if any(_size_match(_norm_text(p.get('name')), w) for w in sizes)]
+    colors = [c.lower() for c in _arg_list('color')]
+    if colors:
+        products = [p for p in products
+                    if any(c in (p.get('name') or '').lower() for c in colors)]
 
     sort = args.get('sort') or 'popular'
     if sort == 'price_asc':
@@ -4201,6 +4363,19 @@ def _filtered_catalog(args):
         items = products[(page_num - 1) * per_page: page_num * per_page]
 
     categories = sorted({p.get('category') for p in get_products() if p.get('category')})
+    # Размеры/цвета для выпадающих списков фильтра: парсим из имён товаров
+    # (у WB/Ozon размеры и цвета живут в названии карточки).
+    size_tokens = set()
+    color_tokens = set()
+    for p in get_products():
+        nm = _norm_text(p.get('name'))
+        for m in _re.finditer(r'(\d{2,3}x\d{2,3})', nm):
+            size_tokens.add(m.group(1))
+        for c in re.findall(r'(бел\w+|сер\w+|голуб\w+|син\w+|кремов\w+|розов\w+'
+                            r'|бежев\w+|зелен\w+|зелён\w+|коричнев\w+|черн\w+)', nm):
+            color_tokens.add(c)
+    applied_sizes = sizes
+    applied_colors = _arg_list('color')
     return {
         'products': items,
         'total': total,
@@ -4208,11 +4383,15 @@ def _filtered_catalog(args):
         'pages': pages,
         'per_page': 'all' if args.get('per_page') == 'all' else per_page,
         'categories': categories,
+        'sizes': sorted(size_tokens),
+        'colors': sorted(color_tokens),
         'applied': {
             'q': args.get('q') or '', 'source': source, 'category': category,
             'in_stock': bool(args.get('in_stock')),
             'price_from': args.get('price_from') or '', 'price_to': args.get('price_to') or '',
-            'sort': sort,
+            'sort': sort, 'size': applied_sizes[0] if applied_sizes else '',
+            'size_all': applied_sizes, 'color': applied_colors[0] if applied_colors else '',
+            'color_all': applied_colors,
         },
     }
 
@@ -4233,10 +4412,17 @@ def ozon_product_page(product_id):
     return _product_page('ozon', product_id)
 
 
+@app.route('/catalog/site/<int:product_id>/')
+def site_product_page(product_id):
+    """Карточка товара, созданного в админке (без привязки к WB/Ozon)."""
+    return _product_page('site', product_id)
+
+
 def _product_page(source, nm_id):
-    """Единая карточка товара для обоих источников (CT-2…CT-4, OZ-3)."""
+    """Единая карточка товара для всех источников (CT-2…CT-4, OZ-3)."""
     product = next((p for p in get_products()
-                    if p.get('source') == source and int(p.get('nm_id') or 0) == nm_id), None)
+                    if p.get('source') == source
+                    and int(p.get('nm_id') or p.get('id') or 0) == nm_id), None)
     if not product:
         return 'Товар не найден', 404
     content = load_content()
@@ -4325,6 +4511,18 @@ def _product_detail_html(product):
         desc_html = ('<h2 style="font-size:1.15rem;margin:26px 0 10px;">Описание</h2>'
                      f'<div style="line-height:1.65;color:#333;white-space:pre-line;">{_esc(desc)}</div>')
 
+    # Внешняя ссылка на маркетплейс — только второстепенная: основная покупка
+    # (корзина/1 клик) происходит на сайте.
+    ext_url = str(product.get('url') or '').strip()
+    ext_html = ''
+    if ext_url.startswith(('http://', 'https://')):
+        mp_name = 'Ozon' if src == 'ozon' else 'Wildberries'
+        ext_html = (
+            '<div style="margin-top:14px;font-size:0.85rem;">'
+            f'<a href="{_esc(ext_url)}" target="_blank" rel="noopener" '
+            'style="color:#888;text-decoration:underline;">'
+            f'Посмотреть на {mp_name} ↗</a></div>')
+
     disabled = stock <= 0
     buy_style = ('margin-top:.6rem;width:100%;background:#ccc;color:#fff;border:0;padding:.7rem;'
                  'border-radius:6px;cursor:not-allowed;font-weight:600;' if disabled else
@@ -4346,11 +4544,13 @@ def _product_detail_html(product):
 
     return (
         '<div class="wb-detail" style="max-width:1200px;margin:0 auto;padding:28px 16px 48px;">'
+        '<style>@media (max-width:768px){.wb-detail-grid{grid-template-columns:1fr !important;'
+        'gap:20px !important;}.wb-detail h1{font-size:1.35rem !important;}}</style>'
         '<div style="font-size:.85rem;color:#888;margin-bottom:18px;">'
         '<a href="/" style="color:#888;text-decoration:none;">Главная</a> / '
         '<a href="/catalog/" style="color:#888;text-decoration:none;">Каталог</a> / '
         f'<span>{_esc(name)}</span></div>'
-        '<div style="display:grid;grid-template-columns:minmax(280px,480px) 1fr;gap:36px;align-items:start;">'
+        '<div class="wb-detail-grid" style="display:grid;grid-template-columns:minmax(280px,480px) 1fr;gap:36px;align-items:start;">'
         f'<div>{img_html}</div>'
         '<div>'
         f'<h1 style="font-size:1.6rem;line-height:1.3;margin:0 0 14px;">{_esc(name)}</h1>'
@@ -4364,6 +4564,7 @@ def _product_detail_html(product):
         f'data-price="{final_price}" data-stock="{stock}"{(" disabled" if disabled else "")} '
         f'style="{buy_style}">Купить в 1 клик</button>'
         f'{order_form}'
+        f'{ext_html}'
         f'<button type="button" class="wb-like-btn" data-id="{_esc(str(pid))}" data-name="{_esc(name)}" '
         f'data-price="{final_price}" data-photo="{_esc(str(product.get("photo") or ""))}" '
         f'data-url="/catalog/{_esc(src)}/{_esc(str(pid))}/" data-source="{_esc(src)}" '
