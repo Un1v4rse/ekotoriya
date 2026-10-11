@@ -4049,7 +4049,8 @@ def admin_product_update():
     """Полное редактирование товара (замечание «управление товарами»):
     название, описание, базовая цена, скидка для сайта, фото (URL),
     категория, видимость, бренд, артикул, ссылка, рейтинг, остаток,
-    раздел сайта, характеристики, SEO title/description. Скидка задаётся
+    раздел сайта, характеристики, SEO title/description, галерея изображений,
+    текст бейджа наличия, явные группы вариантов (чипы). Скидка задаётся
     теми же полями admin_discount_*, что и /admin/api/product-discount.
     Поля, которые перезаписывает синхронизация WB (название, бренд, артикул,
     цена, фото, ссылка, остаток, видимость), автоматически закрепляются в
@@ -4171,15 +4172,17 @@ def admin_product_update():
     if 'site_section' in data:
         prod.site_section = str(data.get('site_section') or '').strip()[:60]
         changes['site_section'] = prod.site_section
-    if 'characteristics' in data or 'seo_title' in data or 'seo_description' in data:
-        # характеристики и SEO храним в extra рядом с описанием
+    if 'characteristics' in data or 'seo_title' in data or 'seo_description' in data \
+            or 'gallery' in data or 'stock_label' in data or 'variants' in data:
+        # характеристики, SEO, галерея, бейдж наличия и варианты — в extra
         extra = dict(prod.extra) if isinstance(prod.extra, dict) else {}
         if 'characteristics' in data:
             chars = data.get('characteristics') or {}
             if not isinstance(chars, dict):
                 return jsonify({'success': False, 'error': 'characteristics must be an object'}), 400
             for k in list(extra.keys()):
-                if k not in ('description', 'seo_title', 'seo_description'):
+                if k not in ('description', 'seo_title', 'seo_description',
+                             'gallery', 'stock_label', 'variants'):
                     extra.pop(k)
             for k, v in chars.items():
                 key = str(k).strip()[:200]
@@ -4194,6 +4197,46 @@ def admin_product_update():
                 else:
                     extra.pop(seo_key, None)
                 changes[seo_key] = value[:120]
+        if 'gallery' in data:
+            gallery = data.get('gallery') or []
+            if not isinstance(gallery, list):
+                return jsonify({'success': False, 'error': 'gallery must be a list'}), 400
+            urls = [str(g).strip()[:2000] for g in gallery if str(g or '').strip()]
+            bad = [g for g in urls if not g.startswith(('http://', 'https://', '/static/', '/proxy/', '/upload/'))]
+            if bad:
+                return jsonify({'success': False, 'error': 'gallery items must be URLs or /static/... paths'}), 400
+            if urls:
+                extra['gallery'] = urls
+            else:
+                extra.pop('gallery', None)
+            changes['gallery'] = len(urls)
+        if 'stock_label' in data:
+            # свой текст бейджа наличия; пусто — авто («Много»/«Осталось мало»/…)
+            value = re.sub(r'<[^>]+>', '', str(data.get('stock_label') or '')).strip()[:100]
+            if value:
+                extra['stock_label'] = value
+            else:
+                extra.pop('stock_label', None)
+            changes['stock_label'] = value
+        if 'variants' in data:
+            variants = data.get('variants') or {}
+            if not isinstance(variants, dict):
+                return jsonify({'success': False, 'error': 'variants must be an object'}), 400
+            clean = {}
+            for group, values in variants.items():
+                key = str(group).strip()[:60]
+                if key not in ('colors', 'heights', 'sizes'):
+                    continue  # чипы на карточке строятся только для этих групп
+                if not isinstance(values, list):
+                    return jsonify({'success': False, 'error': 'variants values must be lists'}), 400
+                vals = [str(v).strip()[:100] for v in values if str(v or '').strip()]
+                if vals:
+                    clean[key] = vals
+            if clean:
+                extra['variants'] = clean
+            else:
+                extra.pop('variants', None)
+            changes['variants'] = sorted(clean)
         prod.extra = extra
 
     if pinned:
@@ -4257,6 +4300,32 @@ def admin_product_create():
         value = re.sub(r'<[^>]+>', '', str(data.get(seo_key) or '')).strip()[:500]
         if value:
             extra[seo_key] = value
+    # галерея, бейдж наличия и явные варианты — как в product-update
+    gallery = data.get('gallery') or []
+    if not isinstance(gallery, list):
+        return jsonify({'success': False, 'error': 'gallery must be a list'}), 400
+    urls = [str(g).strip()[:2000] for g in gallery if str(g or '').strip()]
+    bad = [g for g in urls if not g.startswith(('http://', 'https://', '/static/', '/proxy/', '/upload/'))]
+    if bad:
+        return jsonify({'success': False, 'error': 'gallery items must be URLs or /static/... paths'}), 400
+    if urls:
+        extra['gallery'] = urls
+    stock_label = re.sub(r'<[^>]+>', '', str(data.get('stock_label') or '')).strip()[:100]
+    if stock_label:
+        extra['stock_label'] = stock_label
+    variants = data.get('variants') or {}
+    if not isinstance(variants, dict):
+        return jsonify({'success': False, 'error': 'variants must be an object'}), 400
+    clean = {}
+    for group, values in variants.items():
+        key = str(group).strip()[:60]
+        if key not in ('colors', 'heights', 'sizes') or not isinstance(values, list):
+            continue
+        vals = [str(v).strip()[:100] for v in values if str(v or '').strip()]
+        if vals:
+            clean[key] = vals
+    if clean:
+        extra['variants'] = clean
     rating = None
     if data.get('rating') not in (None, ''):
         try:
@@ -4867,11 +4936,17 @@ def _product_page(source, nm_id):
     except Exception:
         pass
 
-    # SEO title/description из шаблонов с переменными {name} {brand} {price}… (SEO-2)
+    # SEO title/description из шаблонов с переменными {name} {brand} {price}… (SEO-2);
+    # явные seo_title/seo_description товара (из админки, extra) имеют приоритет.
     seo = content.get('site', {}).get('seo', {})
     page = dict(get_page_by_slug(content, 'catalog__namatrasniki'))
     page['title'] = _render_meta_template(seo.get('product_title_template'), product, content.get('site', {})) or page.get('title', '')
     page['meta_description'] = _render_meta_template(seo.get('product_description_template'), product, content.get('site', {})) or page.get('meta_description', '')
+    pextra = product.get('extra') if isinstance(product.get('extra'), dict) else {}
+    if pextra.get('seo_title'):
+        page['title'] = str(pextra['seo_title'])
+    if pextra.get('seo_description'):
+        page['meta_description'] = str(pextra['seo_description'])
     # Детальный блок товара вместо статичной ленты раздела: страница товара
     # показывает сам товар (фото, имя, цена, описание, кнопки) — иначе по
     # карточке WB/Ozon отдавалась просто категорийная вёрстка без данных.
@@ -5011,18 +5086,16 @@ def _product_variants(product):
     name = product.get('name')
     key = _stem(name)
     pid = str(product.get('nm_id') or product.get('id') or '')
-    if not key or not _size(name):
-        return {}
     group = []
-    for p in get_products():
-        if p.get('source') != product.get('source'):
-            continue
-        if not _size(p.get('name')) or _stem(p.get('name')) != key:
-            continue
-        group.append(p)
+    if key and _size(name):
+        for p in get_products():
+            if p.get('source') != product.get('source'):
+                continue
+            if not _size(p.get('name')) or _stem(p.get('name')) != key:
+                continue
+            group.append(p)
     ids = {str(p.get('nm_id') or p.get('id') or '') for p in group}
-    if len(group) < 2 or pid not in ids:
-        return {}
+    has_group = len(group) >= 2 and pid in ids
 
     attrs = (_size, _height, _color)
 
@@ -5046,6 +5119,40 @@ def _product_variants(product):
             seen.add(v)
             out.append((v, _pick(attr, v)))
         return out
+
+    # Явный список вариантов из админки (extra['variants'], группы
+    # colors/heights/sizes): чипы показываем именно из него, в заданном
+    # порядке. Ссылку на товар-вариант подставляем из авто-группы, если
+    # нашёлся сосед с таким значением, иначе чип без ссылки.
+    extra = product.get('extra')
+    manual = extra.get('variants') if isinstance(extra, dict) else None
+    if isinstance(manual, dict) and manual:
+        auto = {}
+        if has_group:
+            auto = {'sizes': _unique(_size), 'heights': _unique(_height),
+                    'colors': _unique(_color)}
+        current = {'sizes': _size(name), 'heights': _height(name),
+                   'colors': _color(name)}
+        explicit = {}
+        for grp in ('sizes', 'heights', 'colors'):
+            values = manual.get(grp)
+            if not isinstance(values, list):
+                continue
+            items = []
+            for v in values:
+                v = str(v).strip()
+                if not v:
+                    continue
+                target = next((p for val, p in auto.get(grp, [])
+                               if str(val).lower() == v.lower()), None)
+                items.append((v, target))
+            if items:
+                explicit[grp] = items
+        if explicit:
+            return explicit
+
+    if not has_group:
+        return {}
 
     variants = {}
     sizes = _unique(_size)
@@ -5082,6 +5189,13 @@ def _product_detail_html(product):
     src = product.get('source') or 'wb'
     pid = product.get('nm_id') or product.get('id') or ''
     photo = product.get('photo') or ''
+    # Галерея изображений (extra['gallery'], задаётся в админке): главное —
+    # photo (или первое из галереи, если фото нет), остальные — миниатюры.
+    gallery = product.get('gallery')
+    if not isinstance(gallery, list):
+        gallery = []
+    if not photo and gallery:
+        photo = str(gallery[0])
     if photo and photo.startswith(('http://', 'https://')):
         photo = '/proxy/image?url=' + _uparse.quote(photo, safe='')
     price = int(product.get('price') or 0)
@@ -5136,19 +5250,54 @@ def _product_detail_html(product):
             f'<span style="color:#777;font-size:.95rem;">/шт</span>')
 
     if stock <= 0:
-        stock_label, stock_color = 'Нет в наличии', '#c00'
+        stock_color = '#c00'
     elif stock <= 5:
-        stock_label, stock_color = 'Осталось мало', '#b26a00'
+        stock_color = '#b26a00'
     else:
-        stock_label, stock_color = 'Много', '#2e7d32'
+        stock_color = '#2e7d32'
+    # текст бейджа: свой из админки (extra['stock_label']) или авто по остатку
+    custom_label = str(product.get('stock_label') or '').strip()
+    if custom_label:
+        stock_label = custom_label[:100]
+    elif stock <= 0:
+        stock_label = 'Нет в наличии'
+    elif stock <= 5:
+        stock_label = 'Осталось мало'
+    else:
+        stock_label = 'Много'
     stock_html = (
         f'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;'
         f'background:{stock_color};margin-right:.35rem;"></span>'
-        f'<span style="color:{stock_color};font-weight:600;">{stock_label}</span>')
+        f'<span style="color:{stock_color};font-weight:600;">{_esc(stock_label)}</span>')
 
-    img_html = (f'<img src="{_esc(photo)}" alt="{_esc(name)}" '
-                f'style="width:100%;max-width:460px;object-fit:contain;display:block;margin:0 auto;">'
-                if photo else '')
+    # Галерея: главное фото + миниатюры (клик подменяет главное).
+    images = []
+    if photo:
+        images.append(photo)
+    for g in gallery:
+        g = str(g or '')
+        if not g:
+            continue
+        if g.startswith(('http://', 'https://')):
+            g = '/proxy/image?url=' + _uparse.quote(g, safe='')
+        if g not in images:
+            images.append(g)
+    if images:
+        thumbs = ''
+        if len(images) > 1:
+            thumbs = ('<div style="display:flex;gap:.5rem;flex-wrap:wrap;'
+                      'justify-content:center;margin-top:.7rem;">' + ''.join(
+                f'<img src="{_esc(u)}" alt="" loading="lazy" onclick="var m=document.getElementById(\'wb-main-img\');'
+                'if(m)m.src=this.src;" '
+                'style="width:64px;height:64px;object-fit:contain;border:1px solid #eee;'
+                'border-radius:6px;cursor:pointer;background:#fff;padding:2px;">'
+                for u in images) + '</div>')
+        img_html = (
+            f'<img id="wb-main-img" src="{_esc(images[0])}" alt="{_esc(name)}" '
+            'style="width:100%;max-width:460px;object-fit:contain;display:block;margin:0 auto;">'
+            + thumbs)
+    else:
+        img_html = ''
 
     # Группы вариантов (чипы-ссылки на товары-соседи; активный — заливка темы).
     variants = _product_variants(product)
@@ -5157,12 +5306,18 @@ def _product_detail_html(product):
         chips = []
         for value, p in items:
             label = fmt(value) if fmt else value
-            spid = str(p.get('nm_id') or p.get('id') or '')
-            if value == current:
+            active = str(value).lower() == str(current or '').lower()
+            if active:
                 chips.append(
                     f'<span style="display:inline-block;padding:.4rem .8rem;border:1px solid #b49d84;'
                     f'background:#b49d84;color:#fff;border-radius:4px;font-size:.83rem;">{_esc(label)}</span>')
+            elif p is None:
+                # явный вариант из админки без товара-ссылки — просто чип
+                chips.append(
+                    f'<span style="display:inline-block;padding:.4rem .8rem;border:1px solid #ddd;'
+                    f'color:#333;border-radius:4px;font-size:.83rem;">{_esc(label)}</span>')
             else:
+                spid = str(p.get('nm_id') or p.get('id') or '')
                 chips.append(
                     f'<a href="/catalog/{_esc(src)}/{_esc(spid)}/" '
                     f'style="display:inline-block;padding:.4rem .8rem;border:1px solid #ddd;'
@@ -5170,7 +5325,7 @@ def _product_detail_html(product):
                     f'{_esc(label)}</a>')
         return (
             '<div style="margin:0 0 16px;">'
-            f'<div style="font-size:.82rem;color:#666;margin-bottom:.45rem;">{title}</div>'
+            f'<div style="font-size:.82rem;color:#666;margin-bottom:.45rem;">{_esc(title)}</div>'
             f'<div style="display:flex;flex-wrap:wrap;gap:.4rem;">{"".join(chips)}</div></div>')
 
     chips_html = ''

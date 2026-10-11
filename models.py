@@ -160,8 +160,16 @@ class Product(db.Model):
             for key in ('seo_title', 'seo_description'):
                 if self.extra.get(key):
                     d[key] = self.extra[key]
+            # галерея, бейдж наличия и явные группы вариантов — тоже из extra
+            if isinstance(self.extra.get('gallery'), list):
+                d['gallery'] = [str(g) for g in self.extra['gallery'] if g]
+            if self.extra.get('stock_label'):
+                d['stock_label'] = str(self.extra['stock_label'])
+            if isinstance(self.extra.get('variants'), dict):
+                d['variants'] = self.extra['variants']
             chars = {k: v for k, v in self.extra.items()
-                     if k not in ('description', 'seo_title', 'seo_description')}
+                     if k not in ('description', 'seo_title', 'seo_description',
+                                  'gallery', 'stock_label', 'variants')}
             if chars:
                 d['characteristics'] = chars
         if self.manual_overrides:

@@ -168,7 +168,8 @@
         /* Товары WB */
         .prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(225px, 1fr)); gap: 1rem; margin-top: 1rem; }
         .prod-card { border: 1px solid var(--border); border-radius: 9px; padding: 0.9rem; background: #fff;
-                     display: flex; flex-direction: column; }
+                     display: flex; flex-direction: column; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+        .prod-card:hover { border-color: var(--accent); box-shadow: 0 2px 10px rgba(0,0,0,.08); }
         .prod-card .pimg { width: 100%; height: 150px; object-fit: contain; background: #f8f8f8; border-radius: 6px;
                            margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: center; }
         .prod-card .pimg img { max-width: 100%; max-height: 100%; object-fit: contain; }
@@ -177,15 +178,7 @@
         .prod-card .pprice { margin-bottom: 0.4rem; }
         .prod-card .old { text-decoration: line-through; color: #999; font-size: 0.83rem; }
         .prod-card .new { font-weight: 700; color: var(--danger); margin-left: 0.4rem; }
-        .prod-card .disc-row { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: auto; padding-top: 0.5rem; }
-        .prod-card .disc-row input { flex: 1 1 55%; min-width: 3.5rem; padding: 0.45rem 0.5rem; font-size: 0.95rem; font-weight: 600; text-align: center; }
-        .prod-card .disc-row select { flex: 1 1 25%; min-width: 2.6rem; padding: 0.45rem 0.3rem; font-size: 0.88rem; }
-        .prod-card .disc-row button { flex: 1 1 100%; padding: 0.45rem 0.85rem; font-size: 0.85rem; white-space: nowrap; }
         .prod-card .field-label { font-size: 0.75rem; color: #888; margin-bottom: 0.25rem; }
-        .prod-card .sect-row { margin-top: 0.45rem; }
-        .prod-card .sect-row select { width: 100%; padding: 0.4rem 0.45rem; font-size: 0.85rem; }
-        .prod-card .edit-row { margin-top: 0.45rem; }
-        .prod-card .edit-row button { width: 100%; padding: 0.45rem 0.85rem; font-size: 0.85rem; }
 
         /* Модалка редактирования товара */
         #product-edit-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 900;
@@ -1665,12 +1658,11 @@
         }
 
         function productCard(p) {
-            const discType = p.admin_discount_type === 'amount' ? 'amount' : 'percent';
-            const discVal = discType === 'amount' ? (p.admin_discount_amount || 0) : (p.admin_discount_percent || 0);
             const hidden = p.visible === false;
             const card = document.createElement('div');
             card.className = 'prod-card';
             if (hidden) card.style.opacity = '0.55';
+            card.title = 'Нажмите, чтобы отредактировать товар';
             card.innerHTML = `
                 <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.8rem;margin-bottom:0.3rem;">
                     <input type="checkbox" class="wb-select" data-source="${p.source}" data-id="${p.nm_id}"> выбрать
@@ -1678,34 +1670,12 @@
                 <div class="pimg">${p.photo ? `<img src="${p.photo}" alt="" loading="lazy">` : '<span class="no-photo">нет фото</span>'}</div>
                 <div class="pname">${escapeHtml(p.name)}</div>
                 <div class="pprice"><span class="old">${p.price} ₽</span><span class="new">${p.final_price} ₽</span></div>
-                ${hidden ? '<div class="help" style="color:var(--danger);margin-bottom:0.3rem;">скрыт с сайта</div>' : ''}
-                <div class="field-label">Скидка для сайта (${discType === 'amount' ? 'руб' : '%'}):</div>
-                <div class="disc-row">
-                    <input type="number" min="0" max="99" value="${discVal}" class="disc-input" title="Скидка для сайта" placeholder="0">
-                    <select class="disc-type" title="Тип скидки: проценты или рубли">
-                        <option value="percent" ${discType === 'percent' ? 'selected' : ''}>%</option>
-                        <option value="amount" ${discType === 'amount' ? 'selected' : ''}>₽</option>
-                    </select>
-                    <button type="button" class="secondary">Применить</button>
-                </div>
-                <div class="sect-row">
-                    <select class="sect-select" title="Раздел сайта, где показывается товар">
-                        ${siteSectionsOptions(p.site_section)}
-                    </select>
-                </div>
-                <div class="edit-row">
-                    <button type="button" class="secondary">✏️ Редактировать</button>
-                </div>`;
-            card.querySelector('.edit-row button').addEventListener('click', () => {
+                ${hidden ? '<div class="help" style="color:var(--danger);margin-bottom:0.3rem;">скрыт с сайта</div>' : ''}`;
+            // вся карточка открывает редактор; клик по чекбоксу выделения —
+            // по-прежнему только отмечает товар (label перехватывает клик)
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('label, input, select, button, a')) return;
                 openProductEditor(p);
-            });
-            card.querySelector('.disc-row button').addEventListener('click', () => {
-                setProductDiscount(p.source, p.nm_id,
-                    parseInt(card.querySelector('.disc-input').value || 0, 10),
-                    card.querySelector('.disc-type').value);
-            });
-            card.querySelector('.sect-select').addEventListener('change', (e) => {
-                setProductSection(p.source, p.nm_id, e.target.value);
             });
             return card;
         }
@@ -1730,19 +1700,6 @@
             container.appendChild(grid);
         }
 
-        async function setProductDiscount(source, productId, value, discountType) {
-            try {
-                const resp = await fetch(`${location.origin}/admin/api/product-discount`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
-                    body: JSON.stringify({source, product_id: productId, discount_type: discountType, value})
-                });
-                const result = await resp.json();
-                showMsg(result.success ? 'Скидка сохранена' : 'Ошибка: ' + (result.error || ''), result.success);
-                if (result.success) await reloadProducts();
-            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
-        }
-
         let siteSections = [];
 
         function siteSectionsOptions(current) {
@@ -1759,19 +1716,6 @@
                 const result = await resp.json();
                 if (result.success) siteSections = result.sections || [];
             } catch (e) { siteSections = []; }
-        }
-
-        async function setProductSection(source, productId, section) {
-            try {
-                const resp = await fetch(`${location.origin}/admin/api/product-section`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
-                    body: JSON.stringify({source, product_id: productId, section})
-                });
-                const result = await resp.json();
-                showMsg(result.success ? 'Раздел сохранён' : 'Ошибка: ' + (result.error || ''), result.success);
-                if (result.success) await reloadProducts();
-            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
         }
 
         async function applySelectedSection() {
@@ -2935,6 +2879,15 @@
                 .map(([k, v]) => k + ': ' + v).join('\n');
             $('pe-seo-title').value = p ? (p.seo_title || '') : '';
             $('pe-seo-description').value = p ? (p.seo_description || '') : '';
+            // галерея, текст наличия и явные группы вариантов (чипы)
+            $('pe-gallery').value = (p && p.gallery || []).join('\n');
+            $('pe-stock-label').value = p ? (p.stock_label || '') : '';
+            const PE_GROUP_TITLES = {colors: 'Цвет', heights: 'Высота борта', sizes: 'Размер'};
+            const variants = p && p.variants ? p.variants : {};
+            $('pe-variants').value = Object.keys(PE_GROUP_TITLES)
+                .filter(g => Array.isArray(variants[g]) && variants[g].length)
+                .map(g => PE_GROUP_TITLES[g] + ': ' + variants[g].join(', '))
+                .join('\n');
             renderPePins(p);
             $('pe-msg').textContent = '';
             $('pe-save').textContent = create ? 'Создать товар' : 'Сохранить товар';
@@ -3010,6 +2963,18 @@
                     if (key) characteristics[key] = line.slice(idx + 1).trim();
                 }
             });
+            // варианты: строки «Группа: зн1, зн2» -> {colors|heights|sizes: [...]}
+            const variants = {};
+            $('pe-variants').value.split('\n').forEach(line => {
+                const idx = line.indexOf(':');
+                if (idx <= 0) return;
+                const title = line.slice(0, idx).trim().toLowerCase();
+                const values = line.slice(idx + 1).split(',').map(v => v.trim()).filter(Boolean);
+                if (!values.length) return;
+                if (title.startsWith('цвет')) variants.colors = values;
+                else if (title.startsWith('высот')) variants.heights = values;
+                else if (title.startsWith('размер')) variants.sizes = values;
+            });
             const body = {
                 source: $('pe-source').value,
                 name: $('pe-name').value,
@@ -3029,6 +2994,9 @@
                 characteristics: characteristics,
                 seo_title: $('pe-seo-title').value.trim(),
                 seo_description: $('pe-seo-description').value.trim(),
+                gallery: $('pe-gallery').value.split('\n').map(s => s.trim()).filter(Boolean),
+                stock_label: $('pe-stock-label').value.trim(),
+                variants: variants,
             };
             if (!create) body.product_id = $('pe-id').value;
             body.site_section = $('pe-section').value;
@@ -3156,13 +3124,25 @@
                 </div>
             </div>
             <div class="pe-field">
-                <label for="pe-photo">Фото (URL или загрузите файл)</label>
+                <label for="pe-photo">Фото (URL или загрузите файл) — главное изображение</label>
                 <input type="text" id="pe-photo" placeholder="https://… или /static/uploads/…">
                 <div style="display:flex;gap:0.5rem;margin-top:0.35rem;align-items:center;">
                     <input type="file" id="pe-photo-file" accept="image/*" style="font-size:0.82rem;">
                     <button type="button" class="secondary" onclick="uploadProductPhoto()">Загрузить</button>
                 </div>
                 <img class="pe-photo-preview" id="pe-photo-preview" alt="" style="display:none;">
+            </div>
+            <div class="pe-field">
+                <label for="pe-gallery">Галерея (дополнительные изображения, URL с новой строки)</label>
+                <textarea id="pe-gallery" style="min-height:64px;" placeholder="https://…"></textarea>
+            </div>
+            <div class="pe-field">
+                <label for="pe-stock-label">Текст наличия (пусто — автоматически: «Много»/«Осталось мало»/«Нет в наличии»)</label>
+                <input type="text" id="pe-stock-label" placeholder="Например: Осталось 3 шт.">
+            </div>
+            <div class="pe-field">
+                <label for="pe-variants">Группы вариантов — чипы на странице товара (каждая группа с новой строки: «Цвет: белый, серый»)</label>
+                <textarea id="pe-variants" style="min-height:64px;" placeholder="Цвет: белый, серый&#10;Размер: 90x200, 120x200"></textarea>
             </div>
             <div class="row2">
                 <div class="pe-field">
