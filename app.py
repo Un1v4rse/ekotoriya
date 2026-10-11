@@ -121,6 +121,13 @@ try:
 except Exception as _migrate_err:
     print(f'[migrate_cycle4] пропущено: {_migrate_err}')
 
+# Миграция «цикл 5»: products.manual_overrides — поля, закреплённые от перезаписи синком.
+try:
+    import migrate_cycle5
+    migrate_cycle5.migrate(app)
+except Exception as _migrate_err:
+    print(f'[migrate_cycle5] пропущено: {_migrate_err}')
+
 # Кэширование (AR-3): SimpleCache по умолчанию, тип — через env CACHE_TYPE.
 from flask_caching import Cache
 cache = Cache(app, config={
@@ -4041,8 +4048,13 @@ def _set_product_discount(source, product_id, discount_type, value):
 def admin_product_update():
     """Полное редактирование товара (замечание «управление товарами»):
     название, описание, базовая цена, скидка для сайта, фото (URL),
-    категория, видимость. Скидка задаётся теми же полями admin_discount_*,
-    что и /admin/api/product-discount. Изменения сразу видны на сайте —
+    категория, видимость, бренд, артикул, ссылка, рейтинг, остаток,
+    раздел сайта, характеристики, SEO title/description. Скидка задаётся
+    теми же полями admin_discount_*, что и /admin/api/product-discount.
+    Поля, которые перезаписывает синхронизация WB (название, бренд, артикул,
+    цена, фото, ссылка, остаток, видимость), автоматически закрепляются в
+    manual_overrides — синк их больше не трёт (снять закрепление:
+    /admin/api/product-unpin). Изменения сразу видны на сайте —
     invalidate_site_cache() сбрасывает кэш каталога и страниц.
     """
     from db import db as _db
@@ -4059,8 +4071,18 @@ def admin_product_update():
         return jsonify({'success': False, 'error': 'Товар не найден'}), 404
 
     changes = {}
+    pinned = set()
+
+    def _pin_if_changed(field, old, new):
+        # закрепляем только реально изменённые поля: форма шлёт все поля
+        # на каждое сохранение, иначе любое правило закрепило бы всё сразу
+        if old != new:
+            pinned.add(field)
+
     if 'name' in data:
-        prod.name = str(data.get('name') or '').strip()[:1000]
+        new_val = str(data.get('name') or '').strip()[:1000]
+        _pin_if_changed('name', prod.name or '', new_val)
+        prod.name = new_val
         changes['name'] = prod.name
     if 'description' in data:
         # описание храним plaintext (без HTML) — в extra['description']
@@ -4074,9 +4096,11 @@ def admin_product_update():
         changes['description'] = desc.strip()
     if 'price' in data:
         try:
-            prod.price = max(0, min(10**7, int(float(data.get('price') or 0))))
+            new_val = max(0, min(10**7, int(float(data.get('price') or 0))))
         except (TypeError, ValueError):
             return jsonify({'success': False, 'error': 'price must be a number'}), 400
+        _pin_if_changed('price', prod.price or 0, new_val)
+        prod.price = new_val
         changes['price'] = prod.price
     if 'discount_type' in data or 'discount_value' in data:
         dtype = data.get('discount_type', prod.admin_discount_type or 'percent')
@@ -4097,6 +4121,7 @@ def admin_product_update():
         photo = str(data.get('photo') or '').strip()[:2000]
         if photo and not (photo.startswith(('http://', 'https://', '/static/', '/proxy/', '/upload/'))):
             return jsonify({'success': False, 'error': 'photo must be an URL or /static/... path'}), 400
+        _pin_if_changed('photo', prod.photo or '', photo)
         prod.photo = photo
         changes['photo'] = photo[:120]
     if 'category' in data:
@@ -4104,18 +4129,82 @@ def admin_product_update():
         changes['category'] = prod.category
     if 'stock' in data:
         try:
-            prod.stock = max(0, int(float(data.get('stock') or 0)))
+            new_val = max(0, int(float(data.get('stock') or 0)))
         except (TypeError, ValueError):
             return jsonify({'success': False, 'error': 'stock must be a number'}), 400
+        _pin_if_changed('stock', prod.stock or 0, new_val)
+        prod.stock = new_val
         changes['stock'] = prod.stock
     if 'visible' in data:
-        prod.visible = bool(data.get('visible'))
+        new_val = bool(data.get('visible'))
+        _pin_if_changed('visible', bool(prod.visible), new_val)
+        prod.visible = new_val
         changes['visible'] = prod.visible
+    if 'brand' in data:
+        new_val = str(data.get('brand') or '').strip()[:300]
+        _pin_if_changed('brand', prod.brand or '', new_val)
+        prod.brand = new_val
+        changes['brand'] = prod.brand
+    if 'vendor_code' in data:
+        new_val = str(data.get('vendor_code') or '').strip()[:300]
+        _pin_if_changed('vendor_code', prod.vendor_code or '', new_val)
+        prod.vendor_code = new_val
+        changes['vendor_code'] = prod.vendor_code
+    if 'url' in data:
+        new_val = str(data.get('url') or '').strip()[:2000]
+        _pin_if_changed('url', prod.url or '', new_val)
+        prod.url = new_val
+        changes['url'] = prod.url[:120]
+    if 'rating' in data:
+        try:
+            rating = data.get('rating')
+            prod.rating = None if rating in (None, '') else max(0.0, min(5.0, float(rating)))
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'rating must be a number'}), 400
+        changes['rating'] = prod.rating
+    if 'review_count' in data:
+        try:
+            prod.review_count = max(0, int(float(data.get('review_count') or 0)))
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'review_count must be a number'}), 400
+        changes['review_count'] = prod.review_count
+    if 'site_section' in data:
+        prod.site_section = str(data.get('site_section') or '').strip()[:60]
+        changes['site_section'] = prod.site_section
+    if 'characteristics' in data or 'seo_title' in data or 'seo_description' in data:
+        # характеристики и SEO храним в extra рядом с описанием
+        extra = dict(prod.extra) if isinstance(prod.extra, dict) else {}
+        if 'characteristics' in data:
+            chars = data.get('characteristics') or {}
+            if not isinstance(chars, dict):
+                return jsonify({'success': False, 'error': 'characteristics must be an object'}), 400
+            for k in list(extra.keys()):
+                if k not in ('description', 'seo_title', 'seo_description'):
+                    extra.pop(k)
+            for k, v in chars.items():
+                key = str(k).strip()[:200]
+                if key:
+                    extra[key] = str(v)[:2000]
+            changes['characteristics'] = len(chars)
+        for seo_key in ('seo_title', 'seo_description'):
+            if seo_key in data:
+                value = re.sub(r'<[^>]+>', '', str(data.get(seo_key) or '')).strip()[:500]
+                if value:
+                    extra[seo_key] = value
+                else:
+                    extra.pop(seo_key, None)
+                changes[seo_key] = value[:120]
+        prod.extra = extra
+
+    if pinned:
+        current = set(prod.manual_overrides or []) if isinstance(prod.manual_overrides, list) else set()
+        prod.manual_overrides = sorted(current | pinned)
 
     _db.session.commit()
     _audit_log('product.update', 'product', f'{source}:{pid}', changes)
     invalidate_site_cache()
-    return jsonify({'success': True})
+    return jsonify({'success': True,
+                    'manual_overrides': prod.manual_overrides or []})
 
 
 @app.route('/admin/api/product-create', methods=['POST'])
@@ -4155,18 +4244,41 @@ def admin_product_create():
         return jsonify({'success': False, 'error': 'stock must be a number'}), 400
 
     desc = re.sub(r'<[^>]+>', '', str(data.get('description') or ''))[:5000].strip()
-    extra = {'description': desc} if desc else None
+    extra = {'description': desc} if desc else {}
+    # характеристики (ключ-значение) и SEO — в extra рядом с описанием
+    chars = data.get('characteristics') or {}
+    if not isinstance(chars, dict):
+        return jsonify({'success': False, 'error': 'characteristics must be an object'}), 400
+    for k, v in chars.items():
+        key = str(k).strip()[:200]
+        if key:
+            extra[key] = str(v)[:2000]
+    for seo_key in ('seo_title', 'seo_description'):
+        value = re.sub(r'<[^>]+>', '', str(data.get(seo_key) or '')).strip()[:500]
+        if value:
+            extra[seo_key] = value
+    rating = None
+    if data.get('rating') not in (None, ''):
+        try:
+            rating = max(0.0, min(5.0, float(data.get('rating'))))
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'rating must be a number'}), 400
+    try:
+        review_count = max(0, int(float(data.get('review_count', 0) or 0)))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'review_count must be a number'}), 400
 
     prod = _Product(source='site', nm_id=0, name=name,
                     brand=str(data.get('brand') or 'Экотория')[:300],
+                    vendor_code=str(data.get('vendor_code') or '').strip()[:300],
                     category=str(data.get('category') or '').strip()[:300],
                     price=price, photo=photo,
                     url=str(data.get('url') or '').strip()[:2000],
-                    stock=stock,
+                    stock=stock, rating=rating, review_count=review_count,
                     admin_discount_type=dtype,
                     admin_discount_percent=max(0, min(99, dval)) if dtype == 'percent' else 0,
                     admin_discount_amount=max(0, dval) if dtype == 'amount' else 0,
-                    extra=extra,
+                    extra=extra or None,
                     site_section=str(data.get('site_section') or '').strip()[:60],
                     visible=bool(data.get('visible', True)))
     _db.session.add(prod)
@@ -4206,6 +4318,37 @@ def admin_product_delete():
     _db.session.commit()
     invalidate_site_cache()
     return jsonify({'success': True})
+
+
+@app.route('/admin/api/product-unpin', methods=['POST'])
+@admin_required
+def admin_product_unpin():
+    """Снять закрепление полей товара: без fields снимается всё.
+    После снятия следующая синхронизация WB снова обновит эти поля."""
+    from db import db as _db
+    from models import Product as _Product
+
+    data = request.get_json() or {}
+    source = data.get('source', 'wb')
+    pid = data.get('product_id') or data.get('nm_id')
+    if not pid:
+        return jsonify({'success': False, 'error': 'product_id required'}), 400
+    prod = _db.session.query(_Product).filter_by(
+        source=source, nm_id=int(pid)).first()
+    if prod is None:
+        return jsonify({'success': False, 'error': 'Товар не найден'}), 404
+    current = list(prod.manual_overrides or []) if isinstance(prod.manual_overrides, list) else []
+    fields = data.get('fields')
+    if fields:
+        remove = {str(f) for f in fields}
+        prod.manual_overrides = [f for f in current if f not in remove] or None
+    else:
+        prod.manual_overrides = None
+    _db.session.commit()
+    _audit_log('product.unpin', 'product', f'{source}:{pid}',
+               {'fields': fields or 'all'})
+    invalidate_site_cache()
+    return jsonify({'success': True, 'manual_overrides': prod.manual_overrides or []})
 
 
 @app.route('/admin/api/wb-discount-bulk', methods=['POST'])

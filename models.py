@@ -118,6 +118,8 @@ class Product(db.Model):
     review_count = db.Column(db.Integer, default=0)
     extra = db.Column(db.JSON, nullable=True)               # характеристики из API (CT-2)
     site_section = db.Column(db.String(60), default='', index=True)  # раздел сайта (п.2 цикла 3): '' = везде
+    # поля, вручную изменённые в админке: синхронизации WB/Ozon их не перезаписывают
+    manual_overrides = db.Column(db.JSON, nullable=True)
     created_at = db.Column(db.DateTime, default=utcnow)
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
 
@@ -154,6 +156,16 @@ class Product(db.Model):
             d['review_count'] = self.review_count
         if isinstance(self.extra, dict):
             d['extra'] = self.extra
+            # служебные ключи extra (не характеристики) отдаём отдельными полями
+            for key in ('seo_title', 'seo_description'):
+                if self.extra.get(key):
+                    d[key] = self.extra[key]
+            chars = {k: v for k, v in self.extra.items()
+                     if k not in ('description', 'seo_title', 'seo_description')}
+            if chars:
+                d['characteristics'] = chars
+        if self.manual_overrides:
+            d['manual_overrides'] = list(self.manual_overrides)
         return d
 
 

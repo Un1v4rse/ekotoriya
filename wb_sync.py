@@ -308,7 +308,12 @@ def _db_products_by_nm():
 
 
 def _persist_products(items, demo):
-    """Сохранить товары WB: в БД (основное хранилище, AR-1) и в JSON-фолбэк."""
+    """Сохранить товары WB: в БД (основное хранилище, AR-1) и в JSON-фолбэк.
+
+    Поля, закреплённые вручную (products.manual_overrides — см. админ-API
+    product-update/product-unpin), из данных WB не перезаписываются: админ
+    правил их сам, и синк не должен затирать его правки.
+    """
     from db import db
     from models import Product
     import export_filter
@@ -321,16 +326,28 @@ def _persist_products(items, demo):
             if prod is None:
                 prod = Product(source='wb', nm_id=nm)
                 db.session.add(prod)
-            prod.name = item.get('name', '')
-            prod.brand = item.get('brand', '')
-            prod.vendor_code = item.get('vendor_code', '')
-            prod.price = item.get('price', 0) or 0
+                overridden = set()
+            else:
+                overridden = set(prod.manual_overrides or []) if isinstance(
+                    prod.manual_overrides, list) else set()
+            if 'name' not in overridden:
+                prod.name = item.get('name', '')
+            if 'brand' not in overridden:
+                prod.brand = item.get('brand', '')
+            if 'vendor_code' not in overridden:
+                prod.vendor_code = item.get('vendor_code', '')
+            if 'price' not in overridden:
+                prod.price = item.get('price', 0) or 0
             prod.discount_price = item.get('discount_price', 0) or 0
             prod.mp_discount_percent = item.get('wb_discount_percent', 0) or 0
-            prod.photo = item.get('photo', '')
-            prod.url = item.get('url', '')
-            prod.stock = item.get('stock', 0) or 0
-            prod.visible = bool(item.get('visible', True))
+            if 'photo' not in overridden:
+                prod.photo = item.get('photo', '')
+            if 'url' not in overridden:
+                prod.url = item.get('url', '')
+            if 'stock' not in overridden:
+                prod.stock = item.get('stock', 0) or 0
+            if 'visible' not in overridden:
+                prod.visible = bool(item.get('visible', True))
         db.session.commit()
     save_json(PRODUCTS_FILE, {'products': items, 'demo': demo})
 

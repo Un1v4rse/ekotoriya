@@ -208,6 +208,14 @@
         #product-edit-modal .pe-actions button { flex: 1; padding: 0.6rem; font-size: 0.95rem; }
         #product-edit-modal .pe-visibility { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; margin-bottom: 0.7rem; }
 
+        /* Бейджи закреплённых полей (ручные правки, синк WB не перезаписывает) */
+        #product-edit-modal .pe-pins { margin-bottom: 0.7rem; }
+        #product-edit-modal .pe-pin { display: inline-flex; align-items: center; gap: 0.35rem; background: #fff7e6;
+            border: 1px solid #ffd591; border-radius: 6px; padding: 0.2rem 0.5rem; font-size: 0.78rem;
+            color: #ad6800; margin: 0 0.35rem 0.35rem 0; }
+        #product-edit-modal .pe-pin button { border: none; background: none; color: #ad6800; cursor: pointer;
+            font-size: 0.78rem; text-decoration: underline; padding: 0; }
+
         table.adm { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
         table.adm th { background: #f4f4f8; padding: 0.45rem 0.6rem; border: 1px solid var(--border); text-align: left; }
         table.adm td { padding: 0.45rem 0.6rem; border: 1px solid var(--border); }
@@ -2916,9 +2924,75 @@
             $('pe-visible').checked = p ? p.visible !== false : true;
             $('pe-section').innerHTML = siteSectionsOptions(p ? (p.site_section || '') : '');
             $('pe-stock').value = p ? (p.stock || 0) : '';
+            // полный набор полей: бренд, артикул, ссылка, рейтинг, характеристики, SEO
+            $('pe-brand').value = p ? (p.brand || '') : '';
+            $('pe-vendor-code').value = p ? (p.vendor_code || '') : '';
+            $('pe-url').value = p ? (p.url || '') : '';
+            $('pe-rating').value = p && p.rating != null ? p.rating : '';
+            $('pe-review-count').value = p ? (p.review_count || 0) : '';
+            const chars = p && p.characteristics ? p.characteristics : {};
+            $('pe-characteristics').value = Object.entries(chars)
+                .map(([k, v]) => k + ': ' + v).join('\n');
+            $('pe-seo-title').value = p ? (p.seo_title || '') : '';
+            $('pe-seo-description').value = p ? (p.seo_description || '') : '';
+            renderPePins(p);
             $('pe-msg').textContent = '';
             $('pe-save').textContent = create ? 'Создать товар' : 'Сохранить товар';
             ov.classList.add('open');
+        }
+
+        // русские подписи полей для бейджей закрепления
+        const PE_PIN_LABELS = {
+            name: 'название', brand: 'бренд', vendor_code: 'артикул',
+            price: 'цена', photo: 'фото', url: 'ссылка', stock: 'остаток',
+            visible: 'видимость',
+        };
+
+        function renderPePins(p) {
+            const box = $('pe-pins');
+            const pins = (p && p.manual_overrides) || [];
+            box.innerHTML = '';
+            if (!pins.length) return;
+            pins.forEach(field => {
+                const badge = document.createElement('span');
+                badge.className = 'pe-pin';
+                const label = PE_PIN_LABELS[field] || field;
+                badge.textContent = '«' + label + '» закреплено, WB не перезаписывает ';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = 'снять';
+                btn.onclick = () => unpinProductField(field);
+                badge.appendChild(btn);
+                box.appendChild(badge);
+            });
+        }
+
+        async function unpinProductField(field) {
+            const body = {
+                source: $('pe-source').value,
+                product_id: $('pe-id').value,
+                fields: [field],
+            };
+            $('pe-msg').textContent = 'Снимаем закрепление…';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/product-unpin`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify(body)
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    $('pe-msg').textContent = 'Закрепление снято: после следующей синхронизации поле обновится из WB.';
+                    const p = productsOf(body.source).find(x => String(x.nm_id || x.id) === String(body.product_id));
+                    if (p) p.manual_overrides = result.manual_overrides || [];
+                    renderPePins(p);
+                    reloadProducts();
+                } else {
+                    $('pe-msg').textContent = 'Ошибка: ' + (result.error || '');
+                }
+            } catch (e) {
+                $('pe-msg').textContent = 'Ошибка сети: ' + e.message;
+            }
         }
 
         function closeProductEditor() {
@@ -2927,6 +3001,15 @@
 
         async function saveProductEditor() {
             const create = $('product-edit-overlay').dataset.create === '1';
+            // характеристики: строки «Ключ: значение» -> объект
+            const characteristics = {};
+            $('pe-characteristics').value.split('\n').forEach(line => {
+                const idx = line.indexOf(':');
+                if (idx > 0) {
+                    const key = line.slice(0, idx).trim();
+                    if (key) characteristics[key] = line.slice(idx + 1).trim();
+                }
+            });
             const body = {
                 source: $('pe-source').value,
                 name: $('pe-name').value,
@@ -2938,8 +3021,17 @@
                 category: $('pe-category').value.trim(),
                 stock: parseInt($('pe-stock').value || 0, 10),
                 visible: $('pe-visible').checked,
+                brand: $('pe-brand').value.trim(),
+                vendor_code: $('pe-vendor-code').value.trim(),
+                url: $('pe-url').value.trim(),
+                rating: $('pe-rating').value,
+                review_count: parseInt($('pe-review-count').value || 0, 10),
+                characteristics: characteristics,
+                seo_title: $('pe-seo-title').value.trim(),
+                seo_description: $('pe-seo-description').value.trim(),
             };
             if (!create) body.product_id = $('pe-id').value;
+            body.site_section = $('pe-section').value;
             const btn = $('pe-save');
             btn.disabled = true;
             $('pe-msg').textContent = create ? 'Создаём…' : 'Сохраняем…';
@@ -2996,6 +3088,7 @@
             <h3 id="pe-title">Товар</h3>
             <input type="hidden" id="pe-source">
             <input type="hidden" id="pe-id">
+            <div class="pe-pins" id="pe-pins"></div>
             <div class="pe-field">
                 <label for="pe-name">Название</label>
                 <input type="text" id="pe-name">
@@ -3003,6 +3096,44 @@
             <div class="pe-field">
                 <label for="pe-description">Описание (текст, показывается на странице товара)</label>
                 <textarea id="pe-description"></textarea>
+            </div>
+            <div class="row2">
+                <div class="pe-field">
+                    <label for="pe-brand">Бренд</label>
+                    <input type="text" id="pe-brand">
+                </div>
+                <div class="pe-field">
+                    <label for="pe-vendor-code">Артикул (WB/SKU)</label>
+                    <input type="text" id="pe-vendor-code">
+                </div>
+            </div>
+            <div class="row2">
+                <div class="pe-field">
+                    <label for="pe-rating">Рейтинг (0–5)</label>
+                    <input type="number" id="pe-rating" min="0" max="5" step="0.1">
+                </div>
+                <div class="pe-field">
+                    <label for="pe-review-count">Число отзывов</label>
+                    <input type="number" id="pe-review-count" min="0" step="1">
+                </div>
+            </div>
+            <div class="pe-field">
+                <label for="pe-url">Ссылка на товар (URL/slug)</label>
+                <input type="text" id="pe-url" placeholder="https://…">
+            </div>
+            <div class="pe-field">
+                <label for="pe-characteristics">Характеристики (каждая с новой строки: «Ключ: значение»)</label>
+                <textarea id="pe-characteristics" style="min-height:80px;"></textarea>
+            </div>
+            <div class="row2">
+                <div class="pe-field">
+                    <label for="pe-seo-title">SEO title</label>
+                    <input type="text" id="pe-seo-title">
+                </div>
+                <div class="pe-field">
+                    <label for="pe-seo-description">SEO description</label>
+                    <input type="text" id="pe-seo-description">
+                </div>
             </div>
             <div class="row2">
                 <div class="pe-field">

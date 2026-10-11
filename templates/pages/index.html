@@ -28,6 +28,15 @@
   @media (min-width: 1024px) {
     .top_slider_wrapp .main-slider__wrapper .main-slider__item { height: 631px !important; }
   }
+  /* Вертикальные отступы секций главной как на оригинале: там они даются
+     правилами для .wrapper_inner.front, но этот уровень вёрстки потерян при
+     миграции (цепочка .wraps > .middle). Повторяем правила template_styles.css
+     для фактической структуры: 60px над содержимым секции, 50px у блоков
+     без content_wrapper, 30px у главного слайдера. */
+  .middle > .drag-block.container .content_wrapper_block > .maxwidth-theme { padding-top: 60px; }
+  .middle > .drag-block.container > .maxwidth-theme,
+  .middle > .drag-block.container > .grey_block > .maxwidth-theme { padding-top: 50px; }
+  .middle > .drag-block.container.BIG_BANNER_INDEX > .maxwidth-theme { padding-top: 30px; }
 </style>
 <meta name="description" content="{{ page.meta_description }}" />
 <link href="/static/bitrix/css/aspro.max/notice.min.css" rel="stylesheet"/>
