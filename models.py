@@ -323,6 +323,24 @@ class AdminUser(db.Model):
     created_at = db.Column(db.DateTime, default=utcnow)
 
 
+class Subscriber(db.Model):
+    """Подписчики рассылки (подписка из подвала сайта)."""
+    __tablename__ = 'subscribers'
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(300), unique=True, nullable=False, index=True)
+    source = db.Column(db.String(60), default='')            # откуда подписка (footer и т.п.)
+    created_at = db.Column(db.DateTime, default=utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'email': self.email or '',
+            'source': self.source or '',
+            'created_at': self.created_at.isoformat(timespec='seconds') if self.created_at else '',
+        }
+
+
 class AuditLog(db.Model):
     """Аудит-лог действий админов (AD-4, PR-7)."""
     __tablename__ = 'audit_log'

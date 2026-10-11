@@ -128,6 +128,13 @@ try:
 except Exception as _migrate_err:
     print(f'[migrate_cycle5] пропущено: {_migrate_err}')
 
+# Миграция «цикл 6»: subscribers — подписка на рассылку из подвала сайта.
+try:
+    import migrate_cycle6
+    migrate_cycle6.migrate(app)
+except Exception as _migrate_err:
+    print(f'[migrate_cycle6] пропущено: {_migrate_err}')
+
 # Кэширование (AR-3): SimpleCache по умолчанию, тип — через env CACHE_TYPE.
 from flask_caching import Cache
 cache = Cache(app, config={
@@ -2678,6 +2685,35 @@ CATALOG_LIVE_CSS = (
 # Клики по пагинации перехватываются и уходят тем же путём. В iframe редактора
 # pushState отключён. После подмены разметки кидается событие
 # wb:results-updated — wb-actions.js восстанавливает состояние кнопок.
+# JS формы подписки на рассылку в подвале (инжектится в _inject_lazyload_fix):
+# submit без перезагрузки → POST /api/subscribe → сообщение рядом с формой.
+SUBSCRIBE_JS = (
+    '<script>(function(){'
+    'if(window.__wbSubscribe)return;window.__wbSubscribe=1;'
+    "document.addEventListener('submit',function(e){"
+    'var f=e.target;'
+    "if(!f||!f.classList||!f.classList.contains('wb-subscribe-form'))return;"
+    'e.preventDefault();'
+    "var btn=f.querySelector('[type=submit]');"
+    "var msg=f.parentElement?f.parentElement.querySelector('.wb-subscribe-msg'):null;"
+    'if(btn)btn.disabled=true;'
+    "fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},"
+    "body:JSON.stringify({email:(f.email&&f.email.value||'').trim(),source:f.dataset.source||'footer'})})"
+    '.then(function(r){return r.json().then(function(d){return{status:r.status,data:d};});})'
+    '.then(function(res){'
+    'var d=res.data||{};'
+    "if(msg){msg.style.display='block';"
+    "msg.textContent=d.message||(res.status===400?'Проверьте email и попробуйте ещё раз':'Не удалось подписаться. Попробуйте позже.');}"
+    "if(d&&d.success){f.reset();}"
+    '})'
+    ".catch(function(){if(msg){msg.style.display='block';"
+    "msg.textContent='Не удалось подписаться. Попробуйте позже.';}})"
+    '.finally(function(){if(btn)btn.disabled=false;});'
+    '},false);'
+    '})();</script>'
+)
+
+
 CATALOG_LIVE_JS = (
     '<script>(function(){'
     'if(window.__wbCatalogLive)return;window.__wbCatalogLive=1;'
@@ -2800,6 +2836,7 @@ def _inject_lazyload_fix(html):
               + LEGACY_MODAL_JS + '\n'
               + CATALOG_LIVE_CSS + '\n'
               + CATALOG_LIVE_JS + '\n'
+              + SUBSCRIBE_JS + '\n'
               # Мёртвая пагинация категорий: «Показать ещё» → все товары раздела
               # одним списком, номера страниц → тот же список (?page=N игнорируется
               # в режиме per_page=all).
@@ -4950,7 +4987,7 @@ def _product_page(source, nm_id):
     # Детальный блок товара вместо статичной ленты раздела: страница товара
     # показывает сам товар (фото, имя, цена, описание, кнопки) — иначе по
     # карточке WB/Ozon отдавалась просто категорийная вёрстка без данных.
-    page['content_html'] = _product_detail_html(product)
+    page['content_html'] = _product_detail_html(product, site=content.get('site', {}))
 
     ctx = make_context(content, page)
     ctx['seo_product'] = _seo_product(product, request.host_url)
@@ -5169,7 +5206,7 @@ def _product_variants(product):
     return variants
 
 
-def _product_detail_html(product):
+def _product_detail_html(product, site=None):
     """Детальный блок карточки товара для /catalog/<source>/<nm_id>/.
 
     Вёрстка по оригинальному aspro-дизайну: слева галерея, в центре —
@@ -5180,10 +5217,28 @@ def _product_detail_html(product):
     — те же классы wb-cart-btn/wb-buy-btn/wb-like-btn + форма .wb-order-form,
     обработчики уже живут на страницах), доставка/«Хочу в подарок» и блок
     консультации; ниже — вкладки Описание/Характеристики.
+    Подписи блоков («Нашли дешевле?», «Хочу в подарок», текст доставки,
+    «Нужна консультация?») читаются из настроек сайта (site.*) с дефолтами.
     """
     from markupsafe import escape as _esc
     import urllib.parse as _uparse
     import re as _re
+
+    site = site or {}
+
+    def _site_label(key, default):
+        # Подписи блоков карточки — из настроек сайта; пусто/пробелы -> дефолт.
+        val = str(site.get(key) or '').strip()
+        return val[:200] if val else default
+
+    label_cheaper = _site_label('product_cheaper_label', 'Нашли дешевле?')
+    label_delivery = _site_label('product_delivery_text',
+                                 'Доставка по России — при оформлении заказа')
+    label_gift = _site_label('product_gift_label', 'Хочу в подарок')
+    label_consult_title = _site_label('product_consult_title', 'Нужна консультация?')
+    label_consult_text = _site_label(
+        'product_consult_text', 'Наш специалист ответит на любой интересующий вопрос')
+    label_consult_button = _site_label('product_consult_button', 'Задать вопрос')
 
     name = str(product.get('name') or 'Товар')
     src = product.get('source') or 'wb'
@@ -5377,6 +5432,14 @@ def _product_detail_html(product):
     extra_chars = [('Артикул', str(pid)), ('Бренд', brand),
                    ('Источник', 'Wildberries' if src == 'wb' else
                     ('Ozon' if src == 'ozon' else 'Сайт Экотория'))]
+    # Характеристики из админки (extra товара, редактируются в модалке) —
+    # показываем в общем списке: в панели после авто-характеристик,
+    # во вкладке «Характеристики» вместе со всеми.
+    admin_chars = []
+    raw_chars = product.get('characteristics')
+    if isinstance(raw_chars, dict):
+        admin_chars = [(str(k), str(v)) for k, v in raw_chars.items()
+                       if str(k).strip() and str(v).strip()]
 
     def _char_rows(pairs, bordered=True):
         border = 'border-bottom:1px solid #f2f2f2;' if bordered else ''
@@ -5389,14 +5452,14 @@ def _product_detail_html(product):
     chars_panel = (
         '<div style="margin-top:20px;">'
         '<div style="font-weight:700;font-size:1rem;margin-bottom:.5rem;">Характеристики</div>'
-        f'{_char_rows(main_chars, bordered=False)}'
+        f'{_char_rows(main_chars + admin_chars, bordered=False)}'
         '<div class="wb-chars-extra" hidden>'
         f'{_char_rows(extra_chars, bordered=False)}</div>'
         '<a href="#" class="wb-chars-more" '
         'style="font-size:.82rem;color:#b49d84;text-decoration:underline dotted;">'
         'Все характеристики</a></div>')
 
-    chars_tab = f'<div>{_char_rows(main_chars + extra_chars)}</div>'
+    chars_tab = f'<div>{_char_rows(main_chars + admin_chars + extra_chars)}</div>'
 
     desc_html = (f'<div style="line-height:1.7;color:#333;white-space:pre-line;">{_esc(desc)}</div>'
                  if desc else
@@ -5545,7 +5608,7 @@ def _product_detail_html(product):
         'margin-top:.7rem;font-size:.85rem;flex-wrap:wrap;">'
         f'<span>{stock_html}'
         '<span style="color:#aaa;margin-left:.3rem;cursor:help;" title="Остаток обновляется автоматически">ⓘ</span></span>'
-        '<a href="#" style="color:#777;font-size:.82rem;text-decoration:underline;">📋 Нашли дешевле?</a>'
+        f'<a href="#" style="color:#777;font-size:.82rem;text-decoration:underline;">📋 {_esc(label_cheaper)}</a>'
         '</div>'
         '<div style="display:flex;gap:.5rem;margin-top:14px;align-items:stretch;">'
         f'{stepper_html}'
@@ -5557,19 +5620,19 @@ def _product_detail_html(product):
         f'style="{buy_style}">Купить в 1 клик</button>'
         f'{order_form}'
         '<div style="margin-top:16px;font-size:.85rem;color:#555;line-height:1.6;">'
-        '🚚 Доставка по России — при оформленении заказа '
+        f'🚚 {_esc(label_delivery)} '
         '<a href="/contacts/" style="color:#b49d84;text-decoration:underline;">Подробнее</a><br>'
         '<label style="display:flex;align-items:center;gap:.35rem;margin-top:.4rem;cursor:pointer;color:#777;">'
-        '<input type="checkbox" style="margin:0;">🎁 Хочу в подарок</label></div>'
+        f'<input type="checkbox" style="margin:0;">🎁 {_esc(label_gift)}</label></div>'
         f'{ext_html}'
         '</div>'
         '<div style="margin-top:18px;border:1px solid #eee;border-radius:8px;padding:18px;text-align:center;">'
         '<div style="font-size:1.5rem;">✉️</div>'
-        '<div style="font-weight:600;margin:.25rem 0;">Нужна консультация?</div>'
-        '<div style="font-size:.82rem;color:#888;margin-bottom:.6rem;">Наш специалист ответит на любой '
-        'интересующий вопрос</div>'
+        f'<div style="font-weight:600;margin:.25rem 0;">{_esc(label_consult_title)}</div>'
+        f'<div style="font-size:.82rem;color:#888;margin-bottom:.6rem;">{_esc(label_consult_text)}</div>'
         '<a href="/contacts/" style="display:block;border:1px solid #b49d84;color:#b49d84;'
-        'padding:.5rem;text-decoration:none;font-size:.8rem;letter-spacing:.5px;">ЗАДАТЬ ВОПРОС</a>'
+        'padding:.5rem;text-decoration:none;font-size:.8rem;letter-spacing:.5px;">'
+        f'{_esc(label_consult_button).upper()}</a>'
         '</div>'
         '</div></div>'
         f'{tabs_html}'
@@ -5943,6 +6006,61 @@ def admin_api_customer_delete():
     if not ok:
         return jsonify({'success': False, 'error': 'Клиент не найден'}), 404
     _audit_log('customer.delete', 'customer', customer_id)
+    return jsonify({'success': True})
+
+
+# Подписка на рассылку из подвала сайта.
+_SUBSCRIBE_EMAIL_RE = re.compile(r'^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$')
+
+
+@app.route('/api/subscribe', methods=['POST'])
+@_rate_limit(20)
+def api_subscribe():
+    """Публичная подписка на рассылку: email в таблицу subscribers, защита от дублей.
+
+    Дубль — не ошибка: отвечаем success с already=True (idempotent для посетителя).
+    """
+    from models import Subscriber
+    data = request.get_json(silent=True) or request.form.to_dict() or {}
+    email = (data.get('email') or '').strip().lower()
+    if len(email) > 300 or not _SUBSCRIBE_EMAIL_RE.match(email):
+        return jsonify({'success': False, 'error': 'Некорректный email'}), 400
+    # source — служебная метка, только безопасные символы
+    source = re.sub(r'[^\w\-.]', '', str(data.get('source') or 'footer'))[:60] or 'footer'
+    existing = db.session.query(Subscriber).filter_by(email=email).first()
+    if existing:
+        return jsonify({'success': True, 'already': True,
+                        'message': 'Вы уже подписаны на рассылку'})
+    db.session.add(Subscriber(email=email, source=source))
+    db.session.commit()
+    return jsonify({'success': True, 'already': False,
+                    'message': 'Вы подписаны на рассылку'})
+
+
+@app.route('/admin/api/subscribers')
+@admin_required
+def admin_api_subscribers():
+    """Список подписчиков рассылки для админки."""
+    from models import Subscriber
+    subs = db.session.query(Subscriber).order_by(Subscriber.id.desc()).all()
+    return jsonify({'success': True, 'subscribers': [s.to_dict() for s in subs]})
+
+
+@app.route('/admin/api/subscriber/delete', methods=['POST'])
+@admin_required
+def admin_api_subscriber_delete():
+    """Удаление подписчика по запросу (152-ФЗ) — с аудитом."""
+    from models import Subscriber
+    data = request.get_json() or {}
+    sid = data.get('id')
+    if not sid:
+        return jsonify({'success': False, 'error': 'id обязателен'}), 400
+    sub = db.session.get(Subscriber, int(sid))
+    if not sub:
+        return jsonify({'success': False, 'error': 'Подписчик не найден'}), 404
+    db.session.delete(sub)
+    db.session.commit()
+    _audit_log('subscriber.delete', 'subscriber', sid)
     return jsonify({'success': True})
 
 

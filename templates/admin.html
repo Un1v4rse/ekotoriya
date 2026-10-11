@@ -348,6 +348,43 @@
                         </div>
                     </div>
                     <div class="field">
+                        <label for="site-subscribe-label">Подпись кнопки подписки</label>
+                        <input type="text" id="site-subscribe-label" data-path="site.subscribe_label" placeholder="Подписаться на рассылку">
+                        <div class="help">Кнопка формы подписки на рассылку в подвале сайта.</div>
+                    </div>
+                    <h3 style="margin:0.8rem 0 0.4rem;">Подписи на странице товара</h3>
+                    <div class="row">
+                        <div class="field">
+                            <label for="site-cheaper-label">«Нашли дешевле?»</label>
+                            <input type="text" id="site-cheaper-label" data-path="site.product_cheaper_label" placeholder="Нашли дешевле?">
+                        </div>
+                        <div class="field">
+                            <label for="site-delivery-text">Текст доставки</label>
+                            <input type="text" id="site-delivery-text" data-path="site.product_delivery_text" placeholder="Доставка по России — при оформлении заказа">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="field">
+                            <label for="site-gift-label">«Хочу в подарок»</label>
+                            <input type="text" id="site-gift-label" data-path="site.product_gift_label" placeholder="Хочу в подарок">
+                        </div>
+                        <div class="field">
+                            <label for="site-consult-title">«Нужна консультация?» (заголовок)</label>
+                            <input type="text" id="site-consult-title" data-path="site.product_consult_title" placeholder="Нужна консультация?">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="field">
+                            <label for="site-consult-text">Текст консультации</label>
+                            <input type="text" id="site-consult-text" data-path="site.product_consult_text" placeholder="Наш специалист ответит на любой интересующий вопрос">
+                        </div>
+                        <div class="field">
+                            <label for="site-consult-button">Кнопка консультации</label>
+                            <input type="text" id="site-consult-button" data-path="site.product_consult_button" placeholder="Задать вопрос">
+                        </div>
+                    </div>
+                    <div class="help">Пустые поля — стандартные тексты. Применяются ко всем карточкам товара.</div>
+                    <div class="field">
                         <label>Логотип</label>
                         <input type="file" id="logo-file" accept="image/*">
                         <button type="button" class="secondary" style="margin-top:0.4rem;" onclick="uploadLogo()">Загрузить логотип</button>
@@ -903,6 +940,13 @@
                     </div>
                     <h3 style="margin-top:1.4rem;">База клиентов</h3>
                     <div id="customers-list" class="table-wrap"></div>
+                    <h3 style="margin-top:1.4rem;">Подписчики рассылки</h3>
+                    <div class="field row">
+                        <button type="button" class="secondary" onclick="loadSubscribers()">🔄 Обновить список</button>
+                    </div>
+                    <div id="subscribers-list" class="table-wrap">
+                        <p class="help">Нажмите «Обновить список», чтобы загрузить подписчиков.</p>
+                    </div>
                 </section>
 
                 <section id="tab-seo">
@@ -1965,6 +2009,7 @@
         async function loadCustomers() {
             $('customers-list').innerHTML = '<p class="help">Загрузка…</p>';
             $('orders-list').innerHTML = '<p class="help">Загрузка…</p>';
+            loadSubscribers();
             try {
                 const [cResp, oResp] = await Promise.all([
                     fetch(`${location.origin}/admin/api/customers`),
@@ -2000,6 +2045,43 @@
                 const result = await resp.json();
                 showMsg(result.success ? 'Клиент удалён' : 'Ошибка: ' + (result.error || ''), result.success);
                 if (result.success) loadCustomers();
+            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
+        }
+
+        /* Подписчики рассылки (форма в подвале сайта) */
+        async function loadSubscribers() {
+            const container = $('subscribers-list');
+            container.innerHTML = '<p class="help">Загрузка…</p>';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/subscribers`);
+                const data = await resp.json();
+                renderSubscribers(data.success ? data.subscribers : []);
+            } catch (e) {
+                container.innerHTML = '<p class="help">Ошибка: ' + e.message + '</p>';
+            }
+        }
+
+        function renderSubscribers(subscribers) {
+            const container = $('subscribers-list');
+            if (!subscribers.length) { container.innerHTML = '<p class="help">Пока нет подписчиков. Подписка работает в форме в подвале сайта.</p>'; return; }
+            let html = '<table class="adm"><thead><tr><th>ID</th><th>Email</th><th>Источник</th><th>Дата подписки</th><th></th></tr></thead><tbody>';
+            subscribers.forEach(s => {
+                html += `<tr><td>${s.id}</td><td>${escapeHtml(s.email)}</td><td>${escapeHtml(s.source || '')}</td><td>${formatDate(s.created_at)}</td><td><button type="button" class="secondary" onclick="deleteSubscriber(${s.id})" title="Удалить подписчика (152-ФЗ)">🗑</button></td></tr>`;
+            });
+            container.innerHTML = html + '</tbody></table>';
+        }
+
+        async function deleteSubscriber(id) {
+            if (!confirm('Удалить подписчика рассылки? Это действие необратимо (152-ФЗ).')) return;
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/subscriber/delete`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({id})
+                });
+                const result = await resp.json();
+                showMsg(result.success ? 'Подписчик удалён' : 'Ошибка: ' + (result.error || ''), result.success);
+                if (result.success) loadSubscribers();
             } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
         }
 

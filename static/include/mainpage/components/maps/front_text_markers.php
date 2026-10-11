@@ -1,5 +1,10 @@
-<div class="include-maps-wrap" style="max-width:1400px;margin:0 auto;padding:2.5rem 1rem;">
-  <div class="maxwidth-theme">
+<style>
+/* Контейнер как у прочих секций: ширина темы 1408px, боковые отступы 30px (16px на мобильных) */
+.include-maps-wrap{max-width:1408px;margin-left:auto;margin-right:auto;padding:2.5rem 30px;box-sizing:border-box;}
+@media (max-width:767px){.include-maps-wrap{padding-left:16px;padding-right:16px;}}
+</style>
+<div class="include-maps-wrap">
+  <div>
     <h2 style="font-size:1.6rem;font-weight:600;margin:0 0 1.5rem;">Контакты и магазин</h2>
     <div style="display:flex;gap:2rem;flex-wrap:wrap;">
       <div style="flex:1;min-width:260px;">
