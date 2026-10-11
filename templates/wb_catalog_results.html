@@ -5,7 +5,101 @@
 <div class="wb-catalog-count" style="margin-bottom:1rem; color:#666; font-size:0.9rem;">Найдено товаров: {{ catalog_view.total }}</div>
 {% endif %}
 
+{% if catalog_view.section %}
+<!-- Сетка категорийной страницы в стиле оригинала: 4 колонки, цена с копейками
+     «₽/шт», зачёркнутая база, жёлтый бейдж «-N% Экономия»; кнопки лайк/корзина/
+     1-клик — те же классы wb-like-btn/wb-cart-btn/wb-buy-btn (+ .wb-order-form). -->
+<style>
+.wb-sec-results .wb-products-grid{display:grid !important;
+    grid-template-columns:repeat(4,minmax(0,1fr)) !important;gap:2.4rem 1rem !important;}
+@media (max-width:1199px){.wb-sec-results .wb-products-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;}}
+@media (max-width:991px){.wb-sec-results .wb-products-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;}}
+@media (max-width:520px){.wb-sec-results .wb-products-grid{
+    grid-template-columns:1fr !important;}}
+.wb-sec-card{display:block;text-decoration:none;color:inherit;background:#fff;
+    border:1px solid #ededed;border-radius:2px;overflow:hidden;
+    transition:box-shadow .2s;}
+.wb-sec-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.08);}
+.wb-sec-card__photo{display:block;padding:0;}
+.wb-sec-card__photo img{width:100%;height:230px;object-fit:cover;display:block;}
+.wb-sec-card__body{display:block;padding:.9rem 1rem 1.1rem;}
+.wb-sec-card__name{font-size:.92rem;font-weight:400;line-height:1.35;
+    color:#222;min-height:2.7em;display:-webkit-box;-webkit-line-clamp:2;
+    -webkit-box-orient:vertical;overflow:hidden;}
+.wb-sec-card__stock{margin-top:.55rem;font-size:.82rem;font-weight:600;}
+.wb-sec-card__price{margin-top:.55rem;display:flex;align-items:baseline;
+    gap:.5rem;flex-wrap:wrap;}
+.wb-sec-card__price strong{font-size:1.15rem;font-weight:700;color:#222;
+    white-space:nowrap;}
+.wb-sec-card__price s{color:#999;font-size:.88rem;white-space:nowrap;}
+.wb-sec-card__badge{display:inline-flex;gap:.35rem;margin-top:.45rem;}
+.wb-sec-card__badge i{font-style:normal;background:#ffcf3f;color:#333;
+    font-size:.7rem;font-weight:700;padding:.1rem .4rem;border-radius:3px;}
+.wb-sec-card__badge u{text-decoration:none;background:#ffe9a8;color:#6b5200;
+    font-size:.74rem;padding:.1rem .45rem;border-radius:3px;}
+.wb-sec-card__acts{display:flex;flex-direction:column;gap:.4rem;margin-top:.8rem;}
+.wb-sec-card__acts .wb-like-btn,.wb-sec-card__acts .wb-cart-btn{
+    width:100%;background:#fff;border:1px solid #ddd;border-radius:3px;
+    padding:.42rem;font-size:.82rem;font-weight:600;cursor:pointer;}
+.wb-sec-card__acts .wb-cart-btn{border-color:#b49d84;color:#b49d84;}
+.wb-sec-card__acts .wb-buy-btn{width:100%;background:#b49d84;color:#fff;
+    border:0;border-radius:3px;padding:.5rem;font-size:.84rem;font-weight:600;
+    cursor:pointer;}
+.wb-sec-card__acts .wb-buy-btn:disabled{background:#ccc;cursor:not-allowed;}
+</style>
 {% if catalog_view.products %}
+<div class="wb-products-grid">
+    {% for p in catalog_view.products %}
+    {% set st = p.get('stock', 10) %}
+    {% set base = p.price or 0 %}
+    {% set fp = p.final_price or base %}
+    <a href="/catalog/{{ p.source }}/{{ p.id }}/" class="wb-product-card wb-sec-card">
+        <span class="wb-sec-card__photo">
+            <img src="{% if p.photo.startswith('/') %}{{ p.photo }}{% else %}/proxy/image?url={{ p.photo | urlencode }}{% endif %}" alt="{{ p.name }}" {% if loop.index0 > 3 %}loading="lazy"{% endif %}>
+        </span>
+        <span class="wb-sec-card__body">
+            <span class="wb-sec-card__name">{{ p.name }}</span>
+            {% if st <= 0 %}
+            <span class="wb-sec-card__stock" style="color:#c00;">• Нет в наличии</span>
+            {% elif st <= 5 %}
+            <span class="wb-sec-card__stock" style="color:#b26a00;">• Мало</span>
+            {% else %}
+            <span class="wb-sec-card__stock" style="color:#2e7d32;">• Много</span>
+            {% endif %}
+            <span class="wb-sec-card__price">
+                <strong>{{ money(fp) }} ₽<span style="font-size:.8rem;font-weight:400;color:#777;">/шт</span></strong>
+                {% if base and fp < base %}<s>{{ money(base, kopecks=False) }} ₽</s>{% endif %}
+            </span>
+            {% if base and fp < base %}
+            <span class="wb-sec-card__badge"><i>-{{ ((base - fp) * 100 / base) | round | int }}%</i><u>Экономия {{ money(base - fp) }} ₽</u></span>
+            {% endif %}
+            <span class="wb-sec-card__acts">
+                <button type="button" class="wb-like-btn" data-id="{{ p.id }}" data-name="{{ p.name }}" data-price="{{ fp }}" data-photo="{{ p.photo or '' }}" data-url="/catalog/{{ p.source }}/{{ p.id }}/" data-source="{{ p.source or 'wb' }}">❤ В избранное</button>
+                <button type="button" class="wb-cart-btn" data-id="{{ p.id }}" data-source="{{ p.source or 'wb' }}">🛒 В корзину</button>
+                <button type="button" class="wb-buy-btn" data-id="{{ p.id }}" data-name="{{ p.name }}" data-price="{{ fp }}" data-stock="{{ st }}"{% if st <= 0 %} disabled{% endif %}>Купить в 1 клик</button>
+                <form class="wb-order-form" data-id="{{ p.id }}" style="display:none; padding:.6rem; background:#f9f9f9; border-radius:4px;">
+                    <input type="text" name="name" placeholder="Ваше имя" required style="width:100%; margin-bottom:.35rem; padding:.4rem; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+                    <input type="tel" name="phone" placeholder="Телефон" required style="width:100%; margin-bottom:.35rem; padding:.4rem; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+                    <input type="email" name="email" placeholder="Email (необязательно)" style="width:100%; margin-bottom:.35rem; padding:.4rem; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+                    <label style="display:flex; align-items:flex-start; gap:.3rem; font-size:.72rem; color:#666; margin-bottom:.45rem; cursor:pointer;">
+                        <input type="checkbox" name="consent_pd" value="1" required style="margin-top:.1rem;">
+                        <span>Соглашаюсь с обработкой персональных данных</span>
+                    </label>
+                    <button type="submit" style="width:100%; background:#137333; color:#fff; border:0; padding:.45rem; border-radius:4px; cursor:pointer; font-weight:600;">Оформить заявку</button>
+                    <div class="wb-order-result" style="margin-top:.35rem; font-size:.78rem;"></div>
+                </form>
+            </span>
+        </span>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="wb-empty-result" style="padding:2rem 1rem; text-align:center; color:#888;">По выбранным фильтрам ничего не найдено. Попробуйте изменить условия поиска.</div>
+{% endif %}
+
+{% elif catalog_view.products %}
 <div class="wb-products-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.5rem;">
     {% for p in catalog_view.products %}
     {% set st = p.get('stock', 10) %}

@@ -2183,6 +2183,56 @@ SECTION_LISTING_HIDE_CSS = (
     '</style>'
 )
 
+# Раскладка категорийных страниц (/catalog/<раздел>/) как у оригинала: живой
+# каталог (.wb-catalog-wrapper) встаёт в правую колонку рядом с левым меню
+# раздела (.left_block bitrix-клона), а не полной шириной под ним. Дочерние
+# элементы #content .middle: section_header → wb-catalog-wrapper →
+# section-content-wrapper (мёртвый листинг, скрыт) → left_block.
+# Меню развёрнуто до первого уровня (Наматрасники › / Одеяла › / Наперники,
+# активный — подсвечен), подразделы раскрываются по hover — как в оригинале.
+# Скоуп .section-content-wrapper есть только на страницах разделов.
+SECTION_LAYOUT_CSS = (
+    '<style>'
+    '@media (min-width:992px){'
+    '#content .middle{display:grid !important;'
+    'grid-template-columns:262px minmax(0,1fr) !important;'
+    'column-gap:32px !important;align-items:start !important;}'
+    '#content .middle>.maxwidth-theme.wb-section-header{grid-column:1/-1;}'
+    '#content .middle>.wb-catalog-wrapper{grid-column:2;grid-row:2;'
+    'padding-top:0 !important;}'
+    '#content .middle>.left_block{grid-column:1;grid-row:2;'
+    'width:100% !important;height:auto !important;position:static !important;}'
+    '#content .middle>.left_block .sticky-sidebar__inner{'
+    'position:static !important;width:auto !important;}'
+    '#content .middle>.section-content-wrapper{grid-column:1/-1;}'
+    '}'
+    '@media (max-width:991px){'
+    '#content .middle>.left_block{display:none !important;}'
+    '}'
+    '#content .middle>.left_block .slide-block__body{display:block !important;}'
+    '#content .middle>.left_block li.has-child{position:relative;}'
+    '#content .middle>.left_block li.has-child>ul.dropdown{'
+    'display:none !important;position:absolute !important;left:100% !important;'
+    'top:0 !important;width:250px !important;background:#fff !important;'
+    'border:1px solid #eee !important;'
+    'box-shadow:0 8px 24px rgba(0,0,0,.08) !important;'
+    'z-index:60 !important;padding:.4rem 0 !important;margin:0 !important;'
+    'max-height:none !important;overflow:visible !important;}'
+    '#content .middle>.left_block li.has-child:hover>ul.dropdown{'
+    'display:block !important;}'
+    '#content .middle>.left_block li.has-child>ul.dropdown>li{'
+    'float:none !important;display:block !important;width:auto !important;}'
+    '#content .middle>.left_block li.has-child>ul.dropdown .image{'
+    'display:none !important;}'
+    '#content .middle>.left_block li.has-child>ul.dropdown li>a{'
+    'display:block !important;padding:.5rem 1rem !important;'
+    'font-size:.85rem !important;font-weight:400 !important;'
+    'white-space:normal !important;border:none !important;}'
+    '#content .middle>.left_block a.bordered{border:none !important;'
+    'border-radius:0 !important;}'
+    '</style>'
+)
+
 # Иконки соцсетей в выдвижной мобильной панели (#mobilemenu, «сайдбар» на
 # мобильных) шли общими aspro-правилами .social-icons li a: квадратные
 # (border-radius:3px), без обводки, всегда белые иконки (верхняя строка
@@ -2733,6 +2783,9 @@ def _inject_lazyload_fix(html):
               + CATALOG_LAYOUT_CSS + '\n'
               + SECTION_FILTER_CSS + '\n'
               + (SECTION_LISTING_HIDE_CSS if re.match(
+                  r'^/catalog/(?:namatrasniki|odeyala|naperniki)/$',
+                  request.path or '') else '') + '\n'
+              + (SECTION_LAYOUT_CSS if re.match(
                   r'^/catalog/(?:namatrasniki|odeyala|naperniki)/$',
                   request.path or '') else '') + '\n'
               + SOCIALS_CSS + '\n'
@@ -4563,6 +4616,49 @@ def _filtered_catalog(args, section='', per_page=None, base='/catalog/',
         qs_parts['per_page'] = 'all'
     elif per_page and per_page != 24:
         qs_parts['per_page'] = str(per_page)
+
+    # Плитки подкатегорий раздела (как у оригинала: «Наматрасники на молнии —
+    # 64 товара»): children текущего раздела из меню сайта; счётчик и фото —
+    # из товаров раздела, имена которых содержат ключевое слово подраздела.
+    # Товары без совпадения не выводят плитку со счётчиком (в демо-каталоге
+    # привязки товаров к подразделам нет — по ТЗ неизвестное не выводится).
+    subsections = []
+    if section:
+        _SUB_KEYS = {
+            'namatrasniki-na-molnii': ('молни',),
+            'namatrasniki-na-rezinke': ('резинк',),
+            'nepromokaemye-namatrasniki': ('непромокаем',),
+            'zimnie': ('зимн',),
+            'vsesezonnye': ('всесезон',),
+            'letnie': ('летн',),
+        }
+        try:
+            menu = load_content().get('menu') or []
+            sec_url = f'/catalog/{section}/'
+            for top in menu:
+                for child in (top.get('children') or []):
+                    if (child.get('url') or '') != sec_url:
+                        continue
+                    all_products = list(get_products())
+                    all_products = [p for p in all_products
+                                    if not p.get('site_section')
+                                    or p.get('site_section') == section]
+                    for sub in (child.get('children') or []):
+                        slug = (sub.get('url') or '').rstrip('/').split('/')[-1]
+                        keys = _SUB_KEYS.get(slug, ())
+                        matched = [p for p in all_products
+                                   if keys and all(
+                                       k in (p.get('name') or '').lower()
+                                       for k in keys)]
+                        subsections.append({
+                            'title': sub.get('title') or '',
+                            'url': sub.get('url') or '',
+                            'count': len(matched) if matched else 0,
+                            'photo': matched[0].get('photo') if matched else '',
+                        })
+        except Exception:
+            subsections = []
+
     return {
         'products': items,
         'total': total,
@@ -4575,6 +4671,7 @@ def _filtered_catalog(args, section='', per_page=None, base='/catalog/',
         'base': base,
         'show_filters': show_filters,
         'section': section,
+        'subsections': subsections,
         'qs': _urlencode(qs_parts),
         'applied': {
             'q': args.get('q') or '', 'source': source, 'category': category,
@@ -4710,14 +4807,129 @@ def _product_size_siblings(product):
     return unique
 
 
+def _money(value, kopecks=True):
+    """Формат цены как на оригинале: «4 146.21» (тысячи — через пробел)."""
+    try:
+        v = float(value or 0)
+    except (TypeError, ValueError):
+        v = 0.0
+    s = f'{v:,.2f}' if kopecks else f'{v:,.0f}'
+    return s.replace(',', ' ')
+
+
+app.add_template_global(_money, 'money')
+
+
+def _product_variants(product):
+    """Группы вариантов карточки: цвет / высота борта / размер.
+
+    Товары-«соседи» того же источника с тем же «стволом» имени (имя без
+    токена размера NxM, фразы «высота N-M см» и слов цвета). Возвращает dict
+    {'sizes': [(размер, товар)], 'heaths': [(высота, товар)],
+    'colors': [(цвет, товар)]} с уникальными значениями (пустые группы
+    опускаются); товар в каждой группе — ссылка на вариант с этим значением,
+    максимально близкий к текущему (тот же размер/цвет/высота). Текущий товар
+    входит в каждую группу — как на оригинале, активное значение подсвечено.
+    """
+    import re as _re
+
+    colors = ('белый с узором', 'светло-коричневый', 'светло-серый',
+              'темно-серый', 'тёмно-серый', 'черный', 'чёрный', 'бежевый',
+              'серый', 'белый', 'коричневый')
+
+    def _norm(s):
+        s = str(s or '').lower()
+        for ch in ('х', '*', '×'):
+            s = s.replace(ch, 'x')
+        return _re.sub(r'\s+', ' ', s).strip()
+
+    def _size(s):
+        m = _re.search(r'(\d{2,3})x(\d{2,3})', _norm(s))
+        return f'{m.group(1)}x{m.group(2)}' if m else ''
+
+    def _height(s):
+        m = _re.search(r'высота\s*(\d+(?:-\d+)?)\s*см', _norm(s))
+        return m.group(1) if m else ''
+
+    def _color(s):
+        s = _norm(s)
+        for c in colors:
+            if c in s:
+                return c
+        return ''
+
+    def _stem(s):
+        s = _re.sub(r'высота\s*\d+(?:-\d+)?\s*см', '', _norm(s))
+        s = _re.sub(r'\d{2,3}x\d{2,3}(?:x\d{2,3})?(?:\s*см)?', '', s)
+        for c in colors:
+            s = s.replace(c, '')
+        return _re.sub(r'\s+', ' ', s).strip()
+
+    name = product.get('name')
+    key = _stem(name)
+    pid = str(product.get('nm_id') or product.get('id') or '')
+    if not key or not _size(name):
+        return {}
+    group = []
+    for p in get_products():
+        if p.get('source') != product.get('source'):
+            continue
+        if not _size(p.get('name')) or _stem(p.get('name')) != key:
+            continue
+        group.append(p)
+    ids = {str(p.get('nm_id') or p.get('id') or '') for p in group}
+    if len(group) < 2 or pid not in ids:
+        return {}
+
+    attrs = (_size, _height, _color)
+
+    def _pick(attr, value):
+        others = [a for a in attrs if a is not attr]
+        cand = [q for q in group if attr(q.get('name')) == value]
+        for q in cand:  # вариант, отличающийся только этим атрибутом
+            if all(o(q.get('name')) == o(name) for o in others):
+                return q
+        for q in cand:  # иначе — хотя бы с тем же размером
+            if _size(q.get('name')) == _size(name):
+                return q
+        return cand[0]
+
+    def _unique(attr):
+        seen, out = set(), []
+        for p in group:
+            v = attr(p.get('name'))
+            if not v or v in seen:
+                continue
+            seen.add(v)
+            out.append((v, _pick(attr, v)))
+        return out
+
+    variants = {}
+    sizes = _unique(_size)
+    if len(sizes) >= 2:
+        sizes.sort(key=lambda x: int(x[0].split('x')[0]) * int(x[0].split('x')[1]))
+        variants['sizes'] = sizes
+    heights = _unique(_height)
+    if len(heights) >= 2:
+        heights.sort(key=lambda x: int(x[0].split('-')[0]))
+        variants['heights'] = heights
+    found_colors = _unique(_color)
+    if len(found_colors) >= 2:
+        variants['colors'] = found_colors
+    return variants
+
+
 def _product_detail_html(product):
     """Детальный блок карточки товара для /catalog/<source>/<nm_id>/.
 
-    Вёрстка по оригинальному aspro-дизайну: слева галерея, справа — избранное,
-    артикул/бренд/наличие, переключатель размера (товары-соседи в других
-    размерах), ценовой блок, «В корзину» / «Купить в 1 клик» (те же классы
-    wb-cart-btn/wb-buy-btn/wb-like-btn + форма .wb-order-form — обработчики
-    уже живут на страницах), доставка и вкладки Описание/Характеристики.
+    Вёрстка по оригинальному aspro-дизайну: слева галерея, в центре —
+    избранное/рейтинг, группы вариантов (Цвет / Высота борта / Размер —
+    чипы-ссылки на товары-соседи), компактные «Характеристики» с раскрытием
+    «Все характеристики», справа — карточка покупки (цена с копейками,
+    бейдж «-N% Экономия», степпер количества, «В корзину» / «Купить в 1 клик»
+    — те же классы wb-cart-btn/wb-buy-btn/wb-like-btn + форма .wb-order-form,
+    обработчики уже живут на страницах), доставка/«Хочу в подарок» и блок
+    консультации; ниже — вкладки Описание/Характеристики.
     """
     from markupsafe import escape as _esc
     import urllib.parse as _uparse
@@ -4730,111 +4942,206 @@ def _product_detail_html(product):
     if photo and photo.startswith(('http://', 'https://')):
         photo = '/proxy/image?url=' + _uparse.quote(photo, safe='')
     price = int(product.get('price') or 0)
-    discount_price = int(product.get('discount_price') or 0)
     final_price = int(product.get('final_price') or price or 0)
     stock = int(product.get('stock') or 0)
     brand = str(product.get('brand') or 'Экотория')
-    base = discount_price if discount_price and discount_price < price else price
+    # Зачёркнутая «старая» цена — прайс WB до скидки; продажа — по final_price.
+    base = price
     desc = str(product.get('description') or '').strip()
     site_badge = product.get('site_discount_badge')
 
-    if stock <= 0:
-        stock_html = '<span style="color:#c00;font-weight:600;">Нет в наличии</span>'
-    elif stock <= 5:
-        stock_html = '<span style="color:#b26a00;font-weight:600;">Осталось мало</span>'
-    else:
-        stock_html = '<span style="color:#137333;font-weight:600;">В наличии</span>'
+    nm_norm = name.lower().replace('х', 'x')
+    m_size = _re.search(r'(\d{2,3})x(\d{2,3})', nm_norm)
+    cur_size = f'{m_size.group(1)}x{m_size.group(2)}' if m_size else ''
+    m_height = _re.search(r'высота\s*(\d+(?:-\d+)?)\s*см', nm_norm)
+    cur_height = m_height.group(1) if m_height else ''
 
+    def _cur_color():
+        for c in ('белый с узором', 'светло-коричневый', 'светло-серый',
+                  'темно-серый', 'тёмно-серый', 'черный', 'чёрный', 'бежевый',
+                  'серый', 'белый', 'коричневый'):
+            if c in nm_norm:
+                return c
+        return ''
+
+    cur_color = _cur_color()
+
+    # Карточка покупки: цена с копейками, зачёркнутая базовая, бейдж скидки.
     price_html = ''
+    badge_html = ''
     if base and final_price < base:
-        price_html = (f'<span style="text-decoration:line-through;color:#999;font-size:1rem;">'
-                      f'{base} ₽</span> '
-                      f'<span style="color:#333;font-weight:700;font-size:1.9rem;">{final_price} ₽</span>'
-                      f'<span style="color:#777;font-size:.9rem;">/шт</span>')
-        if site_badge:
-            price_html += (f' <span style="background:#137333;color:#fff;font-size:.78rem;'
-                           f'padding:.2rem .6rem;border-radius:4px;">скидка {site_badge}% на сайте</span>')
+        pct = round((base - final_price) * 100 / base)
+        price_html = (
+            f'<span style="color:#222;font-weight:700;font-size:1.55rem;white-space:nowrap;">'
+            f'{_money(final_price)} ₽</span>'
+            f'<span style="color:#777;font-size:.95rem;">/шт</span>'
+            f'<span style="text-decoration:line-through;color:#999;font-size:1rem;margin-left:.5rem;white-space:nowrap;">'
+            f'{_money(base, kopecks=False)} ₽</span>')
+        badge_html = (
+            '<div style="display:flex;gap:.4rem;align-items:center;margin-top:.4rem;flex-wrap:wrap;">'
+            f'<span style="background:#ffcf3f;color:#333;font-size:.72rem;font-weight:700;'
+            f'padding:.14rem .45rem;border-radius:3px;white-space:nowrap;">-{pct}%</span>'
+            f'<span style="background:#ffe9a8;color:#6b5200;font-size:.78rem;padding:.14rem .5rem;'
+            f'border-radius:3px;white-space:nowrap;">Экономия {_money(base - final_price)} ₽</span>'
+            + (f'<span style="background:#137333;color:#fff;font-size:.72rem;padding:.14rem .5rem;'
+               f'border-radius:3px;white-space:nowrap;">скидка {site_badge}% на сайте</span>' if site_badge else '')
+            + '</div>')
     else:
-        price_html = (f'<span style="color:#333;font-weight:700;font-size:1.9rem;">'
-                      f'{final_price or base} ₽</span>'
-                      f'<span style="color:#777;font-size:.9rem;">/шт</span>')
+        price_html = (
+            f'<span style="color:#222;font-weight:700;font-size:1.55rem;white-space:nowrap;">'
+            f'{_money(final_price or base)} ₽</span>'
+            f'<span style="color:#777;font-size:.95rem;">/шт</span>')
+
+    if stock <= 0:
+        stock_label, stock_color = 'Нет в наличии', '#c00'
+    elif stock <= 5:
+        stock_label, stock_color = 'Осталось мало', '#b26a00'
+    else:
+        stock_label, stock_color = 'Много', '#2e7d32'
+    stock_html = (
+        f'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;'
+        f'background:{stock_color};margin-right:.35rem;"></span>'
+        f'<span style="color:{stock_color};font-weight:600;">{stock_label}</span>')
 
     img_html = (f'<img src="{_esc(photo)}" alt="{_esc(name)}" '
                 f'style="width:100%;max-width:460px;object-fit:contain;display:block;margin:0 auto;">'
                 if photo else '')
 
-    # Переключатель размера: товары-соседи в других размерах (оригинальный
-    # сайт показывает размерный ряд чипсами; активный — подсвечен).
-    cur_pid = str(pid)
-    size_chips = ''
-    siblings = _product_size_siblings(product)
-    if siblings:
+    # Группы вариантов (чипы-ссылки на товары-соседи; активный — заливка темы).
+    variants = _product_variants(product)
+
+    def _chips_group(title, items, current, fmt=None):
         chips = []
-        for size, p in siblings:
+        for value, p in items:
+            label = fmt(value) if fmt else value
             spid = str(p.get('nm_id') or p.get('id') or '')
-            active = spid == cur_pid
-            if active:
+            if value == current:
                 chips.append(
-                    f'<span style="display:inline-block;padding:.45rem .9rem;border:1px solid #b49d84;'
-                    f'background:#b49d84;color:#fff;border-radius:4px;font-size:.85rem;">{size}</span>')
+                    f'<span style="display:inline-block;padding:.4rem .8rem;border:1px solid #b49d84;'
+                    f'background:#b49d84;color:#fff;border-radius:4px;font-size:.83rem;">{_esc(label)}</span>')
             else:
                 chips.append(
                     f'<a href="/catalog/{_esc(src)}/{_esc(spid)}/" '
-                    f'style="display:inline-block;padding:.45rem .9rem;border:1px solid #ddd;'
-                    f'color:#333;border-radius:4px;font-size:.85rem;text-decoration:none;">{size}</a>')
-        size_chips = (
-            '<div style="margin:0 0 18px;">'
-            '<div style="font-size:.85rem;color:#777;margin-bottom:.5rem;">Размер, см</div>'
+                    f'style="display:inline-block;padding:.4rem .8rem;border:1px solid #ddd;'
+                    f'color:#333;border-radius:4px;font-size:.83rem;text-decoration:none;">'
+                    f'{_esc(label)}</a>')
+        return (
+            '<div style="margin:0 0 16px;">'
+            f'<div style="font-size:.82rem;color:#666;margin-bottom:.45rem;">{title}</div>'
             f'<div style="display:flex;flex-wrap:wrap;gap:.4rem;">{"".join(chips)}</div></div>')
 
-    # Характеристики: размер и высота борта из имени, остальное из полей.
-    chars = [('Артикул', str(pid)), ('Бренд', brand),
-             ('Источник', 'Wildberries' if src == 'wb' else ('Ozon' if src == 'ozon' else 'Сайт Экотория'))]
-    nm_norm = name.lower().replace('х', 'x')
-    m = _re.search(r'(\d{2,3}x\d{2,3})', nm_norm)
-    if m:
-        chars.append(('Размер', m.group(1).replace('x', 'х') + ' см'))
-    m = _re.search(r'высота\s*(\d+(?:-\d+)?)\s*см', nm_norm)
-    if m:
-        chars.append(('Высота борта', m.group(1) + ' см'))
-    chars_rows = ''.join(
-        f'<div style="display:flex;gap:1rem;padding:.55rem 0;border-bottom:1px solid #f0f0f0;font-size:.92rem;">'
-        f'<div style="width:180px;color:#888;flex-shrink:0;">{_esc(k)}</div>'
-        f'<div>{_esc(v)}</div></div>'
-        for k, v in chars)
-    chars_html = f'<div>{chars_rows}</div>'
+    chips_html = ''
+    if variants.get('colors'):
+        chips_html += _chips_group(
+            'Цвет', variants['colors'], cur_color,
+            fmt=lambda v: v[0].upper() + v[1:])
+    if variants.get('heights'):
+        chips_html += _chips_group(
+            'Высота борта, см', variants['heights'], cur_height,
+            fmt=lambda v: f'{v} см')
+    if variants.get('sizes'):
+        chips_html += _chips_group('Размер, см', variants['sizes'], cur_size)
+
+    # Характеристики (панель под чипами + полный список во вкладке):
+    # известное — из имени/типа товара, неизвестное — прочерк (как оригинал).
+    is_mattress = 'наматрасник' in nm_norm
+    is_blanket = 'одеяло' in nm_norm
+    filler = 'Синтепон' if (is_mattress or is_blanket) else ''
+    waterproof = 'Да' if 'непромокаем' in nm_norm else '—'
+    if is_mattress:
+        if 'на молнии' in nm_norm:
+            item_name = 'Наматрасник на молнии'
+        elif 'резинк' in nm_norm or '4d-fix' in nm_norm or '4d-фикс' in nm_norm:
+            item_name = 'Наматрасник на резинке'
+        else:
+            item_name = 'Наматрасник'
+    elif is_blanket:
+        item_name = 'Одеяло'
+    else:
+        item_name = ''
+    completeness = f'{item_name} - 1шт. Заводская упаковка - 1шт.' if item_name else '—'
+    purpose = 'Взрослая' if (is_mattress or is_blanket) else '—'
+
+    main_chars = []
+    if filler:
+        main_chars.append(('Наполнитель', filler))
+    main_chars.append(('Толщина (см)', cur_height or '—'))
+    if is_mattress:
+        main_chars.append(('Водонепроницаемость', waterproof))
+        main_chars.append(('Комплектация', completeness))
+        main_chars.append(('Назначение текстиля', purpose))
+        if cur_size:
+            main_chars.append(('Размер наматрасника', cur_size))
+    elif cur_size:
+        main_chars.append(('Размер', cur_size))
+    if cur_color:
+        main_chars.append(('Цвет', cur_color[0].upper() + cur_color[1:]))
+    extra_chars = [('Артикул', str(pid)), ('Бренд', brand),
+                   ('Источник', 'Wildberries' if src == 'wb' else
+                    ('Ozon' if src == 'ozon' else 'Сайт Экотория'))]
+
+    def _char_rows(pairs, bordered=True):
+        border = 'border-bottom:1px solid #f2f2f2;' if bordered else ''
+        return ''.join(
+            f'<div style="display:flex;gap:.6rem;padding:.32rem 0;font-size:.85rem;{border}">'
+            f'<div style="min-width:150px;color:#888;flex-shrink:0;">{_esc(k)}</div>'
+            f'<div style="color:#333;">{_esc(v)}</div></div>'
+            for k, v in pairs)
+
+    chars_panel = (
+        '<div style="margin-top:20px;">'
+        '<div style="font-weight:700;font-size:1rem;margin-bottom:.5rem;">Характеристики</div>'
+        f'{_char_rows(main_chars, bordered=False)}'
+        '<div class="wb-chars-extra" hidden>'
+        f'{_char_rows(extra_chars, bordered=False)}</div>'
+        '<a href="#" class="wb-chars-more" '
+        'style="font-size:.82rem;color:#b49d84;text-decoration:underline dotted;">'
+        'Все характеристики</a></div>')
+
+    chars_tab = f'<div>{_char_rows(main_chars + extra_chars)}</div>'
 
     desc_html = (f'<div style="line-height:1.7;color:#333;white-space:pre-line;">{_esc(desc)}</div>'
                  if desc else
                  '<div style="color:#888;">Описание появится в ближайшее время.</div>')
 
+    def _tab_btn(tab, label, active):
+        return (
+            f'<button type="button" data-tab="{tab}" '
+            'style="padding:.55rem 1.1rem;background:#fff;border:1px solid '
+            f'{"#b49d84" if active else "#e5e5e5"};font-size:.8rem;letter-spacing:.6px;'
+            'text-transform:uppercase;cursor:pointer;'
+            f'color:{"#333" if active else "#888"};font-weight:{600 if active else 400};">'
+            f'{label}</button>')
+
     tabs_html = (
-        '<div class="wb-detail-tabs" style="margin-top:36px;">'
-        '<div class="wb-detail-tabs__nav" style="display:flex;gap:.2rem;border-bottom:2px solid #eee;">'
-        '<button type="button" data-tab="desc" '
-        'style="padding:.7rem 1.2rem;border:0;background:none;font-size:1rem;font-weight:600;'
-        'color:#b49d84;border-bottom:2px solid #b49d84;margin-bottom:-2px;cursor:pointer;">Описание</button>'
-        '<button type="button" data-tab="chars" '
-        'style="padding:.7rem 1.2rem;border:0;background:none;font-size:1rem;color:#777;'
-        'cursor:pointer;">Характеристики</button>'
-        '</div>'
+        '<div class="wb-detail-tabs" style="margin-top:40px;">'
+        '<div class="wb-detail-tabs__nav" style="display:flex;gap:.4rem;flex-wrap:wrap;">'
+        + _tab_btn('desc', 'Описание', True)
+        + _tab_btn('chars', 'Характеристики', False)
+        + '</div>'
         '<div class="wb-detail-tabs__pane" data-pane="desc" style="padding:1.2rem 0;">'
         f'{desc_html}</div>'
         f'<div class="wb-detail-tabs__pane" data-pane="chars" hidden '
-        f'style="padding:1.2rem 0;">{chars_html}</div>'
+        f'style="padding:1.2rem 0;">{chars_tab}</div>'
         '<script>(function(){'
         'if(window.__wbDetailTabs)return;window.__wbDetailTabs=1;'
         "document.addEventListener('click',function(e){"
         "var b=e.target.closest&&e.target.closest('.wb-detail-tabs__nav button');"
-        'if(!b)return;var t=b.closest(".wb-detail-tabs");'
+        'if(b){var t=b.closest(".wb-detail-tabs");'
         't.querySelectorAll(".wb-detail-tabs__nav button").forEach(function(x){'
         'var on=x===b;'
-        'x.style.color=on?"#b49d84":"#777";'
-        'x.style.borderBottom=on?"2px solid #b49d84":"none";'
-        'x.style.marginBottom="-2px";'
+        'x.style.color=on?"#333":"#888";x.style.borderColor=on?"#b49d84":"#e5e5e5";'
         'x.style.fontWeight=on?"600":"400";});'
         't.querySelectorAll(".wb-detail-tabs__pane").forEach(function(p){'
-        'p.hidden=p.getAttribute("data-pane")!==b.getAttribute("data-tab");});'
+        'p.hidden=p.getAttribute("data-pane")!==b.getAttribute("data-tab");});}'
+        "var a=e.target.closest&&e.target.closest('.wb-chars-more');"
+        'if(a){e.preventDefault();var box=a.parentElement.querySelector(".wb-chars-extra");'
+        'if(box){box.hidden=!box.hidden;'
+        'a.textContent=box.hidden?"Все характеристики":"Свернуть";}}'
+        "var s=e.target.closest&&e.target.closest('.wb-qty button');"
+        'if(s){var inp=s.parentElement.querySelector("input");'
+        'var v=parseInt(inp.value||"1",10)+parseInt(s.getAttribute("data-step"),10);'
+        'if(v<1)v=1;if(v>99)v=99;inp.value=v;}'
         '});})();</script>'
         '</div>')
 
@@ -4851,10 +5158,11 @@ def _product_detail_html(product):
             f'Посмотреть на {mp_name} ↗</a></div>')
 
     disabled = stock <= 0
-    buy_style = ('margin-top:.6rem;width:100%;background:#ccc;color:#fff;border:0;padding:.75rem;'
+    buy_style = ('margin-top:.6rem;width:100%;background:#ccc;color:#fff;border:0;padding:.7rem;'
                  'border-radius:6px;cursor:not-allowed;font-weight:600;' if disabled else
-                 'margin-top:.6rem;width:100%;background:#b49d84;color:#fff;border:0;padding:.75rem;'
-                 'border-radius:6px;cursor:pointer;font-weight:600;text-transform:uppercase;letter-spacing:.4px;')
+                 'margin-top:.6rem;width:100%;background:#fff;color:#333;border:1px solid #ccc;'
+                 'padding:.7rem;border-radius:6px;cursor:pointer;font-weight:600;'
+                 'text-transform:uppercase;letter-spacing:1px;')
     order_form = ''
     if not disabled:
         order_form = (
@@ -4869,45 +5177,102 @@ def _product_detail_html(product):
             '<button type="submit" style="width:100%;background:#137333;color:#fff;border:0;padding:.5rem;border-radius:4px;cursor:pointer;font-weight:600;">Оформить заявку</button>'
             '<div class="wb-order-result" style="margin-top:.4rem;font-size:.8rem;"></div></form>')
 
+    stepper_html = (
+        '<div class="wb-qty" style="display:flex;border:1px solid #ddd;border-radius:6px;'
+        'overflow:hidden;flex-shrink:0;">'
+        '<button type="button" data-step="-1" '
+        'style="width:34px;background:#f7f7f7;border:0;border-right:1px solid #eee;'
+        'cursor:pointer;font-size:1rem;color:#555;">−</button>'
+        '<input type="text" value="1" readonly '
+        'style="width:42px;text-align:center;border:0;font-size:.95rem;color:#333;">'
+        '<button type="button" data-step="1" '
+        'style="width:34px;background:#f7f7f7;border:0;border-left:1px solid #eee;'
+        'cursor:pointer;font-size:1rem;color:#555;">+</button></div>')
+
+    cart_btn_style = ('flex:1;background:#ccc;color:#fff;border:0;padding:.7rem;border-radius:6px;'
+                      'cursor:not-allowed;font-weight:600;text-transform:uppercase;'
+                      'letter-spacing:.4px;' if disabled else
+                      'flex:1;background:#b49d84;color:#fff;border:0;padding:.7rem;border-radius:6px;'
+                      'cursor:pointer;font-weight:600;text-transform:uppercase;letter-spacing:.4px;')
+
+    rating = 0
+    try:
+        rating = round(float(product.get('rating') or 0))
+    except (TypeError, ValueError):
+        rating = 0
+    stars_html = (
+        f'<span style="color:#f5a623;font-size:.95rem;letter-spacing:2px;" title="Рейтинг">'
+        f'{"★" * rating}</span>'
+        f'<span style="color:#ddd;font-size:.95rem;letter-spacing:2px;">{"★" * (5 - rating)}</span>')
+
+    like_btn = (
+        f'<button type="button" class="wb-like-btn" data-id="{_esc(str(pid))}" data-name="{_esc(name)}" '
+        f'data-price="{final_price}" data-photo="{_esc(str(product.get("photo") or ""))}" '
+        f'data-url="/catalog/{_esc(src)}/{_esc(str(pid))}/" data-source="{_esc(src)}" '
+        'style="background:#fff;border:1px solid #ddd;border-radius:20px;color:#555;'
+        'cursor:pointer;font-size:.78rem;padding:.35rem .95rem;letter-spacing:.4px;">'
+        '♡ В ИЗБРАННОЕ</button>')
+
     section = str(product.get('site_section') or '').strip()
     section_link = (f'<a href="/catalog/{_esc(section)}/" style="color:#888;text-decoration:none;">'
                     f'{_esc(section)}</a> / ' if section else '')
 
     return (
         '<div class="wb-detail" style="max-width:1408px;margin:0 auto;padding:24px 16px 48px;">'
-        '<style>@media (max-width:768px){.wb-detail-grid{grid-template-columns:1fr !important;'
-        'gap:24px !important;}.wb-detail h1{font-size:1.3rem !important;}}</style>'
+        '<style>@media (max-width:1100px){.wb-detail-grid{grid-template-columns:1fr !important;'
+        'gap:28px !important;}.wb-detail h1{font-size:1.3rem !important;}}'
+        '@media (min-width:1101px){.wb-buy-card{position:sticky;top:16px;}}</style>'
         '<div style="font-size:.85rem;color:#888;margin-bottom:14px;">'
         '<a href="/" style="color:#888;text-decoration:none;">Главная</a> / '
         '<a href="/catalog/" style="color:#888;text-decoration:none;">Каталог</a> / '
         f'{section_link}<span>{_esc(name)}</span></div>'
         f'<h1 id="pagetitle" style="font-size:1.75rem;line-height:1.3;margin:0 0 24px;font-weight:600;">{_esc(name)}</h1>'
-        '<div class="wb-detail-grid" style="display:grid;grid-template-columns:minmax(280px,520px) 1fr;gap:48px;align-items:start;">'
+        '<div class="wb-detail-grid" style="display:grid;'
+        'grid-template-columns:minmax(260px,460px) minmax(300px,1fr) 340px;gap:36px;align-items:start;">'
         f'<div style="border:1px solid #f0f0f0;border-radius:8px;padding:16px;background:#fff;">{img_html}</div>'
         '<div>'
-        '<div style="display:flex;justify-content:flex-end;margin-bottom:4px;">'
-        f'<button type="button" class="wb-like-btn" data-id="{_esc(str(pid))}" data-name="{_esc(name)}" '
-        f'data-price="{final_price}" data-photo="{_esc(str(product.get("photo") or ""))}" '
-        f'data-url="/catalog/{_esc(src)}/{_esc(str(pid))}/" data-source="{_esc(src)}" '
-        'style="background:none;border:0;color:#c00;cursor:pointer;font-size:.85rem;">♡ В избранное</button>'
+        f'<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:10px;">'
+        f'{like_btn}<span>{stars_html}</span></div>'
+        f'<div style="font-size:.82rem;color:#999;margin-bottom:16px;">Артикул: {_esc(str(pid))}'
+        f'&nbsp;&nbsp;Бренд: {_esc(brand)}</div>'
+        f'{chips_html}'
+        f'{chars_panel}'
         '</div>'
-        f'<div style="font-size:.88rem;color:#777;margin-bottom:20px;">Артикул: {_esc(str(pid))}'
-        f'&nbsp;&nbsp;Бренд: {_esc(brand)}&nbsp;&nbsp;{stock_html}</div>'
-        f'{size_chips}'
-        f'<div style="margin:0 0 22px;display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap;">{price_html}</div>'
-        '<div style="max-width:440px;">'
+        '<div>'
+        '<div class="wb-buy-card" style="background:#fff;border:1px solid #eee;border-radius:8px;'
+        'box-shadow:0 2px 12px rgba(0,0,0,.06);padding:20px;">'
+        f'<div style="display:flex;align-items:baseline;gap:.4rem;flex-wrap:wrap;">{price_html}</div>'
+        f'{badge_html}'
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;'
+        'margin-top:.7rem;font-size:.85rem;flex-wrap:wrap;">'
+        f'<span>{stock_html}'
+        '<span style="color:#aaa;margin-left:.3rem;cursor:help;" title="Остаток обновляется автоматически">ⓘ</span></span>'
+        '<a href="#" style="color:#777;font-size:.82rem;text-decoration:underline;">📋 Нашли дешевле?</a>'
+        '</div>'
+        '<div style="display:flex;gap:.5rem;margin-top:14px;align-items:stretch;">'
+        f'{stepper_html}'
         f'<button type="button" class="wb-cart-btn" data-id="{_esc(str(pid))}" data-source="{_esc(src)}" '
-        'style="width:100%;background:#fff;color:#333;border:1px solid #999;padding:.75rem;border-radius:6px;'
-        'cursor:pointer;font-weight:600;text-transform:uppercase;letter-spacing:.4px;">🛒 В корзину</button>'
+        f'style="{cart_btn_style}">В корзину</button>'
+        '</div>'
         f'<button type="button" class="wb-buy-btn" data-id="{_esc(str(pid))}" data-name="{_esc(name)}" '
         f'data-price="{final_price}" data-stock="{stock}"{(" disabled" if disabled else "")} '
         f'style="{buy_style}">Купить в 1 клик</button>'
         f'{order_form}'
+        '<div style="margin-top:16px;font-size:.85rem;color:#555;line-height:1.6;">'
+        '🚚 Доставка по России — при оформленении заказа '
+        '<a href="/contacts/" style="color:#b49d84;text-decoration:underline;">Подробнее</a><br>'
+        '<label style="display:flex;align-items:center;gap:.35rem;margin-top:.4rem;cursor:pointer;color:#777;">'
+        '<input type="checkbox" style="margin:0;">🎁 Хочу в подарок</label></div>'
         f'{ext_html}'
         '</div>'
-        '<div style="margin-top:26px;font-size:.88rem;color:#555;line-height:1.6;">'
-        '🚚 Доставка по России — при оформлении заказа<br>'
-        '📦 Самовывоз: г. Череповец, ул. Гоголя 56</div>'
+        '<div style="margin-top:18px;border:1px solid #eee;border-radius:8px;padding:18px;text-align:center;">'
+        '<div style="font-size:1.5rem;">✉️</div>'
+        '<div style="font-weight:600;margin:.25rem 0;">Нужна консультация?</div>'
+        '<div style="font-size:.82rem;color:#888;margin-bottom:.6rem;">Наш специалист ответит на любой '
+        'интересующий вопрос</div>'
+        '<a href="/contacts/" style="display:block;border:1px solid #b49d84;color:#b49d84;'
+        'padding:.5rem;text-decoration:none;font-size:.8rem;letter-spacing:.5px;">ЗАДАТЬ ВОПРОС</a>'
+        '</div>'
         '</div></div>'
         f'{tabs_html}'
         '<div style="margin-top:30px;"><a href="/catalog/" style="color:#b49d84;text-decoration:underline;">← Все товары каталога</a></div>'

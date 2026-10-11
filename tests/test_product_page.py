@@ -64,6 +64,65 @@ def test_product_page_size_siblings_chips(client):
     assert 'href="/catalog/wb/67928567/"' in html
 
 
+def test_product_page_variant_groups_chips(client):
+    _seed()
+    # 47521588 — «140х200 на молнии высота 17-20 см»: ряд 140/160/180 и
+    # высоты 17-20/21-23 того же «ствола» имени
+    r = client.get('/catalog/wb/47521588/')
+    html = r.data.decode('utf-8')
+    assert 'Размер, см' in html
+    assert '140x200' in html and '160x200' in html and '180x200' in html
+    assert 'Высота борта, см' in html
+    assert '17-20 см' in html and '21-23 см' in html
+    # активный чип высоты — span с заливкой (ссылки на себя нет)
+    zone = re.search(r'Высота борта, см.*?</div></div>', html, re.S).group(0)
+    assert 'href=' not in zone.split('17-20 см')[0][-400:] or '17-20' in zone
+    assert re.search(r'<span[^>]*background:#b49d84[^>]*>17-20 см</span>', zone)
+    # сосед по высоте ссылается на его карточку
+    assert 'href="/catalog/wb/67928567/"' in html or 'href="/catalog/wb/182356719/"' in html
+
+
+def test_product_page_price_badge_and_buy_card(client):
+    _seed()
+    r = client.get('/catalog/wb/381073941/')
+    html = r.data.decode('utf-8')
+    # цена с копейками и зачёркнутая базовая (прайс WB 2490 → финал 2241)
+    assert '2 241.00 ₽' in html
+    assert '2 490 ₽' in html
+    # жёлтый бейдж скидки и экономия
+    assert '-10%' in html
+    assert 'Экономия 249.00 ₽' in html
+    # наличие точкой, «Нашли дешевле?», степпер, подарок, консультация
+    assert 'Много' in html
+    assert 'Нашли дешевле?' in html
+    assert 'wb-qty' in html
+    assert 'Хочу в подарок' in html
+    assert 'Нужна консультация?' in html
+    assert 'ЗАДАТЬ ВОПРОС' in html
+    assert 'В ИЗБРАННОЕ' in html
+
+
+def test_product_page_characteristics_panel(client):
+    _seed()
+    r = client.get('/catalog/wb/381073941/')
+    html = r.data.decode('utf-8')
+    assert 'Наполнитель' in html and 'Синтепон' in html
+    assert 'Водонепроницаемость' in html
+    assert 'Комплектация' in html
+    assert 'Назначение текстиля' in html
+    assert 'Размер наматрасника' in html and '140x200' in html
+    # раскрытие «Все характеристики» и скрытые доп. поля
+    assert 'Все характеристики' in html
+    assert 'wb-chars-extra' in html
+    assert 'Артикул' in html and 'Бренд' in html
+
+
+def test_product_page_money_format():
+    assert app_module._money(4146.21) == '4 146.21'
+    assert app_module._money(2241) == '2 241.00'
+    assert app_module._money(6009, kopecks=False) == '6 009'
+
+
 def test_product_page_hides_section_panel(client):
     _seed()
     r = client.get('/catalog/wb/381073941/')

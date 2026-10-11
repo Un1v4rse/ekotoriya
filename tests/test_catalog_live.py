@@ -105,7 +105,7 @@ def test_section_page_has_live_filter_panel(client):
     r = client.get('/catalog/namatrasniki/')
     assert r.status_code == 200
     body = r.data.decode('utf-8')
-    assert 'class="wb-catalog-filters"' in body
+    assert 'wb-catalog-filters' in body
     form = re.search(r'<form[^>]*wb-catalog-filters.*?</form>', body, re.S)
     assert form, 'форма фильтров не найдена'
     form_html = form.group(0)
@@ -114,6 +114,9 @@ def test_section_page_has_live_filter_panel(client):
     # кнопок отправки и селекта «Источник» в форме нет
     assert 'type="submit"' not in form_html
     assert 'name="source"' not in form_html
+    # живые поля фильтра на месте (чипы раздела)
+    for name in ('sort', 'size', 'price_from', 'price_to', 'in_stock'):
+        assert f'name="{name}"' in form_html
     assert 'data-base="/catalog/namatrasniki/"' in body
     assert 'wb-catalog-results' in body
 

@@ -1,7 +1,13 @@
 <!-- Заголовок раздела + хлебные крошки в aspro-стиле оригинала: h1 (на разделах
      — со счётчиком товаров catalog_view.total с живым предфильтром) и цепочка
-     Главная / Каталог / <раздел> с микроразметкой BreadcrumbList. -->
-<div class="maxwidth-theme">
+     Главная / Каталог / <раздел> с микроразметкой BreadcrumbList.
+     Отступ снизу — как у оригинала (.page-top .headerFlexWrap даёт 40px
+     до контента раздела). -->
+<style>
+.wb-section-header { padding-bottom: 40px; }
+@media (max-width: 767px) { .wb-section-header { padding-bottom: 24px; } }
+</style>
+<div class="maxwidth-theme wb-section-header">
     <div class="topic">
         <div class="topic__inner">
             <div class="topic__heading">
@@ -17,7 +23,7 @@
             <a href="/" itemprop="item"><span itemprop="name">Главная</span></a>
             <meta itemprop="position" content="1" />
         </span>
-        <span class="separator">-</span>
+        <span class="separator">—</span>
         {% if (page.url or '') == '/catalog/' %}
         <span itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
             <span itemprop="name">Каталог</span>
@@ -28,7 +34,7 @@
             <a href="/catalog/" itemprop="item"><span itemprop="name">Каталог</span></a>
             <meta itemprop="position" content="2" />
         </span>
-        <span class="separator">-</span>
+        <span class="separator">—</span>
         <span itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
             <span itemprop="name">{{ page.h1 or page.title }}</span>
             <meta itemprop="position" content="3" />
