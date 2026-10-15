@@ -167,9 +167,17 @@ class Product(db.Model):
                 d['stock_label'] = str(self.extra['stock_label'])
             if isinstance(self.extra.get('variants'), dict):
                 d['variants'] = self.extra['variants']
+            # состав, уход, размерная сетка, видео и бейджи — из extra
+            for key in ('composition', 'care', 'size_chart', 'video_url'):
+                if self.extra.get(key):
+                    d[key] = str(self.extra[key])
+            if isinstance(self.extra.get('badges'), list):
+                d['badges'] = [str(b) for b in self.extra['badges'] if b]
             chars = {k: v for k, v in self.extra.items()
                      if k not in ('description', 'seo_title', 'seo_description',
-                                  'gallery', 'stock_label', 'variants')}
+                                  'gallery', 'stock_label', 'variants',
+                                  'composition', 'care', 'size_chart',
+                                  'video_url', 'badges')}
             if chars:
                 d['characteristics'] = chars
         if self.manual_overrides:

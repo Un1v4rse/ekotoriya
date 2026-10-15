@@ -754,6 +754,9 @@
                         <h3>Товары Wildberries</h3>
                         <div class="field">
                             <input type="text" id="wb-search" placeholder="Поиск по имени или артикулу" oninput="renderProductList('wb')">
+                            <label style="display:flex;gap:.35rem;align-items:center;font-size:.82rem;margin-top:.35rem;">
+                                <input type="checkbox" id="wb-edits-only" onchange="renderProductList('wb')"> только с правками
+                            </label>
                         </div>
                         <div id="wb-products"></div>
 
@@ -763,6 +766,9 @@
                         <div class="field" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
                             <button type="button" class="primary" onclick="openProductEditor(null)">+ Создать товар</button>
                             <input type="text" id="site-search" placeholder="Поиск по имени или артикулу" oninput="renderProductList('site')" style="flex:1;min-width:14rem;">
+                            <label style="display:flex;gap:.35rem;align-items:center;font-size:.82rem;">
+                                <input type="checkbox" id="site-edits-only" onchange="renderProductList('site')"> только с правками
+                            </label>
                         </div>
                         <div id="site-products"></div>
                     </div>
@@ -831,6 +837,9 @@
                         <h3>Товары Ozon</h3>
                         <div class="field">
                             <input type="text" id="ozon-search" placeholder="Поиск по имени или артикулу" oninput="renderProductList('ozon')">
+                            <label style="display:flex;gap:.35rem;align-items:center;font-size:.82rem;margin-top:.35rem;">
+                                <input type="checkbox" id="ozon-edits-only" onchange="renderProductList('ozon')"> только с правками
+                            </label>
                         </div>
                         <div id="ozon-products"></div>
                     </div>
@@ -1668,6 +1677,15 @@
                 || (p.vendor_code || '').toLowerCase().includes(q);
         }
 
+        // «Есть правки» — товар редактировался в админке: закреплённые поля
+        // (manual_overrides) или дополнительные данные в extra (описание, SEO,
+        // галерея, характеристики, состав, бейджи и т.д.).
+        function productHasEdits(p) {
+            if (p.manual_overrides && p.manual_overrides.length) return true;
+            const ex = p.extra;
+            return !!ex && typeof ex === 'object' && Object.keys(ex).length > 0;
+        }
+
         async function loadAllProducts() {
             if (productsLoaded) return;
             try {
@@ -1714,6 +1732,7 @@
                 <div class="pimg">${p.photo ? `<img src="${p.photo}" alt="" loading="lazy">` : '<span class="no-photo">нет фото</span>'}</div>
                 <div class="pname">${escapeHtml(p.name)}</div>
                 <div class="pprice"><span class="old">${p.price} ₽</span><span class="new">${p.final_price} ₽</span></div>
+                ${productHasEdits(p) ? '<div class="help" style="color:#b8860b;margin-bottom:0.3rem;" title="Товар редактировался в админке (правки поверх данных WB/Ozon)">✎ есть правки</div>' : ''}
                 ${hidden ? '<div class="help" style="color:var(--danger);margin-bottom:0.3rem;">скрыт с сайта</div>' : ''}`;
             // вся карточка открывает редактор; клик по чекбоксу выделения —
             // по-прежнему только отмечает товар (label перехватывает клик)
@@ -1732,7 +1751,9 @@
                 return;
             }
             const q = (($(`${source}-search`) && $(`${source}-search`).value) || '').trim().toLowerCase();
-            const items = q ? productsOf(source).filter(p => productMatches(p, q)) : productsOf(source);
+            let items = q ? productsOf(source).filter(p => productMatches(p, q)) : productsOf(source);
+            const editsOnly = $(`${source}-edits-only`);
+            if (editsOnly && editsOnly.checked) items = items.filter(productHasEdits);
             container.innerHTML = '';
             if (!items.length) {
                 container.innerHTML = '<p class="help">Товары не найдены.</p>';
@@ -2970,6 +2991,14 @@
                 .filter(g => Array.isArray(variants[g]) && variants[g].length)
                 .map(g => PE_GROUP_TITLES[g] + ': ' + variants[g].join(', '))
                 .join('\n');
+            // состав, уход, размерная сетка, видео и бейджи
+            $('pe-composition').value = p ? (p.composition || '') : '';
+            $('pe-care').value = p ? (p.care || '') : '';
+            $('pe-size-chart').value = p ? (p.size_chart || '') : '';
+            $('pe-video-url').value = p ? (p.video_url || '') : '';
+            const badges = (p && p.badges) || [];
+            $('pe-badge-hit').checked = badges.includes('hit');
+            $('pe-badge-new').checked = badges.includes('new');
             renderPePins(p);
             $('pe-msg').textContent = '';
             $('pe-save').textContent = create ? 'Создать товар' : 'Сохранить товар';
@@ -3079,6 +3108,12 @@
                 gallery: $('pe-gallery').value.split('\n').map(s => s.trim()).filter(Boolean),
                 stock_label: $('pe-stock-label').value.trim(),
                 variants: variants,
+                composition: $('pe-composition').value.trim(),
+                care: $('pe-care').value.trim(),
+                size_chart: $('pe-size-chart').value.trim(),
+                video_url: $('pe-video-url').value.trim(),
+                badges: [$('pe-badge-hit').checked && 'hit',
+                         $('pe-badge-new').checked && 'new'].filter(Boolean),
             };
             if (!create) body.product_id = $('pe-id').value;
             body.site_section = $('pe-section').value;
@@ -3225,6 +3260,31 @@
             <div class="pe-field">
                 <label for="pe-variants">Группы вариантов — чипы на странице товара (каждая группа с новой строки: «Цвет: белый, серый»)</label>
                 <textarea id="pe-variants" style="min-height:64px;" placeholder="Цвет: белый, серый&#10;Размер: 90x200, 120x200"></textarea>
+            </div>
+            <div class="pe-field">
+                <label for="pe-composition">Состав (пусто — блок скрыт)</label>
+                <textarea id="pe-composition" style="min-height:56px;" placeholder="Например: верх — микрофибра, наполнитель — синтепон"></textarea>
+            </div>
+            <div class="pe-field">
+                <label for="pe-care">Уход (пусто — блок скрыт)</label>
+                <textarea id="pe-care" style="min-height:56px;" placeholder="Например: стирка при 30°C, не отбеливать"></textarea>
+            </div>
+            <div class="pe-field">
+                <label for="pe-size-chart">Размерная сетка (пусто — блок скрыт)</label>
+                <textarea id="pe-size-chart" style="min-height:56px;" placeholder="Например: 90x200 — высота борта до 25 см"></textarea>
+            </div>
+            <div class="row2">
+                <div class="pe-field">
+                    <label for="pe-video-url">Видео (URL youtube/rutube/mp4 — встраивается под галереей)</label>
+                    <input type="text" id="pe-video-url" placeholder="https://youtube.com/watch?v=…">
+                </div>
+                <div class="pe-field">
+                    <label>Бейджи на фото</label>
+                    <div style="display:flex;gap:1rem;align-items:center;padding-top:.35rem;">
+                        <label style="display:flex;gap:.35rem;align-items:center;"><input type="checkbox" id="pe-badge-hit"> Хит</label>
+                        <label style="display:flex;gap:.35rem;align-items:center;"><input type="checkbox" id="pe-badge-new"> Новинка</label>
+                    </div>
+                </div>
             </div>
             <div class="row2">
                 <div class="pe-field">

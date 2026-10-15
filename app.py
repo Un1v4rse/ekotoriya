@@ -850,6 +850,9 @@ def make_context(content, page):
         'seo_canonical': _absolute_url(page.get('canonical'), host_url)
                          or (host_url.rstrip('/') + request.path),
         'seo_product': None,
+        # Число статей блога (счётчик в боковом меню категорий статей).
+        'blog_articles_count': sum(1 for p in content.get('pages', [])
+                                   if str(p.get('slug', '')).startswith('blog__sovety-pokupatelyam__')),
     }
     # Глобальные зоны шапка/подвал (CN-T6): страница может переопределять конфиг
     # через page.settings.override_header/footer (+ header_config/footer_config).
@@ -2000,12 +2003,23 @@ def page_route(path):
 
 @app.errorhandler(404)
 def page_not_found(e):
-    """404 (CN-6): шаблон с редактируемыми блоками системной страницы '404'."""
-    content = load_content()
+    """404 (CN-6): полный aspro-шаблон как на оригинале (блок ошибки со стрелкой
+    «404», пояснением и кнопками); блоки системной страницы '404' при наличии
+    редактируются тем же редактором «на странице» и заменяют блок ошибки."""
+    content, page = _system_page('404')
+    if not page.get('template'):
+        page['template'] = 'pages/404.html'
+        save_content(content)
     edit_mode = _system_edit_mode('404')
-    html = render_template('pages/404.html', site=content.get('site', {}),
-                           menu=content.get('menu', []),
-                           blocks_html=_system_page_blocks_html('404', marked=edit_mode))
+    edit_page = dict(page)
+    if not edit_page.get('title') or edit_page.get('title') == '404':
+        edit_page['title'] = 'Страница не найдена'
+    blocks = page.get('blocks')
+    if not isinstance(blocks, list):
+        blocks = []
+    edit_page['content_html'] = (blocks_module.render_blocks_marked(blocks)
+                                 if edit_mode else blocks_module.render_blocks(blocks))
+    html = render_template(page['template'], **make_context(content, edit_page))
     if edit_mode:
         html = _inject_editor(html, '404')
     else:
@@ -4210,7 +4224,9 @@ def admin_product_update():
         prod.site_section = str(data.get('site_section') or '').strip()[:60]
         changes['site_section'] = prod.site_section
     if 'characteristics' in data or 'seo_title' in data or 'seo_description' in data \
-            or 'gallery' in data or 'stock_label' in data or 'variants' in data:
+            or 'gallery' in data or 'stock_label' in data or 'variants' in data \
+            or 'composition' in data or 'care' in data or 'size_chart' in data \
+            or 'video_url' in data or 'badges' in data:
         # характеристики, SEO, галерея, бейдж наличия и варианты — в extra
         extra = dict(prod.extra) if isinstance(prod.extra, dict) else {}
         if 'characteristics' in data:
@@ -4219,7 +4235,9 @@ def admin_product_update():
                 return jsonify({'success': False, 'error': 'characteristics must be an object'}), 400
             for k in list(extra.keys()):
                 if k not in ('description', 'seo_title', 'seo_description',
-                             'gallery', 'stock_label', 'variants'):
+                             'gallery', 'stock_label', 'variants',
+                             'composition', 'care', 'size_chart', 'video_url',
+                             'badges'):
                     extra.pop(k)
             for k, v in chars.items():
                 key = str(k).strip()[:200]
@@ -4274,6 +4292,34 @@ def admin_product_update():
             else:
                 extra.pop('variants', None)
             changes['variants'] = sorted(clean)
+        # состав, уход, размерная сетка, видео и бейджи («Хит»/«Новинка») —
+        # админские правки поверх данных API; пустое значение = удаление
+        # правки (возврат к дефолтному отсутствию блока на карточке)
+        for text_key, maxlen in (('composition', 3000), ('care', 3000),
+                                 ('size_chart', 5000), ('video_url', 500)):
+            if text_key in data:
+                if text_key == 'video_url':
+                    value = str(data.get(text_key) or '').strip()[:maxlen]
+                    if value and not value.startswith(('http://', 'https://', '/')):
+                        return jsonify({'success': False, 'error': 'video_url must be an URL'}), 400
+                else:
+                    value = str(data.get(text_key) or '').strip()[:maxlen]
+                if value:
+                    extra[text_key] = value
+                else:
+                    extra.pop(text_key, None)
+                changes[text_key] = value[:120]
+        if 'badges' in data:
+            badges = data.get('badges') or []
+            if not isinstance(badges, list):
+                return jsonify({'success': False, 'error': 'badges must be a list'}), 400
+            allowed = ('hit', 'new')
+            clean_badges = [str(b).strip() for b in badges if str(b).strip() in allowed]
+            if clean_badges:
+                extra['badges'] = clean_badges
+            else:
+                extra.pop('badges', None)
+            changes['badges'] = clean_badges
         prod.extra = extra
 
     if pinned:
@@ -4363,6 +4409,23 @@ def admin_product_create():
             clean[key] = vals
     if clean:
         extra['variants'] = clean
+    # состав, уход, размерная сетка, видео и бейджи — как в product-update
+    for text_key, maxlen in (('composition', 3000), ('care', 3000),
+                             ('size_chart', 5000)):
+        value = str(data.get(text_key) or '').strip()[:maxlen]
+        if value:
+            extra[text_key] = value
+    video_url = str(data.get('video_url') or '').strip()[:500]
+    if video_url:
+        if not video_url.startswith(('http://', 'https://', '/')):
+            return jsonify({'success': False, 'error': 'video_url must be an URL'}), 400
+        extra['video_url'] = video_url
+    badges = data.get('badges') or []
+    if not isinstance(badges, list):
+        return jsonify({'success': False, 'error': 'badges must be a list'}), 400
+    clean_badges = [str(b).strip() for b in badges if str(b).strip() in ('hit', 'new')]
+    if clean_badges:
+        extra['badges'] = clean_badges
     rating = None
     if data.get('rating') not in (None, ''):
         try:
@@ -5354,6 +5417,35 @@ def _product_detail_html(product, site=None):
     else:
         img_html = ''
 
+    # Бейджи из админки («Хит»/«Новинка», extra['badges']) — поверх фото.
+    raw_badges = product.get('badges')
+    if isinstance(raw_badges, list) and raw_badges:
+        badge_names = {'hit': 'Хит', 'new': 'Новинка'}
+        badges_html = ''.join(
+            f'<span style="display:inline-block;background:#b49d84;color:#fff;'
+            f'font-size:.72rem;font-weight:700;padding:.18rem .55rem;'
+            f'border-radius:3px;margin:0 .35rem .35rem 0;">'
+            f'{_esc(badge_names.get(str(b), str(b)))}</span>'
+            for b in raw_badges if badge_names.get(str(b)) or str(b).strip())
+        img_html = ('<div style="position:relative;">'
+                    f'<div style="position:absolute;top:.4rem;left:.4rem;z-index:2;">'
+                    f'{badges_html}</div>{img_html}</div>')
+
+    # Видео из админки (extra['video_url']) — iframe под галереей (16:9).
+    video_url = str(product.get('video_url') or '').strip()
+    if video_url and video_url.startswith(('http://', 'https://')):
+        # youtube/vimeo/обычный mp4 — универсальный embed через iframe
+        embed_url = video_url
+        m_yt = _re.search(r'(?:youtube\.com/watch\?v=|youtu\.be/)([\w-]{6,})', video_url)
+        if m_yt:
+            embed_url = f'https://www.youtube.com/embed/{m_yt.group(1)}'
+        img_html += (
+            '<div style="margin-top:.8rem;position:relative;'
+            'padding-top:56.25%;max-width:460px;margin-left:auto;margin-right:auto;">'
+            f'<iframe src="{_esc(embed_url)}" loading="lazy" allowfullscreen '
+            'style="position:absolute;top:0;left:0;width:100%;height:100%;'
+            'border:0;border-radius:6px;"></iframe></div>')
+
     # Группы вариантов (чипы-ссылки на товары-соседи; активный — заливка темы).
     variants = _product_variants(product)
 
@@ -5464,6 +5556,21 @@ def _product_detail_html(product, site=None):
     desc_html = (f'<div style="line-height:1.7;color:#333;white-space:pre-line;">{_esc(desc)}</div>'
                  if desc else
                  '<div style="color:#888;">Описание появится в ближайшее время.</div>')
+
+    # Состав / уход / размерная сетка — правки из админки (extra), блоками
+    # под описанием (заголовок + текст, как секции карточки на оригинале).
+    def _desc_section(title, text):
+        return (
+            f'<div style="margin-top:1.4rem;"><div style="font-weight:700;'
+            f'font-size:1rem;margin-bottom:.5rem;">{_esc(title)}</div>'
+            f'<div style="line-height:1.7;color:#333;white-space:pre-line;">'
+            f'{_esc(text)}</div></div>')
+
+    for _title, _key in (('Состав', 'composition'), ('Уход', 'care'),
+                         ('Размерная сетка', 'size_chart')):
+        _val = str(product.get(_key) or '').strip()
+        if _val:
+            desc_html += _desc_section(_title, _val)
 
     def _tab_btn(tab, label, active):
         return (
