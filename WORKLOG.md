@@ -20,6 +20,76 @@
 
 ---
 
+## [2026-10-16 20:30] Задача: [цикл4-этап-6] Вёрстка «О компании»/«Отзывы»/«Документы» + рабочая кнопка «Оставить отзыв»
+- Статус: done
+- Сделано:
+  1) **6.3 Отзывы (система, как на оригинале)**: модель `models.Review` (name,
+     rating 1–5, text, product_name, approved=False по умолчанию, created_at);
+     `migrate_cycle8.py` (CREATE TABLE IF NOT EXISTS, подключён в app.py рядом
+     с migrate_cycle7). Эндпоинты: `POST /api/review` (rate-limit 10/мин,
+     валидация: рейтинг int 1–5, имя ≤100, текст ≤5000, product_name ≤300;
+     по умолчанию approved=False — модерация), `/admin/api/reviews`,
+     `/admin/api/review/moderate`, `/admin/api/review/delete` (все с аудитом).
+     Серверный рендер `_approved_reviews_html()` в app.py: карточки
+     `.wb-review-card` (имя, звёзды, дата, текст, «Товар: …»), передаётся в
+     make_context как `reviews_dynamic` только для slug `company__reviews`
+     и вставляется в `templates/pages/company__reviews.html` перед content_html.
+     Форма и JS — **отдельный файл `static/js/review-form.js`** (окончательное
+     решение: JS НЕ инлайнится в Python-литералы), подключение через REVIEW_JS_SRC
+     с версией по mtime в `_inject_lazyload_fix`. Перехват клика по битой
+     bitrix-jqm кнопке `.add_review .btn,[data-name="send_review"],
+     [data-param-form_id="REVIEW"]` — была мёртвая → «бесконечная загрузка».
+     Форма попапа: имя, рейтинг (звёзды 1–5), товар (опционально), текст →
+     POST /api/review → «Спасибо, отзыв появится после модерации». CSS — REVIEW_CSS
+     (лента, кнопка «Отзыв полностью» line-clamp 6, контейнеры, мобильные
+     правила ≤640px). Админка: раздел «Отзывы покупателей» после «Заявок»:
+     список (новые сверху, фильтр одобренные/на модерации), одобрить/скрыть,
+     удалить.
+  2) **6.4 Документы**: на оригинале ровно 2 PDF — «Декларация о соответствии»
+     (76,4 кб) и «Cвидетельство Экотория» (857,3 кб, латинская C — как в
+     оригинале). Скачан `static/upload/iblock/f84/gqz86mfakxtkn0hp18kmpdndecfyh6qs.pdf`
+     (877 869 байт, PDF 1.7). `content_html` страницы `company__docs` в dev-БД
+     пересобран по образцу оригинала (обёртка item-views items-list1
+     documents-mode + 2 карточки со ссылками на /static/upload/iblock/…).
+     **ВАЖНО: правка content_html «Документы» живёт только в dev-БД. При
+     деплое (этап 9) применить к прод-БД** — скрипт правки: взять content_html
+     из dev-БД (storage: таблица pages, slug=company__docs) и записать в
+     прод-БД тем же storage.save_content либо скопировать UPDATE-выражение.
+  3) **6.1 «О компании» + 6.2 «Отзывы»**: контейнеры через CSS-инжект REVIEW_CSS
+     (`#content … .container{max-width:1344px;margin:0 auto;padding:0 16px}`)
+     — без правок БД. Скриншоты (chrome-devtools MCP): «О компании» 1366px
+     (контент в границах 30…1336), «Отзывы» 390px мобильная (карточки во всю
+     ширину, без горизонтального скролла, форма попапа корректна), «Документы»
+     (2 карточки PDF в контейнере). Мобильная лента отзывов: ширина карточек
+     100%, дата+имена не ломаются, «Отзыв полностью» работает.
+  4) **Фикс регрессии тестов**: полный прогон упал на
+     `tests/test_section_page_layout.py::test_section_page_layout_markup` и
+     `::test_section_page_subcategory_tiles` (`assert 'Размер, см' in html`).
+     Причина: Flask-Caching SimpleCache глобален между тестами;
+     `tests/test_reviews.py` делает GET страницы → `get_products()` кэширует
+     пустой список из свежей drop_all-БД; фикстура `demo_products` не сбрасывала
+     кэш. Фикс: добавлен `app_module.invalidate_site_cache()` после
+     `wb_sync.sync(token=None, demo=True)` в фикстуре.
+- Изменённые файлы: `app.py` (Review-эндпоинты, _approved_reviews_html, REVIEW_CSS,
+  REVIEW_JS_SRC-инжект), `models.py` (Review), `migrate_cycle8.py` (новый),
+  `static/js/review-form.js` (новый), `templates/pages/company__reviews.html`,
+  `templates/admin.html` (раздел отзывов), `static/upload/iblock/f84/gqz86mfakxtkn0hp18kmpdndecfyh6qs.pdf`
+  (новый), `tests/test_reviews.py` (новый, 7 тестов), `tests/test_section_page_layout.py`
+  (инвалидация кэша в фикстуре).
+- Проверки: полный прогон `pytest -q` — **418 passed** (167 с; 411 базовых + 7
+  отзывов). `node --check static/js/review-form.js` — ок. Визуальная проверка
+  страниц через chrome-devtools MCP (сервер :5000): отзывы/документы/о компании,
+  мобильная 390px, попап формы.
+- Бэкапы: актуальный `backups/backup_2026-10-12_19-35` (ротация макс. 3).
+- Следующий шаг: этап 7 — минимальные профили пользователей (данные, история
+  заказов с повтором, чат клиент↔админ с ответом из админки).
+- Примечания: контейнеры «О компании»/«Отзывы»/«Документы» сделаны CSS-инжектом,
+  не правками БД — при деплое ничего переносить не нужно, кроме content_html
+  «Документы» (см. п.2). Визуальный пикер иконок по-прежнему не делался (как в
+  этапе 5). Модерация отзывов обязательна — на сайте видны только approved.
+
+---
+
 ## [2026-10-15 23:55] Задача: [цикл4-этап-5] Кнопки с действиями + иконки в конструкторе
 - Статус: done
 - Сделано:

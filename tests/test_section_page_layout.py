@@ -18,6 +18,7 @@ def client():
 @pytest.fixture()
 def demo_products():
     wb_sync.sync(token=None, demo=True)
+    app_module.invalidate_site_cache()
     return [p['nm_id'] for p in wb_sync.load_products()]
 
 

@@ -371,6 +371,33 @@ class FeedbackRequest(db.Model):
         }
 
 
+class Review(db.Model):
+    """Отзывы покупателей (страница «Отзывы», цикл 4 / этап 6).
+
+    approved=False по умолчанию — отзыв появляется на сайте после модерации
+    в админке. product_name — необязательная привязка к товару."""
+    __tablename__ = 'reviews'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    rating = db.Column(db.Integer, default=5)                # 1..5
+    text = db.Column(db.Text, default='')
+    product_name = db.Column(db.String(500), default='')
+    approved = db.Column(db.Boolean, default=False, index=True)
+    created_at = db.Column(db.DateTime, default=utcnow, index=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name or '',
+            'rating': self.rating or 5,
+            'text': self.text or '',
+            'product_name': self.product_name or '',
+            'approved': bool(self.approved),
+            'created_at': self.created_at.isoformat(timespec='seconds') if self.created_at else '',
+        }
+
+
 class AuditLog(db.Model):
     """Аудит-лог действий админов (AD-4, PR-7)."""
     __tablename__ = 'audit_log'

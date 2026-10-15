@@ -165,6 +165,13 @@ try:
 except Exception as _migrate_err:
     print(f'[migrate_cycle7] пропущено: {_migrate_err}')
 
+# Миграция «цикл 8» (цикл 4 / этап 6): reviews — отзывы покупателей (модерация).
+try:
+    import migrate_cycle8
+    migrate_cycle8.migrate(app)
+except Exception as _migrate_err:
+    print(f'[migrate_cycle8] пропущено: {_migrate_err}')
+
 # Кэширование (AR-3): SimpleCache по умолчанию, тип — через env CACHE_TYPE.
 from flask_caching import Cache
 cache = Cache(app, config={
@@ -898,6 +905,9 @@ def make_context(content, page):
         # Число статей блога (счётчик в боковом меню категорий статей).
         'blog_articles_count': sum(1 for p in content.get('pages', [])
                                    if str(p.get('slug', '')).startswith('blog__sovety-pokupatelyam__')),
+        # Одобренные отзывы покупателей — только на странице «Отзывы» (PG-6.3).
+        'reviews_dynamic': (_approved_reviews_html()
+                            if page.get('slug') == 'company__reviews' else ''),
     }
     # Глобальные зоны шапка/подвал (CN-T6): страница может переопределять конфиг
     # через page.settings.override_header/footer (+ header_config/footer_config).
@@ -2871,6 +2881,66 @@ CTOR_ACTION_JS = (
 )
 
 
+# Отзывы (цикл 4 / этап 6): кнопка «Оставить свой отзыв» (bitrix-jqm в клоне
+# мёртвая — бесконечная загрузка) открывает рабочую форму: имя, оценка 1–5,
+# товар (необязательно), текст → POST /api/review (на модерацию). Динамическая
+# лента одобренных отзывов — .wb-reviews-dynamic (серверный рендер). Длинные
+# тексты лент обрезаются с кнопкой «Отзыв полностью». Мобильные правила ≤640px.
+REVIEW_CSS = (
+    '<style>'
+    '.wb-review-stars-input{display:flex;gap:4px;margin-bottom:10px;}'
+    '.wb-review-stars-input input{position:absolute;opacity:0;pointer-events:none;}'
+    '.wb-review-stars-input label{font-size:28px;color:#ccc;cursor:pointer;line-height:1;}'
+    '.wb-review-stars-input input:checked ~ label,'
+    '.wb-review-stars-input label:hover,'
+    '.wb-review-stars-input label:hover ~ label{color:#e8b64c;}'
+    '.wb-review-stars-input input:checked + label{color:#e8b64c;}'
+    '.wb-reviews-dynamic{max-width:1344px;margin:0 auto;padding:16px 24px;box-sizing:border-box;}'
+    '.wb-reviews-dynamic h2{font-size:1.5rem;margin:0 0 16px;}'
+    '.wb-review-card{background:#fff;border:1px solid #eee;border-radius:10px;'
+    'padding:18px 20px;margin-bottom:14px;}'
+    '.wb-review-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:6px;}'
+    '.wb-review-name{font-weight:600;font-size:1.05rem;}'
+    '.wb-review-stars{color:#e8b64c;letter-spacing:2px;}'
+    '.wb-review-date{color:#999;font-size:0.85rem;margin-left:auto;}'
+    '.wb-review-product{color:#888;font-size:0.85rem;margin-bottom:4px;}'
+    '.wb-review-text{color:#333;font-size:0.95rem;line-height:1.55;}'
+    '.wb-review-text.clamped{display:-webkit-box;-webkit-line-clamp:6;'
+    '-webkit-box-orient:vertical;overflow:hidden;}'
+    '.wb-review-toggle{display:inline-block;margin-top:8px;border:0;background:none;'
+    'color:#b49d84;cursor:pointer;font-size:0.9rem;text-decoration:underline;padding:0;}'
+    # PG-6.1/6.4: контейнеры страниц «О компании»/«Отзывы»/«Документы»
+    '#content .middle > .right_block > .middle > .container,'
+    '#content .middle > .container{max-width:1344px;margin-left:auto;margin-right:auto;'
+    'padding-left:24px;padding-right:24px;box-sizing:border-box;}'
+    '#content .add_review{max-width:1344px;margin:0 auto;padding:16px 24px;box-sizing:border-box;}'
+    '#content .front_review .maxwidth-theme{max-width:1344px;box-sizing:border-box;}'
+    '#content .body-info{max-width:1344px;margin-left:auto;margin-right:auto;'
+    'padding-left:24px;padding-right:24px;box-sizing:border-box;}'
+    # PG-6.2: мобильная вёрстка ленты отзывов (ширина ≤ 640px)
+    '@media (max-width:640px){'
+    '#content{overflow-x:hidden;}'
+    '#content .container,#content .add_review,#content .body-info,'
+    '.wb-reviews-dynamic{padding-left:14px;padding-right:14px;}'
+    '#content .front_review .item{padding:12px !important;}'
+    '#content .front_review .item-wrapper{padding:0 !important;}'
+    '#content .front_review .top-info{float:none !important;width:100% !important;'
+    'margin:0 0 8px !important;}'
+    '#content .front_review .text{margin-left:0 !important;}'
+    '#content .front_review .text .wb-review-text,'
+    '#content .front_review .text > div,'
+    '#content .front_review .text{font-size:0.92rem !important;}'
+    '.wb-review-card{padding:14px;}'
+    '.wb-review-head{gap:6px;}'
+    '.wb-review-date{margin-left:0;width:100%;}'
+    '}'
+    '</style>'
+)
+
+# JS формы отзыва — отдельный файл static/js/review-form.js (кавычки в
+# разметке формы не проходят через Python-литералы надёжно); версия по mtime.
+REVIEW_JS_SRC = '<script src="/static/js/review-form.js?v={v}" defer></script>'
+
 CATALOG_LIVE_JS = (
     '<script>(function(){'
     'if(window.__wbCatalogLive)return;window.__wbCatalogLive=1;'
@@ -2970,6 +3040,7 @@ def _inject_lazyload_fix(html):
         return html
     html = _rewrite_legacy_product_links(html)
     fix_ver = int(os.path.getmtime(os.path.join(BASE_DIR, 'static', 'js', 'lazyload-fix.js')))
+    review_ver = int(os.path.getmtime(os.path.join(BASE_DIR, 'static', 'js', 'review-form.js')))
     base = json.dumps(_section_catalog_base())
     liked_ids = _visitor_liked_ids()
     liked = json.dumps(liked_ids)
@@ -2996,6 +3067,8 @@ def _inject_lazyload_fix(html):
               + SUBSCRIBE_JS + '\n'
               + CTOR_ACTION_CSS + '\n'
               + CTOR_ACTION_JS + '\n'
+              + REVIEW_CSS + '\n'
+              + REVIEW_JS_SRC.format(v=review_ver) + '\n'
               # Мёртвая пагинация категорий: «Показать ещё» → все товары раздела
               # одним списком, номера страниц → тот же список (?page=N игнорируется
               # в режиме per_page=all).
@@ -6359,6 +6432,108 @@ def admin_api_feedback_delete():
     db.session.commit()
     _audit_log('feedback.delete', 'feedback', fid)
     return jsonify({'success': True})
+
+
+# Отзывы покупателей (цикл 4 / этап 6): форма на странице «Отзывы»,
+# модерация в админке, вывод одобренных на сайте.
+@app.route('/api/review', methods=['POST'])
+@_rate_limit(10)
+def api_review():
+    """Публичная форма «Оставить отзыв»: имя/оценка/текст → reviews (на модерацию)."""
+    from models import Review
+    data = request.get_json(silent=True) or request.form.to_dict() or {}
+    name = (data.get('name') or '').strip()[:200]
+    text = (data.get('text') or '').strip()[:8000]
+    product_name = (data.get('product_name') or '').strip()[:500]
+    try:
+        rating = int(data.get('rating'))
+    except (TypeError, ValueError):
+        rating = 0
+    if not name:
+        return jsonify({'success': False, 'error': 'Укажите имя'}), 400
+    if not text:
+        return jsonify({'success': False, 'error': 'Напишите текст отзыва'}), 400
+    if rating < 1 or rating > 5:
+        return jsonify({'success': False, 'error': 'Оценка — от 1 до 5'}), 400
+    db.session.add(Review(name=name, rating=rating, text=text,
+                          product_name=product_name, approved=False))
+    db.session.commit()
+    return jsonify({'success': True,
+                    'message': 'Спасибо! Ваш отзыв появится на сайте после проверки.'})
+
+
+@app.route('/admin/api/reviews')
+@admin_required
+def admin_api_reviews():
+    """Список отзывов для админки (сначала непроверенные)."""
+    from models import Review
+    rows = db.session.query(Review).order_by(Review.approved.asc(), Review.id.desc()).limit(500).all()
+    return jsonify({'success': True, 'reviews': [r.to_dict() for r in rows]})
+
+
+@app.route('/admin/api/review/moderate', methods=['POST'])
+@admin_required
+def admin_api_review_moderate():
+    """Одобрить/скрыть отзыв — с аудитом."""
+    from models import Review
+    data = request.get_json() or {}
+    rid = data.get('id')
+    if not rid:
+        return jsonify({'success': False, 'error': 'id обязателен'}), 400
+    row = db.session.get(Review, int(rid))
+    if not row:
+        return jsonify({'success': False, 'error': 'Отзыв не найден'}), 404
+    row.approved = bool(data.get('approved'))
+    db.session.commit()
+    _audit_log('review.moderate', 'review', rid, {'approved': row.approved})
+    return jsonify({'success': True, 'approved': row.approved})
+
+
+@app.route('/admin/api/review/delete', methods=['POST'])
+@admin_required
+def admin_api_review_delete():
+    """Удаление отзыва — с аудитом."""
+    from models import Review
+    data = request.get_json() or {}
+    rid = data.get('id')
+    if not rid:
+        return jsonify({'success': False, 'error': 'id обязателен'}), 400
+    row = db.session.get(Review, int(rid))
+    if not row:
+        return jsonify({'success': False, 'error': 'Отзыв не найден'}), 404
+    db.session.delete(row)
+    db.session.commit()
+    _audit_log('review.delete', 'review', rid)
+    return jsonify({'success': True})
+
+
+def _approved_reviews_html(limit=50):
+    """HTML-лента одобренных отзывов для страницы «Отзывы» (новые сверху)."""
+    from markupsafe import escape as esc
+    from models import Review
+    rows = (db.session.query(Review)
+            .filter_by(approved=True)
+            .order_by(Review.id.desc())
+            .limit(limit).all())
+    if not rows:
+        return ''
+    cards = []
+    for r in rows:
+        stars = '★' * (r.rating or 5) + '☆' * (5 - (r.rating or 5))
+        text_html = '<br>'.join(esc(r.text).split('\n'))
+        product = (f'<div class="wb-review-product">Товар: {esc(r.product_name)}</div>'
+                   if r.product_name else '')
+        date = r.created_at.strftime('%d.%m.%Y') if r.created_at else ''
+        cards.append(
+            '<div class="wb-review-card">'
+            f'<div class="wb-review-head"><span class="wb-review-name">{esc(r.name)}</span>'
+            f'<span class="wb-review-stars" title="Оценка: {r.rating or 5} из 5">{stars}</span>'
+            f'<span class="wb-review-date">{date}</span></div>'
+            f'{product}'
+            f'<div class="wb-review-text">{text_html}</div>'
+            '</div>')
+    return ('<div class="wb-reviews-dynamic"><h2>Отзывы наших покупателей</h2>'
+            + ''.join(cards) + '</div>')
 
 
 @app.route('/admin/api/segments')

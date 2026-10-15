@@ -968,6 +968,13 @@
                     <div id="feedback-list" class="table-wrap">
                         <p class="help">Нажмите «Обновить список», чтобы загрузить заявки (кнопки конструктора с действием «Форма заявки»).</p>
                     </div>
+                    <h3 style="margin-top:1.4rem;">Отзывы покупателей</h3>
+                    <div class="field row">
+                        <button type="button" class="secondary" onclick="loadReviews()">🔄 Обновить список</button>
+                    </div>
+                    <div id="reviews-list" class="table-wrap">
+                        <p class="help">Нажмите «Обновить список», чтобы загрузить отзывы. Новые отзывы появляются на сайте только после одобрения.</p>
+                    </div>
                 </section>
 
                 <section id="tab-seo">
@@ -2152,6 +2159,63 @@
                 const result = await resp.json();
                 showMsg(result.success ? 'Заявка удалена' : 'Ошибка: ' + (result.error || ''), result.success);
                 if (result.success) loadFeedback();
+            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
+        }
+
+        /* Отзывы покупателей (форма «Оставить отзыв» на странице Отзывы) */
+        async function loadReviews() {
+            const container = $('reviews-list');
+            container.innerHTML = '<p class="help">Загрузка…</p>';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/reviews`);
+                const data = await resp.json();
+                renderReviews(data.success ? data.reviews : []);
+            } catch (e) {
+                container.innerHTML = '<p class="help">Ошибка: ' + e.message + '</p>';
+            }
+        }
+
+        function renderReviews(items) {
+            const container = $('reviews-list');
+            if (!items.length) { container.innerHTML = '<p class="help">Пока нет отзывов. Они появятся после отправки формы «Оставить свой отзыв» на странице сайта.</p>'; return; }
+            let html = '<table class="adm"><thead><tr><th>ID</th><th>Имя</th><th>Оценка</th><th>Отзыв</th><th>Товар</th><th>Дата</th><th>На сайте</th><th></th></tr></thead><tbody>';
+            items.forEach(r => {
+                const stars = '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating);
+                const short = (r.text || '').length > 80 ? (r.text || '').slice(0, 80) + '…' : (r.text || '');
+                html += `<tr><td>${r.id}</td><td>${escapeHtml(r.name)}</td><td style="color:#e8b64c;white-space:nowrap;">${stars}</td><td>${escapeHtml(short)}</td><td>${escapeHtml(r.product_name || '')}</td><td>${formatDate(r.created_at)}</td>`;
+                html += `<td>${r.approved ? '✅ да' : '⏳ ждёт'}</td>`;
+                html += `<td style="white-space:nowrap;">`;
+                if (!r.approved) html += `<button type="button" class="secondary" onclick="moderateReview(${r.id}, true)" title="Одобрить — показать на сайте">✔</button> `;
+                else html += `<button type="button" class="secondary" onclick="moderateReview(${r.id}, false)" title="Скрыть с сайта">🙈</button> `;
+                html += `<button type="button" class="secondary" onclick="deleteReview(${r.id})" title="Удалить отзыв">🗑</button></td></tr>`;
+            });
+            container.innerHTML = html + '</tbody></table>';
+        }
+
+        async function moderateReview(id, approved) {
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/review/moderate`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({id, approved})
+                });
+                const result = await resp.json();
+                showMsg(result.success ? (approved ? 'Отзыв одобрен и опубликован' : 'Отзыв скрыт с сайта') : 'Ошибка: ' + (result.error || ''), result.success);
+                if (result.success) loadReviews();
+            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
+        }
+
+        async function deleteReview(id) {
+            if (!confirm('Удалить отзыв безвозвратно?')) return;
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/review/delete`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({id})
+                });
+                const result = await resp.json();
+                showMsg(result.success ? 'Отзыв удалён' : 'Ошибка: ' + (result.error || ''), result.success);
+                if (result.success) loadReviews();
             } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
         }
 
