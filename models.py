@@ -349,6 +349,28 @@ class Subscriber(db.Model):
         }
 
 
+class FeedbackRequest(db.Model):
+    """Заявки с кнопок конструктора (действие «форма заявки»)."""
+    __tablename__ = 'feedback_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), default='')
+    phone = db.Column(db.String(60), default='')
+    message = db.Column(db.Text, default='')
+    page = db.Column(db.String(300), default='')             # страница, откуда заявка
+    created_at = db.Column(db.DateTime, default=utcnow, index=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name or '',
+            'phone': self.phone or '',
+            'message': self.message or '',
+            'page': self.page or '',
+            'created_at': self.created_at.isoformat(timespec='seconds') if self.created_at else '',
+        }
+
+
 class AuditLog(db.Model):
     """Аудит-лог действий админов (AD-4, PR-7)."""
     __tablename__ = 'audit_log'

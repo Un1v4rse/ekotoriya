@@ -20,6 +20,62 @@
 
 ---
 
+## [2026-10-15 23:55] Задача: [цикл4-этап-5] Кнопки с действиями + иконки в конструкторе
+- Статус: done
+- Сделано:
+  1) **5.1 Подписка на /contacts/**: форма wb-subscribe-form в футере страницы
+     контактов уже была (вставлена во все templates/pages/*.html в прошлом цикле);
+     проверено тестом, что на /contacts/ форма рендерится и POST /api/subscribe
+     с source=contacts-footer сохраняется. Отдельной кнопки «Подписаться» в
+     контенте контактов нет — подписка живёт в футере (как на оригинале).
+  2) **5.2 Действия кнопок конструктора** (blocks.py, btype == 'button'):
+     новое поле block['action']: link (дефолт, обратная совместимость) /
+     anchor (block['anchor'] → href="#id", id чистится regex) / tel (block['phone'])
+     / mailto (block['email']) / form / subscribe / popup. Для form/subscribe/popup
+     рендерится <a href="#" data-wb-ctor-action="…">; JS (app.py: CTOR_ACTION_JS,
+     инжектится в _inject_lazyload_fix рядом с SUBSCRIBE_JS) открывает попап:
+     «форма заявки» (имя/телефон/сообщение → POST /api/feedback → таблица
+     feedback_requests), «подписка» (email → POST /api/subscribe),
+     «текстовый попап» (контент из hidden .wb-ctor-popup-content рядом с кнопкой;
+     заголовок block['popup_title'], текст block['popup_text'], HTML экранируется,
+     переносы строк → <br>). Попап закрывается по крестику/оверлею/Esc. CSS — CTOR_ACTION_CSS.
+     Заявки: модель models.FeedbackRequest + migrate_cycle7.py (CREATE TABLE IF NOT
+     EXISTS, подключён в app.py) + эндпоинты /api/feedback (rate-limit 20),
+     /admin/api/feedback, /admin/api/feedback/delete (с аудитом).
+     Админка: раздел «Заявки с кнопок сайта» (рядом с подписчиками, вкладка клиентов):
+     таблица + удаление. Редактор (page-editor.js, renderButtonTab для type='button'):
+     селект «Действие по клику» + зависимые поля (ссылка/якорь/телефон/email/
+     заголовок+текст попапа), перерисовка панели через openRightPanel(idx).
+  3) **5.3 Иконки**: встроенный набор SVG в blocks.py (_SVG_ICONS, 19 иконок:
+     truck, shield, percent, chat, star, heart, phone, mail, check, arrow-right,
+     box, gift, clock, map-pin, wallet, award, refresh, factory, leaf) — stroke=
+     currentColor, принимают цвет текста блока. Синтаксис поля: icon:<имя>.
+     Хелпер _icon_html(value): icon:<имя> → inline SVG; http(s):// или /путь →
+     <img> (своя загрузка: SVG/PNG уже разрешены в медиатеке, UPLOAD_ALLOWED_EXTS);
+     иначе эмодзи/текст. Применён в блоке «Преимущества» (features) и в элементе
+     «Иконка» zero-блока (icon:<имя> или эмодзи ≤4 символов). Редактор: подсказки
+     со списком имён набора у полей иконок.
+     Отклонение от плана: визуальный пикер иконок не делал — ввод по имени
+     (icon:truck) + справка; дешевле и не ломает существующие поля. ~19 иконок
+     вместо ~30 (покрыты все сценарии ТЗ: доставка, гарантия, цены, контакты,
+     соцсети-заглушки, стрелки).
+- Изменённые файлы: blocks.py, models.py, migrate_cycle7.py (новый), app.py,
+  static/js/page-editor.js, templates/admin.html, tests/test_subscribe.py,
+  tests/test_button_actions.py (новый, 14 тестов), tests/test_icon_set.py
+  (новый, 9 тестов).
+- Проверки: pytest полный — 411 passed (было 387; +24 новых). В первом прогоне
+  флакнул test_page_save_conflict_409 (тайминг конфликта версий, не связан с
+  этапом) — в одиночку и при повторном полном прогоне зелёный. node --check
+  page-editor.js — OK.
+- Бэкапы: backups/backup_2026-10-12_19-35 (актуален, этап локальный).
+- Следующий шаг: этап 6 — вёрстка «О компании» (контейнер текста/фото),
+  «Отзывы» (мобильный дизайн + «Оставить отзыв»), «Документы» (контейнер +
+  сверка содержимого с оригиналом).
+- Примечания: правки контента в БД этап не требует (всё в коде). При деплое
+  миграция cycle7 отработает автоматически при старте контейнера.
+
+---
+
 ## [2026-10-15 22:40] Задача: [цикл4-этап-4] Единое каноническое лого
 - Статус: done
 - Сделано:

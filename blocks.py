@@ -339,6 +339,63 @@ _BTN_SHADOWS = {
 }
 
 
+# Встроенный набор SVG-иконок конструктора (цикл 4 / этап 5).
+# Использование в поле иконки: icon:<имя> — например icon:truck.
+# Рисуем stroke'ом currentColor: иконка принимает цвет текста блока.
+_SVG_ICONS = {
+    'truck': '<rect x="1" y="4" width="14" height="11" rx="1"/><path d="M15 8h4l3 3v4h-7V8z"/><circle cx="6" cy="18.5" r="2.2"/><circle cx="17.5" cy="18.5" r="2.2"/>',
+    'shield': '<path d="M12 2l8 3v6c0 5-3.5 9.3-8 11-4.5-1.7-8-6-8-11V5l8-3z"/><path d="M9 12l2 2 4-4"/>',
+    'percent': '<path d="M19 5L5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/>',
+    'chat': '<path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5z"/><path d="M9 11h.01M13 11h.01M17 11h.01"/>',
+    'star': '<path d="M12 2l3 6.5 7 .8-5.2 4.7 1.5 6.9L12 17.5 5.7 20.9l1.5-6.9L2 9.3l7-.8L12 2z"/>',
+    'heart': '<path d="M12 20.5C7 16.5 3 13.3 3 9.3 3 6.4 5.2 4.5 7.7 4.5c1.7 0 3.3.9 4.3 2.4 1-1.5 2.6-2.4 4.3-2.4 2.5 0 4.7 1.9 4.7 4.8 0 4-4 7.2-9 11.2z"/>',
+    'phone': '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.13.96.36 1.9.7 2.8a2 2 0 0 1-.45 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.45c.9.34 1.84.57 2.8.7A2 2 0 0 1 22 16.9z"/>',
+    'mail': '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 6L2 7"/>',
+    'check': '<path d="M20 6L9 17l-5-5"/>',
+    'arrow-right': '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    'box': '<path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+    'gift': '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/>',
+    'clock': '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    'map-pin': '<path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+    'wallet': '<path d="M20 7H4a2 2 0 0 1 0-4h14v4"/><path d="M20 7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5"/><circle cx="17" cy="13.5" r="1.2"/>',
+    'award': '<circle cx="12" cy="9" r="6"/><path d="M8.5 14L7 22l5-3 5 3-1.5-8"/>',
+    'refresh': '<path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/>',
+    'factory': '<path d="M2 20h20M4 20V9l5 3V9l5 3V9l5 3v8"/><path d="M17 5V2h3v6"/>',
+    'leaf': '<path d="M6 21c0-9 4-15 14-16-1 10-7 14-14 16z"/><path d="M6 21c3-6 7-9 11-11"/>',
+}
+
+SVG_ICON_NAMES = sorted(_SVG_ICONS.keys())
+
+
+def _svg_icon_html(name, size=48):
+    """Inline-SVG встроенной иконки набора; '' если имени нет."""
+    body = _SVG_ICONS.get((name or '').strip().lower())
+    if not body:
+        return ''
+    try:
+        size = max(12, min(120, int(size)))
+    except (TypeError, ValueError):
+        size = 48
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
+            f'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" '
+            f'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{body}</svg>')
+
+
+def _icon_html(value, size=48):
+    """Иконка по значению поля: icon:<имя> — SVG из набора; http(s):// или
+    /путь — <img> (своя загрузка через медиатеку); иначе — эмодзи/текст."""
+    value = (value or '').strip()
+    if not value:
+        return ''
+    if value.startswith('icon:'):
+        return _svg_icon_html(value[5:], size)
+    if re.fullmatch(r'[\w\-. /:%?&=]+', value) and ('/' in value or value.startswith('http')):
+        return f'<img class="cb-feature-icon" src="{esc(value)}" alt="" loading="lazy">'
+    if len(value) <= 4 and '<' not in value and '>' not in value:
+        return f'<div style="font-size:{max(16, min(96, size))}px;line-height:1;">{esc(value)}</div>'
+    return ''
+
+
 def _button_style(block, key='button_style'):
     """Inline-стили и data-атрибуты кнопки из block['button_style'].
 
@@ -654,14 +711,24 @@ def _zero_element_html(el, index):
                    f'allowfullscreen loading="lazy" title="Видео"></iframe>')
     else:  # icon
         icon = str(props.get('icon') or '').strip()
-        if not icon or len(icon) > 4 or '<' in icon or '>' in icon:
+        if not icon:
             return ''
         color = _color(props.get('color'), '#333333')
         size = _px(props.get('size'), 4, 200)
         size = 32 if size is None else size
-        content = (f'<div style="width:100%;height:100%;display:flex;align-items:center;'
-                   f'justify-content:center;color:{color};font-size:{size}px;line-height:1;">'
-                   f'{esc(icon)}</div>')
+        if icon.startswith('icon:'):
+            # Встроенная SVG-иконка набора (принимает цвет элемента)
+            svg = _svg_icon_html(icon[5:], size=max(12, min(200, int(size) * 2)))
+            if not svg:
+                return ''
+            content = (f'<div style="width:100%;height:100%;display:flex;align-items:center;'
+                       f'justify-content:center;color:{color};">{svg}</div>')
+        elif len(icon) <= 4 and '<' not in icon and '>' not in icon:
+            content = (f'<div style="width:100%;height:100%;display:flex;align-items:center;'
+                       f'justify-content:center;color:{color};font-size:{size}px;line-height:1;">'
+                       f'{esc(icon)}</div>')
+        else:
+            return ''
 
     link = _sanitize_url(el.get('link'))
     if link and etype != 'button':
@@ -746,7 +813,9 @@ def render_block(block):
 
     if btype == 'button':
         text = (block.get('text') or '').strip() or 'Подробнее'
-        url = _sanitize_url(block.get('url')) or '#'
+        action = (block.get('action') or 'link').strip()
+        if action not in ('link', 'anchor', 'tel', 'mailto', 'form', 'subscribe', 'popup'):
+            action = 'link'
         align = block.get('align', 'left')
         align_css = {'left': 'left', 'center': 'center', 'right': 'right'}.get(align, 'left')
         bstyle, battrs = _button_style(block)
@@ -754,7 +823,41 @@ def render_block(block):
             color = (block.get('color') or '#b49d84').strip() or '#b49d84'
             bstyle = (f'display:inline-block;background:{esc(color)};color:#fff;'
                       f'padding:0.8rem 2rem;border-radius:6px;text-decoration:none;font-weight:600;')
-        inner = f'<a href="{esc(url)}" class="btn btn-default btn-lg"{battrs} style="{bstyle}">{esc(text)}</a>'
+
+        href = '#'
+        extra = ''
+        if action == 'link':
+            href = _sanitize_url(block.get('url')) or '#'
+        elif action == 'anchor':
+            anchor = re.sub(r'[^A-Za-z0-9_\-]', '', str(block.get('anchor') or ''))[:60]
+            href = '#' + anchor if anchor else '#'
+        elif action == 'tel':
+            phone = re.sub(r'[^\d+]', '', str(block.get('phone') or ''))[:20]
+            href = 'tel:' + phone if phone else '#'
+        elif action == 'mailto':
+            email = re.sub(r'[^A-Za-z0-9@._\-]', '', str(block.get('email') or ''))[:200]
+            href = 'mailto:' + email if email else '#'
+        elif action in ('form', 'subscribe'):
+            # JS-обработчик (app.py, data-wb-ctor-action) открывает попап
+            # с формой заявки / подписки. href="#" — фолбэк без JS.
+            extra = f' data-wb-ctor-action="{action}"'
+        elif action == 'popup':
+            title = (block.get('popup_title') or '').strip()[:200]
+            body = (block.get('popup_text') or '').strip()[:5000]
+            # Текст попапа кладём в скрытый div рядом с кнопкой (не в
+            # data-атрибут — там кавычки/разметка ломаются); JS показывает его.
+            popup_html = ''
+            if title or body:
+                body_html = '<br>'.join(esc(body).split('\n'))
+                popup_html = (f'<div class="wb-ctor-popup-content" hidden>'
+                              f'<div class="wb-ctor-popup-title">{esc(title)}</div>'
+                              f'<div class="wb-ctor-popup-body">{body_html}</div></div>')
+            extra = ' data-wb-ctor-action="popup"'
+            inner = (f'<a href="#" class="btn btn-default btn-lg"{battrs}{extra} style="{bstyle}">{esc(text)}</a>'
+                     + popup_html)
+            return _block_wrapper(block, inner, extra_style=f'text-align:{align_css};margin:1.5rem 0')
+
+        inner = f'<a href="{esc(href)}" class="btn btn-default btn-lg"{battrs}{extra} style="{bstyle}">{esc(text)}</a>'
         return _block_wrapper(block, inner, extra_style=f'text-align:{align_css};margin:1.5rem 0')
 
     if btype == 'video':
@@ -1057,14 +1160,7 @@ def render_block(block):
             if not title and not text:
                 continue
             icon = (it.get('icon') or '').strip()
-            if icon:
-                if re.fullmatch(r'[\w\-. /:%?&=]+', icon) and ('/' in icon or icon.startswith('http')):
-                    icon_html = f'<img class="cb-feature-icon" src="{esc(icon)}" alt="" loading="lazy">'
-                else:
-                    # Эмодзи или короткий текст вместо картинки
-                    icon_html = f'<span class="cb-feature-icon" style="font-size:2rem;line-height:1;">{esc(icon)}</span>'
-            else:
-                icon_html = ''
+            icon_html = _icon_html(icon, size=40)
             items.append(
                 '<div class="cb-feature-card">'
                 f'{icon_html}<div class="cb-feature-title" style="{t_title}">{esc(title)}</div>'

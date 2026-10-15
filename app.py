@@ -158,6 +158,13 @@ try:
 except Exception as _migrate_err:
     print(f'[migrate_cycle6] пропущено: {_migrate_err}')
 
+# Миграция «цикл 7» (цикл 4 / этап 5): feedback_requests — заявки с кнопок конструктора.
+try:
+    import migrate_cycle7
+    migrate_cycle7.migrate(app)
+except Exception as _migrate_err:
+    print(f'[migrate_cycle7] пропущено: {_migrate_err}')
+
 # Кэширование (AR-3): SimpleCache по умолчанию, тип — через env CACHE_TYPE.
 from flask_caching import Cache
 cache = Cache(app, config={
@@ -2765,6 +2772,104 @@ SUBSCRIBE_JS = (
     '})();</script>'
 )
 
+# Кнопки конструктора с действиями (цикл 4 / этап 5): клик по ссылке с
+# data-wb-ctor-action открывает попап — форма заявки (POST /api/feedback),
+# форма подписки (POST /api/subscribe) или текст из .wb-ctor-popup-content
+# рядом с кнопкой (действие «попап»). Закрытие по крестику/оверлею/Esc.
+CTOR_ACTION_CSS = (
+    '<style>'
+    '.wb-ctor-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9998;}'
+    '.wb-ctor-modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);'
+    'background:#fff;border-radius:10px;max-width:440px;width:calc(100% - 32px);'
+    'padding:28px 24px 24px;z-index:9999;box-shadow:0 12px 40px rgba(0,0,0,.25);}'
+    '.wb-ctor-modal-close{position:absolute;top:8px;right:12px;border:0;background:none;'
+    'font-size:22px;line-height:1;cursor:pointer;color:#999;}'
+    '.wb-ctor-modal-title{margin:0 0 14px;font-size:1.25rem;}'
+    '.wb-ctor-modal input[type=text],.wb-ctor-modal input[type=tel],'
+    '.wb-ctor-modal input[type=email],.wb-ctor-modal textarea{width:100%;'
+    'box-sizing:border-box;padding:10px 12px;margin-bottom:10px;border:1px solid #ddd;'
+    'border-radius:6px;font-size:0.95rem;font-family:inherit;}'
+    '.wb-ctor-modal textarea{min-height:90px;resize:vertical;}'
+    '.wb-ctor-modal button[type=submit]{width:100%;padding:11px;border:0;border-radius:6px;'
+    'background:#b49d84;color:#fff;font-size:1rem;font-weight:600;cursor:pointer;}'
+    '.wb-ctor-modal .wb-ctor-msg{margin-top:10px;font-size:0.9rem;color:#666;}'
+    '.wb-ctor-popup-title{font-size:1.2rem;font-weight:600;margin-bottom:10px;}'
+    '.wb-ctor-popup-body{font-size:0.95rem;line-height:1.55;color:#333;}'
+    '</style>'
+)
+
+CTOR_ACTION_JS = (
+    '<script>(function(){'
+    'if(window.__wbCtorAction)return;window.__wbCtorAction=1;'
+    'function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c)'
+    '{return{"&":"&amp;","<":"&lt;",">":"&gt;",\'"\':"&quot;"}[c];});}'
+    'function close(){var o=document.querySelector(".wb-ctor-overlay"),'
+    'm=document.querySelector(".wb-ctor-modal");'
+    'if(o)o.remove();if(m)m.remove();}'
+    'function open(html){close();'
+    'var o=document.createElement("div");o.className="wb-ctor-overlay";'
+    'var m=document.createElement("div");m.className="wb-ctor-modal";'
+    'm.innerHTML=\'<button type="button" class="wb-ctor-modal-close" aria-label="Закрыть">&times;</button>\'+html;'
+    'm.querySelector(".wb-ctor-modal-close").addEventListener("click",close);'
+    'o.addEventListener("click",close);'
+    'document.body.appendChild(o);document.body.appendChild(m);'
+    'var f=m.querySelector("input");if(f)f.focus();}'
+    'function bindFeedback(form){'
+    'form.addEventListener("submit",function(e){e.preventDefault();'
+    'var btn=form.querySelector("[type=submit]");if(btn)btn.disabled=true;'
+    'var msg=form.parentElement.querySelector(".wb-ctor-msg");'
+    "fetch('/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},"
+    'body:JSON.stringify({name:form.fb_name.value,phone:form.fb_phone.value,'
+    'message:form.fb_message?form.fb_message.value:"",'
+    'page:location.pathname})})'
+    '.then(function(r){return r.json().then(function(d){return{status:r.status,data:d};});})'
+    '.then(function(res){var d=res.data||{};'
+    'if(msg){msg.style.color=d.success?"#2e7d32":"#c62828";'
+    'msg.textContent=d.message||(d.error||"Не удалось отправить. Попробуйте позже.");}'
+    'if(d.success)form.reset();})'
+    '.catch(function(){if(msg){msg.style.color="#c62828";'
+    'msg.textContent="Не удалось отправить. Попробуйте позже.";}})'
+    '.finally(function(){if(btn)btn.disabled=false;});});}'
+    'function bindSubscribe(form){'
+    'form.addEventListener("submit",function(e){e.preventDefault();'
+    'var btn=form.querySelector("[type=submit]");if(btn)btn.disabled=true;'
+    'var msg=form.parentElement.querySelector(".wb-ctor-msg");'
+    "fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},"
+    'body:JSON.stringify({email:form.email.value,source:"popup"})})'
+    '.then(function(r){return r.json().then(function(d){return{status:r.status,data:d};});})'
+    '.then(function(res){var d=res.data||{};'
+    'if(msg){msg.style.color=d.success?"#2e7d32":"#c62828";'
+    'msg.textContent=d.message||(d.error||"Не удалось подписаться. Попробуйте позже.");}'
+    'if(d.success)form.reset();})'
+    '.catch(function(){if(msg){msg.style.color="#c62828";'
+    'msg.textContent="Не удалось подписаться. Попробуйте позже.";}})'
+    '.finally(function(){if(btn)btn.disabled=false;});});}'
+    'document.addEventListener("keydown",function(e){if(e.key==="Escape")close();});'
+    "document.addEventListener('click',function(e){"
+    'var a=e.target.closest&&e.target.closest("[data-wb-ctor-action]");'
+    'if(!a)return;'
+    'var act=a.getAttribute("data-wb-ctor-action");'
+    'if(act==="form"){e.preventDefault();'
+    'open(\'<h3 class="wb-ctor-modal-title">Оставить заявку</h3>\''
+    '+ \'<form><input type="text" name="fb_name" placeholder="Ваше имя" required>\''
+    '+ \'<input type="tel" name="fb_phone" placeholder="Телефон" required>\''
+    '+ \'<textarea name="fb_message" placeholder="Сообщение (необязательно)"></textarea>\''
+    '+ \'<button type="submit">Отправить</button>\''
+    '+ \'<div class="wb-ctor-msg"></div></form>\');'
+    'bindFeedback(document.querySelector(".wb-ctor-modal form"));}'
+    'else if(act==="subscribe"){e.preventDefault();'
+    'open(\'<h3 class="wb-ctor-modal-title">Подписка на рассылку</h3>\''
+    '+ \'<form><input type="email" name="email" placeholder="Ваш e-mail" required>\''
+    '+ \'<button type="submit">Подписаться</button>\''
+    '+ \'<div class="wb-ctor-msg"></div></form>\');'
+    'bindSubscribe(document.querySelector(".wb-ctor-modal form"));}'
+    'else if(act==="popup"){e.preventDefault();'
+    'var c=a.parentElement&&a.parentElement.querySelector(".wb-ctor-popup-content");'
+    'if(c)open(c.innerHTML);}'
+    '},false);'
+    '})();</script>'
+)
+
 
 CATALOG_LIVE_JS = (
     '<script>(function(){'
@@ -2889,6 +2994,8 @@ def _inject_lazyload_fix(html):
               + CATALOG_LIVE_CSS + '\n'
               + CATALOG_LIVE_JS + '\n'
               + SUBSCRIBE_JS + '\n'
+              + CTOR_ACTION_CSS + '\n'
+              + CTOR_ACTION_JS + '\n'
               # Мёртвая пагинация категорий: «Показать ещё» → все товары раздела
               # одним списком, номера страниц → тот же список (?page=N игнорируется
               # в режиме per_page=all).
@@ -6206,6 +6313,51 @@ def admin_api_subscriber_delete():
     db.session.delete(sub)
     db.session.commit()
     _audit_log('subscriber.delete', 'subscriber', sid)
+    return jsonify({'success': True})
+
+
+# Заявки с кнопок конструктора (действие «форма заявки», цикл 4 / этап 5).
+@app.route('/api/feedback', methods=['POST'])
+@_rate_limit(20)
+def api_feedback():
+    """Публичная форма заявки с кнопки: name/phone/message → feedback_requests."""
+    from models import FeedbackRequest
+    data = request.get_json(silent=True) or request.form.to_dict() or {}
+    name = (data.get('name') or '').strip()[:200]
+    phone = re.sub(r'[^\d+\-() ]', '', str(data.get('phone') or '')).strip()[:60]
+    message = (data.get('message') or '').strip()[:5000]
+    page = (data.get('page') or '').strip()[:300]
+    if not name and not phone:
+        return jsonify({'success': False, 'error': 'Укажите имя или телефон'}), 400
+    db.session.add(FeedbackRequest(name=name, phone=phone, message=message, page=page))
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Заявка отправлена. Мы свяжемся с вами.'})
+
+
+@app.route('/admin/api/feedback')
+@admin_required
+def admin_api_feedback():
+    """Список заявок для админки."""
+    from models import FeedbackRequest
+    rows = db.session.query(FeedbackRequest).order_by(FeedbackRequest.id.desc()).limit(500).all()
+    return jsonify({'success': True, 'feedback': [r.to_dict() for r in rows]})
+
+
+@app.route('/admin/api/feedback/delete', methods=['POST'])
+@admin_required
+def admin_api_feedback_delete():
+    """Удаление заявки — с аудитом."""
+    from models import FeedbackRequest
+    data = request.get_json() or {}
+    fid = data.get('id')
+    if not fid:
+        return jsonify({'success': False, 'error': 'id обязателен'}), 400
+    row = db.session.get(FeedbackRequest, int(fid))
+    if not row:
+        return jsonify({'success': False, 'error': 'Заявка не найдена'}), 404
+    db.session.delete(row)
+    db.session.commit()
+    _audit_log('feedback.delete', 'feedback', fid)
     return jsonify({'success': True})
 
 

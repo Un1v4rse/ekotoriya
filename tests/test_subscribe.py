@@ -130,3 +130,32 @@ def test_subscribe_form_rendered_in_footer(client):
     assert 'wb-subscribe-form' in html
     assert 'action="/api/subscribe"' in html
     assert 'data-event="jqm" data-param-id="subscribe"' not in html
+
+
+def test_subscribe_form_rendered_on_contacts_page(client):
+    """На странице /contacts/ (блок «Подписаться на рассылку») — рабочая форма."""
+    import copy
+    import storage
+    content = copy.deepcopy(storage.load_content())
+    content.setdefault('pages', []).append({
+        'slug': 'contacts',
+        'url': '/contacts/',
+        'title': 'Контакты',
+        'h1': 'Контакты',
+        'template': 'pages/contacts.html',
+        'blocks': [],
+    })
+    storage.save_content(content)
+    app_module.invalidate_site_cache()
+
+    resp = client.get('/contacts/')
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'wb-subscribe-form' in html
+    assert 'action="/api/subscribe"' in html
+
+    # подписка, отправленная со страницы контактов, сохраняется
+    resp = client.post('/api/subscribe', json={'email': 'c@example.com', 'source': 'contacts-footer'})
+    assert resp.get_json()['success'] is True
+    sub = db.session.query(Subscriber).filter_by(email='c@example.com').one()
+    assert sub.source == 'contacts-footer'

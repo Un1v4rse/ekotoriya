@@ -961,6 +961,13 @@
                     <div id="subscribers-list" class="table-wrap">
                         <p class="help">Нажмите «Обновить список», чтобы загрузить подписчиков.</p>
                     </div>
+                    <h3 style="margin-top:1.4rem;">Заявки с кнопок сайта</h3>
+                    <div class="field row">
+                        <button type="button" class="secondary" onclick="loadFeedback()">🔄 Обновить список</button>
+                    </div>
+                    <div id="feedback-list" class="table-wrap">
+                        <p class="help">Нажмите «Обновить список», чтобы загрузить заявки (кнопки конструктора с действием «Форма заявки»).</p>
+                    </div>
                 </section>
 
                 <section id="tab-seo">
@@ -2108,6 +2115,43 @@
                 const result = await resp.json();
                 showMsg(result.success ? 'Подписчик удалён' : 'Ошибка: ' + (result.error || ''), result.success);
                 if (result.success) loadSubscribers();
+            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
+        }
+
+        /* Заявки с кнопок конструктора (действие «форма заявки») */
+        async function loadFeedback() {
+            const container = $('feedback-list');
+            container.innerHTML = '<p class="help">Загрузка…</p>';
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/feedback`);
+                const data = await resp.json();
+                renderFeedback(data.success ? data.feedback : []);
+            } catch (e) {
+                container.innerHTML = '<p class="help">Ошибка: ' + e.message + '</p>';
+            }
+        }
+
+        function renderFeedback(items) {
+            const container = $('feedback-list');
+            if (!items.length) { container.innerHTML = '<p class="help">Пока нет заявок. Они появятся, когда посетитель нажмёт кнопку с действием «Форма заявки» на сайте.</p>'; return; }
+            let html = '<table class="adm"><thead><tr><th>ID</th><th>Имя</th><th>Телефон</th><th>Сообщение</th><th>Страница</th><th>Дата</th><th></th></tr></thead><tbody>';
+            items.forEach(s => {
+                html += `<tr><td>${s.id}</td><td>${escapeHtml(s.name || '')}</td><td>${escapeHtml(s.phone || '')}</td><td>${escapeHtml(s.message || '')}</td><td>${escapeHtml(s.page || '')}</td><td>${formatDate(s.created_at)}</td><td><button type="button" class="secondary" onclick="deleteFeedback(${s.id})" title="Удалить заявку">🗑</button></td></tr>`;
+            });
+            container.innerHTML = html + '</tbody></table>';
+        }
+
+        async function deleteFeedback(id) {
+            if (!confirm('Удалить заявку?')) return;
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/feedback/delete`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({id})
+                });
+                const result = await resp.json();
+                showMsg(result.success ? 'Заявка удалена' : 'Ошибка: ' + (result.error || ''), result.success);
+                if (result.success) loadFeedback();
             } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
         }
 

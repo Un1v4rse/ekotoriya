@@ -2609,8 +2609,10 @@
             container.appendChild(field('Преимущества', itemsEditor(b.items, [
                 {key: 'title', label: 'Заголовок', placeholder: 'Гарантия качества'},
                 {key: 'text', label: 'Пояснение', type: 'textarea', placeholder: 'Гарантия на всю продукцию 1 год'},
-                {key: 'icon', label: 'Иконка: эмодзи (🏆) или ссылка', placeholder: '🚚 или /static/img/icon.svg'},
+                {key: 'icon', label: 'Иконка: набор (icon:truck), эмодзи (🏆) или ссылка', placeholder: 'icon:shield или 🚚 или /static/upload/icon.svg'},
             ], v => set('items', v))));
+            container.appendChild(el('div', 'pe-help')).textContent =
+                'Иконки: встроенный набор — icon:truck (доставка), icon:shield (гарантия), icon:percent (скидки), icon:chat (консультация), icon:star, icon:heart, icon:phone, icon:mail, icon:check, icon:arrow-right, icon:box, icon:gift, icon:clock, icon:map-pin, icon:wallet, icon:award, icon:refresh, icon:factory, icon:leaf — или эмодзи, или ссылка на свой SVG/картинку (загрузите файл в медиатеке).';
         } else if (type === 'table') {
             container.appendChild(field('Заголовок (можно пусто)', textInput(b.title, v => set('title', v))));
             container.appendChild(field('Первая строка — шапка таблицы', selectInput([
@@ -2956,7 +2958,43 @@
         const TEXT_KEY = {button: 'text', banner: 'button', timer: 'button_text', form: 'button'}[type];
         const LINK_KEY = {button: 'url', banner: 'url', timer: 'button_link'}[type];
         if (TEXT_KEY) container.appendChild(field('Текст на кнопке', textInput(b[TEXT_KEY], v => set(TEXT_KEY, v))));
-        if (LINK_KEY) container.appendChild(linkField('Ссылка кнопки', b[LINK_KEY], v => set(LINK_KEY, v)));
+        if (type === 'button') {
+            // Действие кнопки (цикл 4 / этап 5): ссылка / якорь / tel / mailto /
+            // форма заявки / подписка / текстовый попап. Рендер в blocks.py.
+            const act = b.action || 'link';
+            const setAct = v => {
+                if (v === 'link') delete b.action; else b.action = v;
+                markDirty();
+                recordHistory();
+                openRightPanel(idx);
+            };
+            container.appendChild(field('Действие по клику', selectInput([
+                ['link', 'Переход по ссылке'],
+                ['anchor', 'Прокрутка к якорю на странице'],
+                ['tel', 'Звонок (телефон)'],
+                ['mailto', 'Письмо (email)'],
+                ['form', 'Форма заявки (всплывающее окно)'],
+                ['subscribe', 'Подписка на рассылку (всплывающее окно)'],
+                ['popup', 'Текстовое всплывающее окно'],
+            ], act, setAct)));
+            if (act === 'link') {
+                container.appendChild(linkField('Ссылка кнопки', b.url, v => set('url', v)));
+            } else if (act === 'anchor') {
+                container.appendChild(field('ID якоря', textInput(b.anchor, v => set('anchor', v), 'например: about'),
+                    'Укажите тот же CSS-класс блока, к которому вести (вкладка «Дополнительно» целевого блока).'));
+            } else if (act === 'tel') {
+                container.appendChild(field('Телефон', textInput(b.phone, v => set('phone', v), '+7 900 000-00-00')));
+            } else if (act === 'mailto') {
+                container.appendChild(field('Email', textInput(b.email, v => set('email', v), 'info@example.com')));
+            } else if (act === 'popup') {
+                container.appendChild(field('Заголовок окна', textInput(b.popup_title, v => set('popup_title', v))));
+                container.appendChild(field('Текст окна', textareaInput(b.popup_text, v => set('popup_text', v), 5)));
+            }
+            container.appendChild(el('div', 'pe-help')).textContent =
+                '«Форма заявки» — посетитель оставляет имя и телефон, заявка попадает в админку (раздел «Заявки»).';
+        } else if (LINK_KEY) {
+            container.appendChild(linkField('Ссылка кнопки', b[LINK_KEY], v => set(LINK_KEY, v)));
+        }
 
         if (!b.button_style || typeof b.button_style !== 'object') b.button_style = {};
         const cfg = b.button_style;
@@ -4253,7 +4291,7 @@
         } else if (elm.type === 'video') {
             box.appendChild(field('Ссылка YouTube/Vimeo/RuTube', textInput(props.url, v => setP('url', v), 'https://youtube.com/watch?v=…')));
         } else if (elm.type === 'icon') {
-            box.appendChild(field('Иконка (эмодзи, до 4 символов)', textInput(props.icon, v => setP('icon', v), '★')));
+            box.appendChild(field('Иконка: набор (icon:star) или эмодзи', textInput(props.icon, v => setP('icon', v), '★'), 'Встроенный набор: icon:truck, icon:shield, icon:percent, icon:chat, icon:star, icon:heart, icon:phone, icon:mail, icon:check, icon:arrow-right, icon:box, icon:gift, icon:clock, icon:map-pin, icon:wallet, icon:award, icon:refresh, icon:factory, icon:leaf. Иконки набора принимают цвет элемента.'));
             box.appendChild(field('Цвет', colorInput(props.color, v => setP('color', v))));
             box.appendChild(field('Размер, px', numberInput(props.size || 32, v => setP('size', v), 4, 200)));
         }
