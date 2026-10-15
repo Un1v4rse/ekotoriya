@@ -86,6 +86,29 @@ def _sync_contacts_html(html, site):
     out = out.replace(_DEFAULT_PHONE, phone)
     out = re.sub(r'helloekotoriya@yandex\.ru', email, out, flags=re.I)
     out = out.replace(_DEFAULT_ADDRESS, address)
+    # PG-3.1: битый якорь email из клона (вложенный mailto с экранированным
+    # HTML внутри атрибута) — заменяем на чистый, с актуальным адресом.
+    out = re.sub(
+        r"<a href='mailto:[^']*'>\s*<a href=\"mailto:[^\"]*\">[^<]*</a>\s*</a>",
+        '<a href="mailto:' + email + '">' + email + '</a>', out)
+    # PG-3.2: Яндекс.Карта под блоком информации. Маркер wb-contacts-map —
+    # идемпотентность: повторные рендеры не плодят блоки. Адрес для поиска —
+    # из настройки site.map_query (можно сменить в админке).
+    if 'wb-contacts-map' not in out:
+        import urllib.parse as _up
+        query = str((site or {}).get('map_query') or '').strip() \
+            or 'Череповец, улица Гоголя, 56'
+        embed = 'https://yandex.ru/map-widget/v1/?text=' \
+            + _up.quote(query) + '&z=16'
+        map_html = (
+            '<div class="maxwidth-theme" style="margin:2rem auto 0;">'
+            '<div class="wb-contacts-map" '
+            'style="position:relative;padding-top:56.25%;border-radius:8px;'
+            'overflow:hidden;">'
+            '<iframe src="' + embed + '" loading="lazy" '
+            'style="position:absolute;top:0;left:0;width:100%;height:100%;'
+            'border:0;" allowfullscreen></iframe></div></div>')
+        out = out + map_html
     return out
 # SECRET_KEY только из окружения: без него сессии не переживают перезапуск.
 if os.environ.get('SECRET_KEY'):
