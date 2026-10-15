@@ -1,0 +1,20 @@
+<!-- Боковое меню раздела — как на оригинале (menu_top_block menu-type1).
+     Перед include задайте: section_menu_items = [(название, url), ...];
+     текущий пункт подсвечивается по page.url. -->
+<aside class="left_block sticky-sidebar">
+    <div class="sticky-sidebar__inner">
+        <div class="menu_top_block menu-type1">
+            <ul class="left_menu dropdown">
+                {% for sm_name, sm_url in (section_menu_items or []) %}
+                <li class="v_bottom item {% if (page.url or '') == sm_url %}current opened{% endif %} ">
+                    <a class="icons_fa rounded2 bordered darken" href="{{ sm_url }}">
+                        <span class="name">{{ sm_name }}</span>
+                        <span class="toggle_block"></span>
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="banner_content_bottom_container flexbox flexbox--gap flexbox--gap-16"></div>
+    </div>
+</aside>

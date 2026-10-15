@@ -1,0 +1,18 @@
+<!-- Боковое меню категорий блога — как на оригинале (левая колонка статей).
+     blog_articles_count — число статей раздела «Советы покупателям». -->
+<aside class="left_block sticky-sidebar">
+    <div class="sticky-sidebar__inner">
+        <div class="categories_block menu_top_block">
+            <ul class="categories left_menu dropdown">
+                <li><a href="/blog/" class="categories_link bordered rounded2"><span class="categories_name darken">Все статьи</span></a></li>
+                <li class="categories_item item v_bottom current opened">
+                    <a href="/blog/sovety-pokupatelyam/" class="categories_link bordered rounded2">
+                        <span class="categories_name darken">Советы покупателям</span>
+                        <span class="categories_count muted">{{ blog_articles_count | default(3) }}</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div class="banner_content_bottom_container flexbox flexbox--gap flexbox--gap-16"></div>
+    </div>
+</aside>

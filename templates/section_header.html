@@ -34,10 +34,17 @@
             <a href="/catalog/" itemprop="item"><span itemprop="name">Каталог</span></a>
             <meta itemprop="position" content="2" />
         </span>
+        {% if section_header_parent is defined and section_header_parent %}
+        <span class="separator">—</span>
+        <span itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+            <a href="{{ section_header_parent[1] }}" itemprop="item"><span itemprop="name">{{ section_header_parent[0] }}</span></a>
+            <meta itemprop="position" content="3" />
+        </span>
+        {% endif %}
         <span class="separator">—</span>
         <span itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
             <span itemprop="name">{{ page.h1 or page.title }}</span>
-            <meta itemprop="position" content="3" />
+            <meta itemprop="position" content="{{ 4 if section_header_parent is defined and section_header_parent else 3 }}" />
         </span>
         {% endif %}
     </div>

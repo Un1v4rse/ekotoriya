@@ -185,7 +185,7 @@
 
                     <script data-skip-moving="true" src="/static/bitrix/templates/aspro_max/js/speed.min.js"></script>
 
-<link rel="shortcut icon" href="/static/favicon.ico" type="image/x-icon" />
+<link rel="shortcut icon" href="/static/favicon.ico?v=4" type="image/x-icon" />
 
 <link rel="apple-touch-icon" sizes="180x180" href="/static/include/apple-touch-icon.png" />
 
@@ -193,9 +193,9 @@
 
 <meta property="og:description" content="Наматрасник для детей и подростков: есть ли отличия от взрослого? Эксперты Экотории дают советы покупателям по выбору приобретению наматрасников и постельного белья. Наш блог" />
 
-<meta property="og:image" content="https://ekotoriya.ru/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg" />
+<meta property="og:image" content="/static/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg?v=4" />
 
-<link rel="image_src" href="https://ekotoriya.ru/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg"  />
+<link rel="image_src" href="/static/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg?v=4"  />
 
 <meta property="og:title" content="{{ page.title }}" />
 
@@ -270,7 +270,7 @@
 
 						<div class="logo">
 
-							<a href="/"><img data-lazyload class="lazy " src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-src="{{ site.logo or '/static/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg' }}" alt="Наматрасники любых размеров | Интернет-магазин Экотория" title="Наматрасники любых размеров | Интернет-магазин Экотория" /></a>						</div>
+							<a href="/"><img data-lazyload class="lazy " src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-src="{{ site.logo or '/static/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg?v=4' }}" alt="Наматрасники любых размеров | Интернет-магазин Экотория" title="Наматрасники любых размеров | Интернет-магазин Экотория" /></a>						</div>
 
 						<div class="top-description addr">
 
@@ -602,7 +602,7 @@
 						<div class="logo  line-block__item no-shrinked">
 
 
-							<a href="/"><img data-lazyload class="lazy " src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-src="{{ site.logo or '/static/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg' }}" alt="Наматрасники любых размеров | Интернет-магазин Экотория" title="Наматрасники любых размеров | Интернет-магазин Экотория" /></a>						</div>
+							<a href="/"><img data-lazyload class="lazy " src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-src="{{ site.logo or '/static/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg?v=4' }}" alt="Наматрасники любых размеров | Интернет-магазин Экотория" title="Наматрасники любых размеров | Интернет-магазин Экотория" /></a>						</div>
 
 
 					</div>
@@ -949,7 +949,7 @@
 
 		<div class="logo">
 
-			<a href="/"><img data-lazyload class="lazy " src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-src="{{ site.logo or '/static/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg' }}" alt="Наматрасники любых размеров | Интернет-магазин Экотория" title="Наматрасники любых размеров | Интернет-магазин Экотория" /></a>		</div>
+			<a href="/"><img data-lazyload class="lazy " src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-src="{{ site.logo or '/static/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg?v=4' }}" alt="Наматрасники любых размеров | Интернет-магазин Экотория" title="Наматрасники любых размеров | Интернет-магазин Экотория" /></a>		</div>
 
 	</div>
 
@@ -1451,8 +1451,17 @@
 
 
 		<div class="wraps hover_shine" id="content">
+		{% set page_top_items = [('Советы покупателям', '/blog/')] %}
+		{% include 'page_top.html' %}
+		<div class="wrapper_inner">
+		<div class="container_inner flexbox flexbox--row-reverse flexbox--gap flexbox--gap-32 flexbox--align-start flexbox--justify-space-between">
+		<div class="right_block wide_N">
 		<div class="middle">
 {{ page.content_html | safe }}
+		</div>
+		</div>
+		{% include 'blog_sidebar_categories.html' %}
+		</div>
 		</div>
 </div> 					</div>
 
@@ -1696,9 +1705,25 @@
 
 
                         <div class="third_bottom_menu">
-
-
-                                                    </div>
+                            		<div class="bottom-menu">
+		<div class="items">
+																													 				<div class="item 0 childs   accordion-close " data-parent="#bottom_help" data-target="#bottom_help" >
+					<div class="title">
+													<a href="/catalog/namatrasniki/">Наматрасники</a>
+											</div>
+											<div class="compact_arrow">
+	                    	<i class="svg  svg-inline-down colored_theme_hover_bg-el" aria-hidden="true" ><svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5"><path  data-name="Rounded Rectangle 890 copy 2" class="cls-1" d="M517.778,610.8a0.721,0.721,0,0,1-1.016,0L514,607.769l-2.79,3.028a0.715,0.715,0,1,1-1.01-1.011l3.273-3.552c0.009-.009.012-0.021,0.021-0.03a0.723,0.723,0,0,1,1.017,0,0.022,0.022,0,0,1,0,0l3.265,3.577A0.712,0.712,0,0,1,517.778,610.8Z" transform="translate(-510 -606)"/></svg></i>						</div>
+									</div>
+																								<div id="bottom_help" class="wrap panel-collapse wrap_compact_mobile">
+																 				<div class="item 1    "  >
+					<div class="title">
+													<a href="/catalog/odeyala/"> Одеяла</a>
+											</div>
+									</div>
+													</div>
+									</div>
+	</div>
+                        </div>
 
 
                     </div>

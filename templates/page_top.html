@@ -1,0 +1,35 @@
+<!-- Верх контентной страницы как на оригинале (aspro page-top): заголовок
+     раздела h1 + хлебные крошки. Перед include задайте переменные:
+       page_top_items — промежуточные крошки [(название, url), ...];
+       page_top_last  — текст последней (текущей) крошки (по умолчанию = h1). -->
+<section class="page-top maxwidth-theme ">
+    <div class="headerFlexWrap">
+        <div class="headerTitle">
+            <div class="topic">
+                <div class="topic__inner">
+                    <div class="topic__heading">
+                        <h1 id="pagetitle">{{ page.h1 or page.title }}</h1>
+                    </div>
+                </div>
+            </div>
+            <div id="navigation">
+                <div class="breadcrumbs swipeignore" itemscope itemtype="https://schema.org/BreadcrumbList">
+                    <div class="breadcrumbs__item" id="bx_breadcrumb_0" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+                        <a class="breadcrumbs__link" href="/" title="Главная" itemprop="item"><span itemprop="name" class="breadcrumbs__item-name font_xs">Главная</span><meta itemprop="position" content="1"></a>
+                    </div>
+                    {% for pt_name, pt_url in (page_top_items or []) %}
+                    <span class="breadcrumbs__separator">&mdash;</span>
+                    <div class="breadcrumbs__item" id="bx_breadcrumb_{{ loop.index }}" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+                        <a class="breadcrumbs__link" href="{{ pt_url }}" title="{{ pt_name }}" itemprop="item"><span itemprop="name" class="breadcrumbs__item-name font_xs">{{ pt_name }}</span><meta itemprop="position" content="{{ loop.index + 1 }}"></a>
+                    </div>
+                    {% endfor %}
+                    <span class="breadcrumbs__separator">&mdash;</span>
+                    <span class="breadcrumbs__item" itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+                        <link href="{{ page.url or request.path }}" itemprop="item" />
+                        <span><span itemprop="name" class="breadcrumbs__item-name font_xs">{{ page_top_last or page.h1 or page.title }}</span><meta itemprop="position" content="{{ (page_top_items or [])|length + 2 }}"></span>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

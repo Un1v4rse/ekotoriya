@@ -576,7 +576,7 @@
                         </div>
                         <div class="field" id="zone-header-logo-image-field">
                             <label for="zone-header-logo-image">URL логотипа (картинка)</label>
-                            <input type="text" id="zone-header-logo-image" placeholder="/static/uploads/logo.png">
+                            <input type="text" id="zone-header-logo-image" placeholder="/static/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg?v=4">
                             <button type="button" class="secondary" style="margin-top:0.3rem;" onclick="pickMediaFile('zone-header-logo-image')">📁 Медиатека</button>
                             <button type="button" class="secondary" style="margin-top:0.3rem;" onclick="uploadToField('zone-header-logo-image')">⬆ Загрузить файл</button>
                             <input type="file" id="zone-header-logo-image-file" accept="image/*" style="margin-top:0.3rem;">
@@ -1190,7 +1190,7 @@
                     if (el.id === 'site-logo') $('logo-preview').src = el.value;
                 });
             });
-            $('logo-preview').src = getDeep(data, 'site.logo') || '';
+            $('logo-preview').src = getDeep(data, 'site.logo') || '/static/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg?v=4';
         }
 
         async function uploadLogo() {

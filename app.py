@@ -741,6 +741,21 @@ def _absolute_url(url, host_url):
     return host_url.rstrip('/') + (url if url.startswith('/') else '/' + url)
 
 
+# Каноническое лого (файл с оригинала ekotoriya.ru) — единственный источник
+# во всех точках: шапка, подвал, favicon, OG, админка. ?v= сбрасывает кэш
+# у посетителей при смене версии (PG-4.4).
+CANONICAL_LOGO = '/static/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg'
+LOGO_VERSION = '4'
+
+
+def _versioned_logo(url):
+    """Каноническому лого добавить ?v=<версия>, если версии ещё нет."""
+    url = str(url or '').strip()
+    if url and url.split('?')[0] == CANONICAL_LOGO and 'v=' not in url:
+        return url + ('&' if '?' in url else '?') + 'v=' + LOGO_VERSION
+    return url
+
+
 def _page_section(page):
     """Раздел сайта по slug страницы: catalog__namatrasniki → 'namatrasniki'.
 
@@ -865,7 +880,7 @@ def make_context(content, page):
         'wb_demo': wb_sync.load_json(wb_sync.PRODUCTS_FILE).get('demo', False),
         'recommended_products': _rec_block_items(popular),
         'seo_org': _seo_org(content, host_url),
-        'seo_og_image': _absolute_url(site.get('logo'), host_url) or (host_url.rstrip('/') + '/static/noimage.png'),
+        'seo_og_image': _absolute_url(_versioned_logo(site.get('logo')), host_url) or (host_url.rstrip('/') + '/static/noimage.png'),
         'seo_breadcrumbs': _seo_breadcrumbs(content, page, host_url),
         'seo_faq': _seo_faq_items(page),
         # canonical: поле страницы в приоритете, иначе — абсолютный URL текущей
