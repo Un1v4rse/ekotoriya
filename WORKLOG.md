@@ -50,11 +50,32 @@
   прежнему 1344px (текст не прилипает); /company/reviews/ — вёрстка ленты
   без изменений.
 - Бэкапы: backups/backup_2026-10-16_17-00 (актуален, до фикса)
-- Следующий шаг: коммит, деплой на прод (185.56.162.91), визуальная
-  проверка прода с ignoreCache.
+- Следующий шаг: —
 - Примечания: у посетителей CSS может быть закэширован (template css без
   version-QueryString) — эффект blur уйдёт после обычного обновления кэша;
   при проверке использовать жёсткую перезагрузку.
+
+## [2026-10-16 20:10] Задача: [фикс] Деплой на прод + инцидент nginx/static/uploads
+- Статус: done
+- Сделано: деплой коммита 3ae28c6 на 185.56.162.91 (git archive HEAD →
+  /opt/ekotoriya, бэкап прод-БД data/ekotoriya.db.bak_fix_border, серверный
+  .env и data/ сохранены, FORCE_HTTPS=0, docker compose up -d --build app).
+  Инцидент: замена директории через `mv` + пересоздание ТОЛЬКО app оставила
+  nginx со старым bind-mount → статика 404 (страница без стилей). Плюс
+  свежий git archive не содержит пустой static/uploads → read-only bind в
+  nginx не мог создать mountpoint (OCI error). Фиксы: `docker compose up -d`
+  (все сервисы), `mkdir -p /opt/ekotoriya/static/uploads`; в git — Dockerfile:
+  `RUN mkdir -p static/uploads` (коммит 8b4ed4c), синхронизирован на проде
+  с rebuild app. Временные скрипты деплоя удалены.
+- Изменённые файлы: Dockerfile (коммит 8b4ed4c), на сервере — /opt/ekotoriya
+- Проверки: прод — / 200, template css 200 (1,2 МБ), /company/ 200,
+  /catalog/ 200; браузер 1920px: баннер 1920 full-width, backdrop-filter
+  none, шапка прозрачная и чёткая; pytest dev — 447 passed.
+- Бэкапы: data/ekotoriya.db.bak_fix_border (на сервере), backups/backup_2026-10-16_17-00 (локально)
+- Следующий шаг: push в main; сл. деплой — всегда `docker compose up -d` без
+  фильтра сервиса (bind-mounts!) или без mv-замены директории.
+- Примечания: deploy_ssh.py (paramiko-хелпер SSH) остаётся в корне, в git не
+  закоммичен по традиции прошлых циклов.
 
 ---
 - Статус: done
