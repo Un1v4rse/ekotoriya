@@ -18,3 +18,7 @@ Thumbs.db
 
 # Бэкапы (крупные, локальные)
 backups/
+_deploy.tar.gz
+_dev_admin*
+_*.js
+_admin_now.html
