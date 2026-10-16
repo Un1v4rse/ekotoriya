@@ -72,8 +72,12 @@ _DEFAULT_EMAIL = 'helloekotoriya@yandex.ru'
 _DEFAULT_ADDRESS = 'г. Череповец, ул. Гоголя 56'
 
 
-def _sync_contacts_html(html, site):
-    """Заменить дефолтные контакты в HTML-строке на текущие из настроек."""
+def _sync_contacts_html(html, site, add_map=True):
+    """Заменить дефолтные контакты в HTML-строке на текущие из настроек.
+
+    add_map: инъекция Яндекс.Карты — ТОЛЬКО для страницы «Контакты»
+    (PG-3.2; инцидент 2026-10-16: карта появлялась на каждой странице,
+    т.к. make_context применял функцию ко всем страницам подряд)."""
     if not html or not isinstance(html, str):
         return html
     phone = (site or {}).get('phone') or _DEFAULT_PHONE
@@ -91,10 +95,11 @@ def _sync_contacts_html(html, site):
     out = re.sub(
         r"<a href='mailto:[^']*'>\s*<a href=\"mailto:[^\"]*\">[^<]*</a>\s*</a>",
         '<a href="mailto:' + email + '">' + email + '</a>', out)
-    # PG-3.2: Яндекс.Карта под блоком информации. Маркер wb-contacts-map —
-    # идемпотентность: повторные рендеры не плодят блоки. Адрес для поиска —
-    # из настройки site.map_query (можно сменить в админке).
-    if 'wb-contacts-map' not in out:
+    # PG-3.2: Яндекс.Карта под блоком информации (только «Контакты»).
+    # Маркер wb-contacts-map — идемпотентность: повторные рендеры не плодят
+    # блоки. Адрес для поиска — из настройки site.map_query (можно сменить
+    # в админке).
+    if add_map and 'wb-contacts-map' not in out:
         import urllib.parse as _up
         query = str((site or {}).get('map_query') or '').strip() \
             or 'Череповец, улица Гоголя, 56'
@@ -886,8 +891,10 @@ def make_context(content, page):
     site = content.get('site', {})
     # Синхронизация контактов: в content_html (снапшоты перенесённого дизайна)
     # контакты захардкожены — подменяем на актуальные из настроек сайта.
+    # Карта инжектится только на страницу «Контакты» (PG-3.2).
     if page.get('content_html'):
-        page = {**page, 'content_html': _sync_contacts_html(page['content_html'], site)}
+        page = {**page, 'content_html': _sync_contacts_html(
+            page['content_html'], site, add_map=(page.get('slug') == 'contacts'))}
     # Раздел сайта: на страницах разделов (catalog__namatrasniki и глубже)
     # показываем товары без назначенного раздела + товары этого раздела.
     page_section = _page_section(page)
