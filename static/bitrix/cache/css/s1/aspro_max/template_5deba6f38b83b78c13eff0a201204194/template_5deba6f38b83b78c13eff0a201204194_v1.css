@@ -1337,7 +1337,7 @@ html{font-size:15px}.fancybox-title,body,body .ymaps-map .ymaps-b-balloon,body d
 
 @media (min-width: 992px) {
 	.long_banner header>.header-wrapper {
-		backdrop-filter: blur(5px);
+		backdrop-filter: none; /* убран blur шапки: баннер за шапкой должен быть чётким */
 	}
 }
 

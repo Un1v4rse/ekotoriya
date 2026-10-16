@@ -3028,7 +3028,26 @@ REVIEW_CSS = (
     '-webkit-box-orient:vertical;overflow:hidden;}'
     '.wb-review-toggle{display:inline-block;margin-top:8px;border:0;background:none;'
     'color:#b49d84;cursor:pointer;font-size:0.9rem;text-decoration:underline;padding:0;}'
-    # PG-6.1/6.4: контейнеры страниц «О компании»/«Отзывы»/«Документы»
+    # PG-6.2: мобильная вёрстка ленты отзывов (ширина ≤ 640px).
+    # Контейнерные правила страниц «О компании»/«Отзывы»/«Документы» вынесены
+    # в PG6_COMPANY_CSS — они инъецируются только на /company*, иначе
+    # max-width:1344px сжимает широкие блоки главной (баннер и др.).
+    '@media (max-width:640px){'
+    '.wb-reviews-dynamic{padding-left:14px;padding-right:14px;}'
+    '.wb-review-card{padding:14px;}'
+    '.wb-review-head{gap:6px;}'
+    '.wb-review-date{margin-left:0;width:100%;}'
+    '}'
+    '</style>'
+)
+
+# PG-6.1/6.4 (цикл 4 / этап 6): ограничение ширины контентных контейнеров
+# страниц «О компании»/«Отзывы»/«Документы» (/company, /company/reviews,
+# /company/docs). Инъектируется ТОЛЬКО там: глобальное применение ломает
+# главную — её широкие блоки (BIG_BANNER и др.) сжимались до 1344px с
+# белыми полями по бокам на экранах >1344px.
+PG6_COMPANY_CSS = (
+    '<style>'
     '#content .middle > .right_block > .middle > .container,'
     '#content .middle > .container{max-width:1344px;margin-left:auto;margin-right:auto;'
     'padding-left:24px;padding-right:24px;box-sizing:border-box;}'
@@ -3036,11 +3055,10 @@ REVIEW_CSS = (
     '#content .front_review .maxwidth-theme{max-width:1344px;box-sizing:border-box;}'
     '#content .body-info{max-width:1344px;margin-left:auto;margin-right:auto;'
     'padding-left:24px;padding-right:24px;box-sizing:border-box;}'
-    # PG-6.2: мобильная вёрстка ленты отзывов (ширина ≤ 640px)
     '@media (max-width:640px){'
     '#content{overflow-x:hidden;}'
-    '#content .container,#content .add_review,#content .body-info,'
-    '.wb-reviews-dynamic{padding-left:14px;padding-right:14px;}'
+    '#content .container,#content .add_review,#content .body-info{'
+    'padding-left:14px;padding-right:14px;}'
     '#content .front_review .item{padding:12px !important;}'
     '#content .front_review .item-wrapper{padding:0 !important;}'
     '#content .front_review .top-info{float:none !important;width:100% !important;'
@@ -3049,9 +3067,6 @@ REVIEW_CSS = (
     '#content .front_review .text .wb-review-text,'
     '#content .front_review .text > div,'
     '#content .front_review .text{font-size:0.92rem !important;}'
-    '.wb-review-card{padding:14px;}'
-    '.wb-review-head{gap:6px;}'
-    '.wb-review-date{margin-left:0;width:100%;}'
     '}'
     '</style>'
 )
@@ -3187,6 +3202,8 @@ def _inject_lazyload_fix(html):
               + CTOR_ACTION_CSS + '\n'
               + CTOR_ACTION_JS + '\n'
               + REVIEW_CSS + '\n'
+              + (PG6_COMPANY_CSS if re.match(
+                  r'^/company(?:/|$)', request.path or '') else '') + '\n'
               + REVIEW_JS_SRC.format(v=review_ver) + '\n'
               # Мёртвая пагинация категорий: «Показать ещё» → все товары раздела
               # одним списком, номера страниц → тот же список (?page=N игнорируется
