@@ -117,3 +117,34 @@ def test_page_editor_accepts_trailing_slash(app_context):
     finally:
         client.post('/admin/api/delete-page', json={'slug': 'test'},
                     headers=client.csrf_headers)
+
+
+def test_page_survives_missing_template_file(app_context):
+    """Шаблоны страниц, созданных админом, живут в контейнере и теряются при
+    деплое (томом смонтирован только data/). Страница не должна отдавать 500
+    (TemplateNotFound) — шаблон пересоздаётся из базового при первом запросе
+    (инцидент 2026-10-16: страница 'test' заказчика отдавала 500)."""
+    client = _admin_client()
+    slug = 'testtpl'
+    template_path = BASE_DIR / 'templates' / 'pages' / f'{slug}.html'
+    r = client.post('/admin/api/add-page',
+                    json={'slug': slug, 'url': f'/{slug}/', 'title': 'Tpl test'},
+                    headers=client.csrf_headers)
+    assert r.get_json()['success']
+    try:
+        assert template_path.exists()
+        template_path.unlink()
+        assert not template_path.exists()
+        resp = client.get(f'/{slug}/')
+        assert resp.status_code == 200, resp.status_code
+        assert 'Tpl test' in resp.get_data(as_text=True)
+        # шаблон пересоздан и остался на диске
+        assert template_path.exists()
+        # работает и рендер для редактора (pe_bare)
+        bare = client.get(f'/{slug}/?pe_bare=1')
+        assert bare.status_code == 200
+    finally:
+        client.post('/admin/api/delete-page', json={'slug': slug},
+                    headers=client.csrf_headers)
+        if template_path.exists():
+            template_path.unlink()

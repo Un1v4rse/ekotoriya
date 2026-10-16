@@ -2145,6 +2145,7 @@ def page_route(path):
     if page and page.get('slug') not in SYSTEM_PAGE_SLUGS:
         if _pe_bare_admin():
             return Response(_inject_lazyload_fix(_render_page_html_marked(content, page)))
+        _ensure_page_template(page)
         html = render_template(page['template'], **make_context(content, page))
         return Response(_inject_lazyload_fix(_inject_admin_edit_button(html, f"/admin/page/{page['slug']}")))
     # Try slug match (double underscores represent slashes)
@@ -2153,6 +2154,7 @@ def page_route(path):
     if page and page.get('slug') not in SYSTEM_PAGE_SLUGS:
         if _pe_bare_admin():
             return Response(_inject_lazyload_fix(_render_page_html_marked(content, page)))
+        _ensure_page_template(page)
         html = render_template(page['template'], **make_context(content, page))
         return Response(_inject_lazyload_fix(_inject_admin_edit_button(html, f"/admin/page/{page['slug']}")))
     # Fallback: if a parent path exists (e.g. product detail link under /catalog/namatrasniki/),
@@ -3327,6 +3329,38 @@ def _pe_bare_admin():
             and _role_allows(_admin_role(), 'pages'))
 
 
+def _ensure_page_template(page):
+    """Гарантировать существование файла шаблона страницы.
+
+    Шаблоны страниц, созданных админом в рантайме, лежат в templates/pages/
+    внутри контейнера; томом смонтирован только /app/data, поэтому при
+    пересоздании контейнера (деплой) эти файлы терялись, а страница в content
+    оставалась → TemplateNotFound и 500 на публичном URL. Лечим лениво:
+    при отсутствии файла пересоздаём его из базового шаблона.
+    """
+    template_name = page.get('template')
+    if not template_name:
+        return
+    dest = BASE_DIR / 'templates' / template_name
+    if dest.exists():
+        return
+    try:
+        base = BASE_DIR / 'templates' / BASE_PAGE_TEMPLATE
+        if base.exists():
+            shutil.copy(base, dest)
+        else:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(
+                "<!DOCTYPE html>\n<html lang=\"ru\">\n<head>\n<meta charset=\"UTF-8\">\n"
+                "<title>{{ page.title }}</title>\n"
+                "<meta name=\"description\" content=\"{{ page.meta_description }}\">\n"
+                "<link rel=\"stylesheet\" href=\"/theme.css?v={{ site.theme.version | default(1) }}\">\n"
+                "</head>\n<body>\n{{ page.content_html | safe }}\n</body>\n</html>\n",
+                encoding='utf-8')
+    except OSError:
+        pass
+
+
 def _render_page_html_marked(content, page, extra_ctx=None):
     """HTML страницы с маркерами блоков <!--blk:N--> (рендер для редактора)."""
     blocks = page.get('blocks')
@@ -3337,6 +3371,7 @@ def _render_page_html_marked(content, page, extra_ctx=None):
     ctx = make_context(content, edit_page)
     if extra_ctx:
         ctx.update(extra_ctx)
+    _ensure_page_template(page)
     return render_template(page['template'], **ctx)
 
 
