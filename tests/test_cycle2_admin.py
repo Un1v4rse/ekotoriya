@@ -109,7 +109,7 @@ def test_admin_page_renders_cycle2_sections(admin_client):
     assert r.status_code == 200
     html = r.get_data(as_text=True)
     assert 'Шапка и подвал' in html
-    assert '📐 Шаблоны' in html
+    assert 'Шаблоны</button>' in html
     assert 'tab-zones' in html
     assert 'tab-templates' in html
     assert 'Расширенная тема' in html

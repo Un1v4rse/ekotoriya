@@ -34,8 +34,9 @@
             top: 0;
             z-index: 10;
         }
-        header h1 { margin: 0; font-size: 1.2rem; font-weight: 600; }
-        header a { color: #fff; text-decoration: none; font-weight: 500; margin-left: 1rem; }
+        header h1 { margin: 0; font-size: 1.2rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+        header a { color: #fff; text-decoration: none; font-weight: 500; margin-left: 1rem; display: inline-flex; align-items: center; gap: 0.35rem; }
+        svg.ic { width: 1em; height: 1em; vertical-align: -0.15em; flex: none; }
         .wrap { max-width: 1600px; margin: 0 auto; padding: 1.25rem; }
         .grid { display: grid; grid-template-columns: 260px 1fr; gap: 1.25rem; align-items: start; }
         nav {
@@ -225,8 +226,49 @@
     </style>
 </head>
 <body>
+    <!-- Встроенный набор SVG-иконок админки (sprite) -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+        <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V12M10 20V5M16 20v-8"/><path d="M2 20h20"/></symbol>
+        <symbol id="i-chart-line" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></symbol>
+        <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M6 10v10h12V10"/></symbol>
+        <symbol id="i-paint" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 2-2s-1-1.5-1-2.5 1-1.5 2.5-1.5H18a3 3 0 0 0 3-3c0-5-4-9-9-9z"/><circle cx="7.5" cy="10.5" r="1.2"/><circle cx="12" cy="7.5" r="1.2"/><circle cx="16.5" cy="10.5" r="1.2"/></symbol>
+        <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+        <symbol id="i-zones" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9h18M3 15h18"/></symbol>
+        <symbol id="i-template" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M9 3v18"/></symbol>
+        <symbol id="i-thumb" viewBox="0 0 24 24"><path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h3z"/><path d="M7 10l4-7a2.1 2.1 0 0 1 2 2v4h6a2 2 0 0 1 2 2.4l-1.5 7a2 2 0 0 1-2 1.6H7"/></symbol>
+        <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/><path d="M3 3h2.5l2.3 11.5a1 1 0 0 0 1 .8h8.6a1 1 0 0 0 1-.8L20.5 7H6"/></symbol>
+        <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8"/></symbol>
+        <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5 6.5-5s5.7 1.5 6.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M17.5 14.5c2.3.4 3.6 1.7 4 4"/></symbol>
+        <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5c-1.5 0-3-.4-4.2-1.1L3 20l1.1-4.3A8.5 8.5 0 1 1 21 11.5z"/></symbol>
+        <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h11l5 5v13H5V3z"/><path d="M8 3v5h8V3M8 21v-7h8v7"/></symbol>
+        <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/></symbol>
+        <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1.1"/><circle cx="4" cy="12" r="1.1"/><circle cx="4" cy="18" r="1.1"/></symbol>
+        <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4.5"/><path d="M11.5 11.5 20 3M16 7l3 3M13.5 9.5l2 2"/></symbol>
+        <symbol id="i-wrench" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></symbol>
+        <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 6.3"/><path d="M20 4v7h-7"/></symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+        <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+        <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M4 4l16 16"/><path d="M10.6 5.9c.5-.1.9-.2 1.4-.2 6.5 0 10 6.3 10 6.3a17.6 17.6 0 0 1-3 3.3M6.7 6.9A16.4 16.4 0 0 0 2 12s3.5 6.3 10 6.3c1.2 0 2.3-.2 3.3-.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
+        <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3v2H7v-2l3-3-1-6z"/><path d="M12 15v6"/></symbol>
+        <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6h6l2 2h10v11H3V6z"/></symbol>
+        <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></symbol>
+        <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 20h16"/></symbol>
+        <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5 9.5 18 20 6.5"/></symbol>
+        <symbol id="i-cross" viewBox="0 0 24 24"><path d="M5 5l14 14M19 5 5 19"/></symbol>
+        <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></symbol>
+        <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="M13.5 6.5l3 3"/></symbol>
+        <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></symbol>
+        <symbol id="i-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" stroke="none"/></symbol>
+        <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M5 15H4V4h11v1"/></symbol>
+        <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 6 6"/></symbol>
+        <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" stroke="none"/></symbol>
+        <symbol id="i-restore" viewBox="0 0 24 24"><path d="M4 10a8 8 0 1 1 2 6"/><path d="M4 4v6h6"/></symbol>
+        <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M19 14v6H4V5h6"/></symbol>
+    </svg>
+    <!-- Иконка: <svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-..."/></svg> -->
     <header>
-        <h1>🛠 Управление сайтом «Экотория»
+        <h1><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-wrench"/></svg> Управление сайтом «Экотория»
             <small style="font-size:0.6em;font-weight:400;color:#999;">
                 {% if admin_role == 'superadmin' %}суперадмин
                 {% elif admin_role == 'content' %}контент-менеджер
@@ -236,7 +278,7 @@
         </h1>
         <div>
             <a href="/" target="_blank">Открыть сайт ↗</a>
-            <a href="/admin/change-password">🔑 Сменить пароль</a>
+            <a href="/admin/change-password"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-key"/></svg> Сменить пароль</a>
             <a href="/admin/logout">Выйти ⏻</a>
         </div>
     </header>
@@ -244,30 +286,31 @@
     <div class="wrap">
         <div class="grid">
             <nav>
-                <button data-tab="dashboard" data-section="dashboard">📊 Дашборд</button>
-                <button data-tab="site" data-section="site">🏠 Настройки сайта</button>
-                <button data-tab="theme" data-section="theme">🎨 Дизайн: цвета и шрифты</button>
-                <button data-tab="menu" data-section="menu">☰ Меню сайта (шапка)</button>
-                <button data-tab="zones" data-section="zones">🧱 Шапка и подвал</button>
-                <button data-tab="templates" data-section="pages">📐 Шаблоны</button>
-                <button data-tab="socials" data-section="socials">👍 Соцсети</button>
-                <button data-tab="wildberries" data-section="integrations">🛒 Интеграции (WB / Ozon)</button>
-                <button data-tab="products" data-section="integrations">📦 Товары</button>
-                <button data-tab="customers" data-section="customers">👥 Клиенты и заявки</button>
-                <button data-tab="chats" data-section="chats">💬 Чаты</button>
-                <button data-tab="seo" data-section="seo">📈 Продвижение (SEO)</button>
-                <button data-tab="backup" data-section="backup">💾 Резервная копия</button>
+                <button data-tab="dashboard" data-section="dashboard"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chart"/></svg> Дашборд</button>
+                <button data-tab="site" data-section="site"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-home"/></svg> Настройки сайта</button>
+                <button data-tab="theme" data-section="theme"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-paint"/></svg> Дизайн: цвета и шрифты</button>
+                <button data-tab="menu" data-section="menu"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-menu"/></svg> Меню сайта (шапка)</button>
+                <button data-tab="zones" data-section="zones"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-zones"/></svg> Шапка и подвал</button>
+                <button data-tab="templates" data-section="pages"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-template"/></svg> Шаблоны</button>
+                <button data-tab="socials" data-section="socials"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-thumb"/></svg> Соцсети</button>
+                <button data-tab="wildberries" data-section="integrations"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-cart"/></svg> Интеграции (WB / Ozon)</button>
+                <button data-tab="products" data-section="integrations"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-box"/></svg> Товары</button>
+                <button data-tab="customers" data-section="customers"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-users"/></svg> Клиенты и заявки</button>
+                <button data-tab="chats" data-section="chats"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chat"/></svg> Чаты</button>
+                <button data-tab="seo" data-section="seo"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chart-line"/></svg> Продвижение (SEO)</button>
+                <button data-tab="backup" data-section="backup"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-save"/></svg> Резервная копия</button>
                 {% if admin_role == 'superadmin' %}
-                <button data-tab="users" data-section="users">🛡 Пользователи</button>
-                <button data-tab="audit" data-section="audit">📋 Аудит-лог</button>
+                <button data-tab="users" data-section="users"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-shield"/></svg> Пользователи</button>
+                <button data-tab="audit" data-section="audit"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-list"/></svg> Аудит-лог</button>
                 {% endif %}
                 <hr style="border:0;border-top:1px solid var(--border);margin:0.9rem 0;">
                 <h3>Страницы сайта</h3>
                 <div id="pages-list"></div>
                 <div style="margin-top:0.5rem;display:flex;gap:0.4rem;flex-wrap:wrap;">
                     <button type="button" class="secondary" onclick="showAddPage()" style="font-size:0.82rem;padding:0.35rem 0.6rem;">+ Новая страница</button>
-                    <button type="button" class="secondary" onclick="duplicateCurrentPage()" style="font-size:0.82rem;padding:0.35rem 0.6rem;" title="Создать копию выбранной страницы">⧉ Дублировать</button>
-                    <button type="button" class="danger" onclick="deleteCurrentPage()" style="font-size:0.82rem;">Удалить</button>
+                    <button type="button" class="secondary" onclick="editCurrentPage()" style="font-size:0.82rem;padding:0.35rem 0.6rem;" title="Открыть выбранную страницу в редакторе (конструктор)"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-edit"/></svg> Редактор</button>
+                    <button type="button" class="secondary" onclick="duplicateCurrentPage()" style="font-size:0.82rem;padding:0.35rem 0.6rem;" title="Создать копию выбранной страницы"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-copy"/></svg> Дублировать</button>
+                    <button type="button" class="danger" onclick="deleteCurrentPage()" style="font-size:0.82rem;"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-trash"/></svg> Удалить</button>
                 </div>
                 <div id="add-page-form" style="display:none;margin-top:0.7rem;padding:0.7rem;border:1px solid var(--border);border-radius:8px;background:#f9f9f9;">
                     <div class="field">
@@ -295,7 +338,7 @@
                 <section id="tab-users">
                     <h2>Пользователи админки</h2>
                     <div class="field">
-                        <button type="button" class="secondary" onclick="loadAdminUsers()">🔄 Обновить список</button>
+                        <button type="button" class="secondary" onclick="loadAdminUsers()"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-refresh"/></svg> Обновить список</button>
                     </div>
                     <h3>Новый пользователь</h3>
                     <div class="row">
@@ -311,7 +354,7 @@
                         </div>
                     </div>
                     <div class="field">
-                        <button type="button" class="primary" onclick="createAdminUser()">➕ Создать</button>
+                        <button type="button" class="primary" onclick="createAdminUser()"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-plus"/></svg> Создать</button>
                         <div class="help">При первом входе пользователь должен сменить пароль.</div>
                     </div>
                     <div id="admin-users-list" class="table-wrap"></div>
@@ -320,7 +363,7 @@
                 <section id="tab-audit">
                     <h2>Аудит-лог действий админов</h2>
                     <div class="field">
-                        <button type="button" class="secondary" onclick="loadAudit()">🔄 Обновить</button>
+                        <button type="button" class="secondary" onclick="loadAudit()"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-refresh"/></svg> Обновить</button>
                     </div>
                     <div id="audit-list" class="table-wrap"></div>
                 </section>
@@ -400,7 +443,7 @@
                         <div id="logo-upload-result" class="help"></div>
                         <div class="preview-img"><img id="logo-preview" src="" alt="logo"></div>
                     </div>
-                    <div class="help" style="margin-bottom:1rem;">Шапка сайта — это раздел «☰ Меню сайта» (меню, телефон, логотип). Подвал — email, адрес и раздел «Соцсети».</div>
+                    <div class="help" style="margin-bottom:1rem;">Шапка сайта — это раздел «<svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-menu"/></svg> Меню сайта» (меню, телефон, логотип). Подвал — email, адрес и раздел «Соцсети».</div>
                 </section>
 
                 <section id="tab-theme">
@@ -532,8 +575,8 @@
                     </div>
                     <div class="row" style="align-items:flex-end;">
                         <button type="button" class="primary" onclick="saveExtendedTheme()">Сохранить расширенную тему</button>
-                        <button type="button" class="secondary" onclick="previewExtendedTheme()">👁 Предпросмотр на главной</button>
-                        <button type="button" class="secondary" onclick="pinThemeVersion()">📌 Зафиксировать версию</button>
+                        <button type="button" class="secondary" onclick="previewExtendedTheme()"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-eye"/></svg> Предпросмотр на главной</button>
+                        <button type="button" class="secondary" onclick="pinThemeVersion()"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-pin"/></svg> Зафиксировать версию</button>
                     </div>
                     <div id="theme-extended-msg" class="help" style="margin-top:0.5rem;"></div>
                     <div class="field" style="margin-top:0.8rem;">
@@ -550,7 +593,7 @@
                         </div>
                         <button type="button" class="secondary" onclick="applyThemePreset()">Применить</button>
                         <button type="button" class="secondary" onclick="deleteThemePreset()">Удалить пресет</button>
-                        <button type="button" class="secondary" onclick="saveThemePreset()">💾 Сохранить как пресет</button>
+                        <button type="button" class="secondary" onclick="saveThemePreset()"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-save"/></svg> Сохранить как пресет</button>
                         <button type="button" class="secondary" onclick="resetTheme()">Сброс к стандартной теме</button>
                     </div>
                     <div id="theme-preset-msg" class="help" style="margin-top:0.5rem;"></div>
@@ -580,8 +623,8 @@
                         <div class="field" id="zone-header-logo-image-field">
                             <label for="zone-header-logo-image">URL логотипа (картинка)</label>
                             <input type="text" id="zone-header-logo-image" placeholder="/static/upload/CMax/b2e/04g8dplb3dqudbalhuo0ryren6a5dklv.svg?v=4">
-                            <button type="button" class="secondary" style="margin-top:0.3rem;" onclick="pickMediaFile('zone-header-logo-image')">📁 Медиатека</button>
-                            <button type="button" class="secondary" style="margin-top:0.3rem;" onclick="uploadToField('zone-header-logo-image')">⬆ Загрузить файл</button>
+                            <button type="button" class="secondary" style="margin-top:0.3rem;" onclick="pickMediaFile('zone-header-logo-image')"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-folder"/></svg> Медиатека</button>
+                            <button type="button" class="secondary" style="margin-top:0.3rem;" onclick="uploadToField('zone-header-logo-image')"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-upload"/></svg> Загрузить файл</button>
                             <input type="file" id="zone-header-logo-image-file" accept="image/*" style="margin-top:0.3rem;">
                         </div>
                         <div class="field" id="zone-header-logo-text-field">
@@ -701,7 +744,7 @@
                     <div class="field" style="background:#f7f5f2;border:1px solid var(--border);border-radius:8px;padding:0.8rem 1rem;">
                         <label style="font-weight:600;display:flex;align-items:center;gap:0.4rem;margin:0;">
                             <input type="checkbox" data-path="site.hide_marketplaces">
-                            🙈 Скрыть упоминания маркетплейсов на сайте
+                            <svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-eye-off"/></svg> Скрыть упоминания маркетплейсов на сайте
                         </label>
                         <div class="help" style="margin:0.3rem 0 0;">Вкл — на сайте исчезают бейджи WB/Ozon на карточках, ссылки «Посмотреть на Wildberries/Ozon» и «Нашли дешевле?». Сами товары и покупка на сайте остаются. Сохраняется кнопкой «Сохранить настройки сайта».</div>
                     </div>
@@ -733,10 +776,10 @@
                             </div>
                         </div>
                         <div class="field">
-                            <button type="button" class="secondary" onclick="marketSync('wb', false)">🔄 Полная синхронизация</button>
-                            <button type="button" class="secondary" onclick="marketSync('wb', true)" style="margin-left:0.5rem;">⚡ Только цены и остатки</button>
+                            <button type="button" class="secondary" onclick="marketSync('wb', false)"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-refresh"/></svg> Полная синхронизация</button>
+                            <button type="button" class="secondary" onclick="marketSync('wb', true)" style="margin-left:0.5rem;"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-bolt"/></svg> Только цены и остатки</button>
                             <span id="wb-sync-result" class="help" style="display:inline;margin-left:0.5rem;"></span>
-                            <button type="button" class="secondary" onclick="toggleSyncLog('wb')" style="margin-left:0.5rem;">📋 Журнал</button>
+                            <button type="button" class="secondary" onclick="toggleSyncLog('wb')" style="margin-left:0.5rem;"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-list"/></svg> Журнал</button>
                         </div>
                         <div id="wb-sync-log" style="display:none;" class="table-wrap">
                             <p class="help">Нажмите «Журнал», чтобы загрузить записи.</p>
@@ -796,10 +839,10 @@
                             </div>
                         </div>
                         <div class="field">
-                            <button type="button" class="secondary" onclick="marketSync('ozon', false)">🔄 Полная синхронизация</button>
-                            <button type="button" class="secondary" onclick="marketSync('ozon', true)" style="margin-left:0.5rem;">⚡ Только цены и остатки</button>
+                            <button type="button" class="secondary" onclick="marketSync('ozon', false)"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-refresh"/></svg> Полная синхронизация</button>
+                            <button type="button" class="secondary" onclick="marketSync('ozon', true)" style="margin-left:0.5rem;"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-bolt"/></svg> Только цены и остатки</button>
                             <span id="ozon-sync-result" class="help" style="display:inline;margin-left:0.5rem;"></span>
-                            <button type="button" class="secondary" onclick="toggleSyncLog('ozon')" style="margin-left:0.5rem;">📋 Журнал</button>
+                            <button type="button" class="secondary" onclick="toggleSyncLog('ozon')" style="margin-left:0.5rem;"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-list"/></svg> Журнал</button>
                         </div>
                         <div id="ozon-sync-log" style="display:none;" class="table-wrap">
                             <p class="help">Нажмите «Журнал», чтобы загрузить записи.</p>
@@ -942,9 +985,9 @@
                 <section id="tab-customers">
                     <h2>Клиенты и заявки</h2>
                     <div class="field row">
-                        <button type="button" class="secondary" onclick="loadCustomers()">🔄 Обновить список</button>
-                        <a class="btn secondary" href="/admin/api/customers/export" download style="display:inline-block;text-decoration:none;">⬇ Экспорт CSV</a>
-                        <button type="button" class="secondary" onclick="loadSegments()">🎯 Сегменты</button>
+                        <button type="button" class="secondary" onclick="loadCustomers()"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-refresh"/></svg> Обновить список</button>
+                        <a class="btn secondary" href="/admin/api/customers/export" download style="display:inline-block;text-decoration:none;"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-download"/></svg> Экспорт CSV</a>
+                        <button type="button" class="secondary" onclick="loadSegments()"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-target"/></svg> Сегменты</button>
                     </div>
                     <div id="segments-box" style="display:none;">
                         <h3>Сегменты клиентов</h3>
@@ -968,21 +1011,21 @@
                     <div id="customers-list" class="table-wrap"></div>
                     <h3 style="margin-top:1.4rem;">Подписчики рассылки</h3>
                     <div class="field row">
-                        <button type="button" class="secondary" onclick="loadSubscribers()">🔄 Обновить список</button>
+                        <button type="button" class="secondary" onclick="loadSubscribers()"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-refresh"/></svg> Обновить список</button>
                     </div>
                     <div id="subscribers-list" class="table-wrap">
                         <p class="help">Нажмите «Обновить список», чтобы загрузить подписчиков.</p>
                     </div>
                     <h3 style="margin-top:1.4rem;">Заявки с кнопок сайта</h3>
                     <div class="field row">
-                        <button type="button" class="secondary" onclick="loadFeedback()">🔄 Обновить список</button>
+                        <button type="button" class="secondary" onclick="loadFeedback()"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-refresh"/></svg> Обновить список</button>
                     </div>
                     <div id="feedback-list" class="table-wrap">
                         <p class="help">Нажмите «Обновить список», чтобы загрузить заявки (кнопки конструктора с действием «Форма заявки»).</p>
                     </div>
                     <h3 style="margin-top:1.4rem;">Отзывы покупателей</h3>
                     <div class="field row">
-                        <button type="button" class="secondary" onclick="loadReviews()">🔄 Обновить список</button>
+                        <button type="button" class="secondary" onclick="loadReviews()"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-refresh"/></svg> Обновить список</button>
                     </div>
                     <div id="reviews-list" class="table-wrap">
                         <p class="help">Нажмите «Обновить список», чтобы загрузить отзывы. Новые отзывы появляются на сайте только после одобрения.</p>
@@ -992,7 +1035,7 @@
                 <section id="tab-chats">
                     <h2>Чаты с покупателями</h2>
                     <div class="field row">
-                        <button type="button" class="secondary" onclick="loadChats()">🔄 Обновить список</button>
+                        <button type="button" class="secondary" onclick="loadChats()"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-refresh"/></svg> Обновить список</button>
                         <span class="help" id="chats-summary"></span>
                     </div>
                     <div id="chats-layout" style="display:grid;grid-template-columns:minmax(260px,340px) 1fr;gap:1rem;align-items:start;">
@@ -1034,11 +1077,11 @@
                     <div class="field">
                         <label for="seo-redirects-csv">Импорт редиректов из CSV</label>
                         <textarea id="seo-redirects-csv" rows="4" placeholder="/old-page/,/catalog/&#10;/old-page-2/;/contacts/"></textarea>
-                        <button type="button" class="secondary" onclick="importRedirects()">⬆ Импорт редиректов CSV</button>
+                        <button type="button" class="secondary" onclick="importRedirects()"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-upload"/></svg> Импорт редиректов CSV</button>
                         <div class="help" id="seo-import-result">Формат: old_path,new_path — по одному на строку (разделитель запятая, «;» или «→»). Дубликаты пропускаются.</div>
                     </div>
                     <div class="field">
-                        <button type="button" class="secondary" onclick="runSeoAudit()">🔍 Запустить SEO-аудит</button>
+                        <button type="button" class="secondary" onclick="runSeoAudit()"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-search"/></svg> Запустить SEO-аудит</button>
                         <div class="help">Проверяет страницы: пустые описания и H1, одинаковые title, битые ссылки в блоках.</div>
                         <div id="seo-audit-results" class="table-wrap" style="margin-top:0.6rem;"></div>
                     </div>
@@ -1060,22 +1103,22 @@
                     <h2>Резервная копия</h2>
                     {% if admin_role == 'superadmin' %}
                     <div class="field">
-                        <a class="btn secondary" href="/admin/api/backup/full" download style="display:inline-block;text-decoration:none;">⬇ Полный бэкап (БД + контент, ZIP)</a>
+                        <a class="btn secondary" href="/admin/api/backup/full" download style="display:inline-block;text-decoration:none;"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-download"/></svg> Полный бэкап (БД + контент, ZIP)</a>
                         <div class="help">Архив содержит файл базы данных и весь контент сайта.</div>
                     </div>
                     <div class="field">
                         <label for="restore-file">Восстановление из бэкапа (ZIP)</label>
                         <input type="file" id="restore-file" accept=".zip">
-                        <button type="button" class="secondary" onclick="restoreBackup()">♻ Восстановить</button>
+                        <button type="button" class="secondary" onclick="restoreBackup()"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-restore"/></svg> Восстановить</button>
                         <div class="help" id="restore-result">Внимание: текущие данные будут заменены данными из архива.</div>
                     </div>
                     {% endif %}
                     <div class="field">
-                        <button type="button" class="secondary" onclick="downloadBackup()">⬇ Скачать резервную копию сайта (JSON)</button>
+                        <button type="button" class="secondary" onclick="downloadBackup()"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-download"/></svg> Скачать резервную копию сайта (JSON)</button>
                         <div class="help">Сохраните файл — в нём весь контент, настройки, меню и страницы.</div>
                     </div>
                     <div class="field">
-                        <button type="button" class="secondary" onclick="rebuild()">♻ Пересобрать шаблоны сайта</button>
+                        <button type="button" class="secondary" onclick="rebuild()"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-restore"/></svg> Пересобрать шаблоны сайта</button>
                         <div id="rebuild-result" class="help">Пригодится, если что-то в дизайне «поехало». Данные из конструктора и настройки сохранятся.</div>
                     </div>
                     <details class="dev">
@@ -1087,7 +1130,7 @@
                 </section>
 
                 <div class="actions">
-                    <button class="primary" onclick="save()">💾 Сохранить всё</button>
+                    <button class="primary" onclick="save()"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-save"/></svg> Сохранить всё</button>
                     <button class="secondary" onclick="location.reload()">Сбросить изменения</button>
                     <span class="msg" id="msg"></span>
                 </div>
@@ -1139,27 +1182,42 @@
             // Порядок — по URL; индексы в data.pages сохраняем для выбора.
             const order = data.pages.map((p, i) => i)
                 .sort((a, b) => String(data.pages[a].url).localeCompare(String(data.pages[b].url)));
+            const ICO_EDIT = '<svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-edit"/></svg>';
+            const ICO_EXT = '<svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-external"/></svg>';
             order.forEach(i => {
                 const p = data.pages[i];
                 const btn = document.createElement('button');
                 btn.className = i === currentPageIndex ? 'active' : '';
+                btn.title = 'Выбрать страницу (клик). Иконки справа: редактировать / открыть на сайте.';
                 // Отступ по глубине вложенности URL (корень — без отступа, максимум 3 уровня)
                 const depth = String(p.url || '/').split('/').filter(Boolean).length;
                 const indent = Math.min(Math.max(depth - 1, 0), 2);
                 const sysBadge = SYSTEM_PAGE_SLUGS.includes(p.slug)
                     ? ' <small style="color:#999;">· системная</small>' : '';
                 btn.innerHTML = `<span style="display:block;padding-left:${indent * 14}px;">${indent ? '└ ' : ''}${escapeHtml(p.h1 || p.title)}${sysBadge}</span><small style="display:block;padding-left:${indent * 14}px;">${p.url}</small>`;
-                // Клик по странице — переход в единый редактор «на странице» (как в Tilda)
+                // Клик по странице — только выбор (удаление/дублирование работают с выбранной)
                 btn.addEventListener('click', () => selectPage(i));
+                const acts = document.createElement('span');
+                acts.style.cssText = 'float:right;margin-left:0.3rem;display:inline-flex;gap:0.45rem;align-items:center;';
+                const edit = document.createElement('span');
+                edit.innerHTML = ICO_EDIT;
+                edit.title = 'Редактировать страницу (конструктор)';
+                edit.style.cssText = 'color:#999;cursor:pointer;';
+                edit.addEventListener('click', e => {
+                    e.stopPropagation();
+                    editPage(i);
+                });
                 const open = document.createElement('span');
-                open.textContent = '↗';
+                open.innerHTML = ICO_EXT;
                 open.title = 'Открыть на сайте';
-                open.style.cssText = 'float:right;color:#999;cursor:pointer;margin-left:0.3rem;';
+                open.style.cssText = 'color:#999;cursor:pointer;';
                 open.addEventListener('click', e => {
                     e.stopPropagation();
                     window.open(p.url, '_blank');
                 });
-                btn.appendChild(open);
+                acts.appendChild(edit);
+                acts.appendChild(open);
+                btn.appendChild(acts);
                 container.appendChild(btn);
             });
         }
@@ -1167,10 +1225,20 @@
         function currentPage() { return data.pages[currentPageIndex]; }
 
         function selectPage(index) {
+            // Только подсветка выбранной страницы — без перехода.
             currentPageIndex = index;
             renderPagesList();
-            const page = currentPage();
+        }
+
+        function editPage(index) {
+            const page = data.pages[index];
             if (page) window.location.href = '/admin/page/' + encodeURIComponent(page.slug);
+        }
+
+        function editCurrentPage() {
+            const page = currentPage();
+            if (!page) { showMsg('Сначала выберите страницу в списке слева (клик по названию).', false); return; }
+            editPage(currentPageIndex);
         }
 
         function textInput(value, onchange, placeholder) {
@@ -1400,7 +1468,7 @@
                     body: JSON.stringify(data)
                 });
                 const result = await resp.json();
-                if (!silent) showMsg(result.success ? '✅ Сохранено' : 'Ошибка: ' + (result.error || ''), result.success);
+                if (!silent) showMsg(result.success ? '<svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg> Сохранено' : 'Ошибка: ' + (result.error || ''), result.success);
                 btn.disabled = false;
                 btn.textContent = orig;
                 return result.success;
@@ -1551,11 +1619,13 @@
                 if (result.success) {
                     data.pages.push(result.page);
                     renderPagesList();
-                    selectPage(data.pages.length - 1);
+                    const idx = data.pages.length - 1;
+                    currentPageIndex = idx;
+                    renderPagesList();
                     hideAddPage();
-                    showMsg('Страница создана — открываем редактор…', true);
                     $('new-page-slug').value = '';
                     $('new-page-title').value = '';
+                    showMsg(`Страница создана и уже доступна на сайте по адресу ${result.page.url}. Для наполнения откройте её в редакторе — кнопка «Редактор» под списком.`, true);
                 } else {
                     resultEl.textContent = 'Ошибка: ' + (result.error || '');
                 }
@@ -1566,8 +1636,12 @@
 
         async function deleteCurrentPage() {
             const page = currentPage();
-            if (!page) return;
-            if (!confirm(`Удалить страницу «${page.h1 || page.title}» (${page.url})?`)) return;
+            if (!page) { showMsg('Сначала выберите страницу в списке слева (клик по названию).', false); return; }
+            if (SYSTEM_PAGE_SLUGS.includes(page.slug)) {
+                showMsg(`«${page.h1 || page.title}» — системная страница (корзина, личный кабинет и т.п.), её нельзя удалить.`, false);
+                return;
+            }
+            if (!confirm(`Удалить страницу «${page.h1 || page.title}» (${page.url})?\nСтраница исчезнет с сайта безвозвратно.`)) return;
             try {
                 const resp = await fetch(`${location.origin}/admin/api/delete-page`, {
                     method: 'POST',
@@ -1590,7 +1664,7 @@
 
         async function duplicateCurrentPage() {
             const page = currentPage();
-            if (!page) return;
+            if (!page) { showMsg('Сначала выберите страницу в списке слева (клик по названию).', false); return; }
             try {
                 const resp = await fetch(`${location.origin}/admin/api/duplicate-page`, {
                     method: 'POST',
@@ -1691,7 +1765,7 @@
                     return;
                 }
                 if (!result.issues.length) {
-                    container.innerHTML = '<p class="help">✅ Проблем не найдено.</p>';
+                    container.innerHTML = '<p class="help"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg> Проблем не найдено.</p>';
                     return;
                 }
                 let html = '<p class="help">Найдено проблем: ' + result.issues.length + '</p>' +
@@ -1784,7 +1858,7 @@
                 <div class="pimg">${p.photo ? `<img src="${p.photo}" alt="" loading="lazy">` : '<span class="no-photo">нет фото</span>'}</div>
                 <div class="pname">${escapeHtml(p.name)}</div>
                 <div class="pprice"><span class="old">${p.price} ₽</span><span class="new">${p.final_price} ₽</span></div>
-                ${productHasEdits(p) ? '<div class="help" style="color:#b8860b;margin-bottom:0.3rem;" title="Товар редактировался в админке (правки поверх данных WB/Ozon)">✎ есть правки</div>' : ''}
+                ${productHasEdits(p) ? '<div class="help" style="color:#b8860b;margin-bottom:0.3rem;" title="Товар редактировался в админке (правки поверх данных WB/Ozon)"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-edit"/></svg> есть правки</div>' : ''}
                 ${hidden ? '<div class="help" style="color:var(--danger);margin-bottom:0.3rem;">скрыт с сайта</div>' : ''}`;
             // вся карточка открывает редактор; клик по чекбоксу выделения —
             // по-прежнему только отмечает товар (label перехватывает клик)
@@ -1899,7 +1973,7 @@
                     const fullAt = fmtTs(s.last_catalog);
                     if (fullAt) line += ` Полная синхронизация выполнялась: ${fullAt}.`;
                     if (s.last_ok) line += ` Последний успех: ${escapeHtml((s.last_ok.time || '').replace('T', ' ').slice(0, 16))}.`;
-                    if (s.last_log) line += ` Журнал: ${s.last_log.status === 'ok' ? '✅' : '❌'} ${escapeHtml((s.last_log.time || '').replace('T', ' ').slice(0, 16))}${s.last_log.message ? ' — ' + escapeHtml(String(s.last_log.message).slice(0, 120)) : ''}.`;
+                    if (s.last_log) line += ` Журнал: ${s.last_log.status === 'ok' ? '<svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg>' : '<svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-cross"/></svg>'} ${escapeHtml((s.last_log.time || '').replace('T', ' ').slice(0, 16))}${s.last_log.message ? ' — ' + escapeHtml(String(s.last_log.message).slice(0, 120)) : ''}.`;
                     if (!s.last_log) line += ' Синхронизация ещё не запускалась.';
                     el.innerHTML = line;
                 });
@@ -1928,7 +2002,7 @@
                 const titles = {wb: 'WB', ozon: 'Ozon'};
                 let html = '<table class="adm"><thead><tr><th>Время</th><th>Источник</th><th>Статус</th><th>Сообщение</th><th>Товаров</th></tr></thead><tbody>';
                 result.entries.forEach(e => {
-                    html += `<tr><td>${escapeHtml(e.time || '')}</td><td>${titles[e.source] || escapeHtml(e.source || '')}</td><td>${e.status === 'ok' ? '✅ ok' : '❌ error'}</td><td>${escapeHtml(e.message || '')}</td><td>${e.count !== null && e.count !== undefined ? e.count : ''}</td></tr>`;
+                    html += `<tr><td>${escapeHtml(e.time || '')}</td><td>${titles[e.source] || escapeHtml(e.source || '')}</td><td>${e.status === 'ok' ? '<svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg> ok' : '<svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-cross"/></svg> error'}</td><td>${escapeHtml(e.message || '')}</td><td>${e.count !== null && e.count !== undefined ? e.count : ''}</td></tr>`;
                 });
                 box.innerHTML = html + '</tbody></table>';
             } catch (e) { box.innerHTML = '<p class="help">Ошибка сети: ' + e.message + '</p>'; }
@@ -2136,7 +2210,7 @@
             if (!customers.length) { container.innerHTML = '<p class="help">Пока нет клиентов. Клиенты добавляются автоматически при заказе или регистрации.</p>'; return; }
             let html = '<table class="adm"><thead><tr><th>ID</th><th>Имя</th><th>Телефон</th><th>Email</th><th>Согласие ПДн</th><th>Добавлен</th><th></th></tr></thead><tbody>';
             customers.forEach(c => {
-                html += `<tr><td>${c.id}</td><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone)}</td><td>${escapeHtml(c.email || '')}</td><td>${c.consent_pd ? '✅' : '—'}</td><td>${formatDate(c.created_at)}</td><td><button type="button" class="secondary" onclick="deleteCustomer(${c.id})" title="Удалить клиента и все его данные (152-ФЗ)">🗑</button></td></tr>`;
+                html += `<tr><td>${c.id}</td><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone)}</td><td>${escapeHtml(c.email || '')}</td><td>${c.consent_pd ? '<svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg>' : '—'}</td><td>${formatDate(c.created_at)}</td><td><button type="button" class="secondary" onclick="deleteCustomer(${c.id})" title="Удалить клиента и все его данные (152-ФЗ)"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-trash"/></svg></button></td></tr>`;
             });
             container.innerHTML = html + '</tbody></table>';
         }
@@ -2173,7 +2247,7 @@
             if (!subscribers.length) { container.innerHTML = '<p class="help">Пока нет подписчиков. Подписка работает в форме в подвале сайта.</p>'; return; }
             let html = '<table class="adm"><thead><tr><th>ID</th><th>Email</th><th>Источник</th><th>Дата подписки</th><th></th></tr></thead><tbody>';
             subscribers.forEach(s => {
-                html += `<tr><td>${s.id}</td><td>${escapeHtml(s.email)}</td><td>${escapeHtml(s.source || '')}</td><td>${formatDate(s.created_at)}</td><td><button type="button" class="secondary" onclick="deleteSubscriber(${s.id})" title="Удалить подписчика (152-ФЗ)">🗑</button></td></tr>`;
+                html += `<tr><td>${s.id}</td><td>${escapeHtml(s.email)}</td><td>${escapeHtml(s.source || '')}</td><td>${formatDate(s.created_at)}</td><td><button type="button" class="secondary" onclick="deleteSubscriber(${s.id})" title="Удалить подписчика (152-ФЗ)"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-trash"/></svg></button></td></tr>`;
             });
             container.innerHTML = html + '</tbody></table>';
         }
@@ -2210,7 +2284,7 @@
             if (!items.length) { container.innerHTML = '<p class="help">Пока нет заявок. Они появятся, когда посетитель нажмёт кнопку с действием «Форма заявки» на сайте.</p>'; return; }
             let html = '<table class="adm"><thead><tr><th>ID</th><th>Имя</th><th>Телефон</th><th>Сообщение</th><th>Страница</th><th>Дата</th><th></th></tr></thead><tbody>';
             items.forEach(s => {
-                html += `<tr><td>${s.id}</td><td>${escapeHtml(s.name || '')}</td><td>${escapeHtml(s.phone || '')}</td><td>${escapeHtml(s.message || '')}</td><td>${escapeHtml(s.page || '')}</td><td>${formatDate(s.created_at)}</td><td><button type="button" class="secondary" onclick="deleteFeedback(${s.id})" title="Удалить заявку">🗑</button></td></tr>`;
+                html += `<tr><td>${s.id}</td><td>${escapeHtml(s.name || '')}</td><td>${escapeHtml(s.phone || '')}</td><td>${escapeHtml(s.message || '')}</td><td>${escapeHtml(s.page || '')}</td><td>${formatDate(s.created_at)}</td><td><button type="button" class="secondary" onclick="deleteFeedback(${s.id})" title="Удалить заявку"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-trash"/></svg></button></td></tr>`;
             });
             container.innerHTML = html + '</tbody></table>';
         }
@@ -2250,11 +2324,11 @@
                 const stars = '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating);
                 const short = (r.text || '').length > 80 ? (r.text || '').slice(0, 80) + '…' : (r.text || '');
                 html += `<tr><td>${r.id}</td><td>${escapeHtml(r.name)}</td><td style="color:#e8b64c;white-space:nowrap;">${stars}</td><td>${escapeHtml(short)}</td><td>${escapeHtml(r.product_name || '')}</td><td>${formatDate(r.created_at)}</td>`;
-                html += `<td>${r.approved ? '✅ да' : '⏳ ждёт'}</td>`;
+                html += `<td>${r.approved ? '<svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg> да' : '<svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-clock"/></svg> ждёт'}</td>`;
                 html += `<td style="white-space:nowrap;">`;
-                if (!r.approved) html += `<button type="button" class="secondary" onclick="moderateReview(${r.id}, true)" title="Одобрить — показать на сайте">✔</button> `;
-                else html += `<button type="button" class="secondary" onclick="moderateReview(${r.id}, false)" title="Скрыть с сайта">🙈</button> `;
-                html += `<button type="button" class="secondary" onclick="deleteReview(${r.id})" title="Удалить отзыв">🗑</button></td></tr>`;
+                if (!r.approved) html += `<button type="button" class="secondary" onclick="moderateReview(${r.id}, true)" title="Одобрить — показать на сайте"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg></button> `;
+                else html += `<button type="button" class="secondary" onclick="moderateReview(${r.id}, false)" title="Скрыть с сайта"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-eye-off"/></svg></button> `;
+                html += `<button type="button" class="secondary" onclick="deleteReview(${r.id})" title="Удалить отзыв"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-trash"/></svg></button></td></tr>`;
             });
             container.innerHTML = html + '</tbody></table>';
         }
@@ -2447,7 +2521,7 @@
                 html += card('Заявок сегодня', d.orders_today);
                 html += card('Клиентов всего', d.customers_total);
                 html += card('Новых клиентов (7 дней)', d.customers_new_7d);
-                html += card(d.chat_unread ? '🔴 Сообщений в чатах' : 'Сообщений в чатах', d.chat_unread || 0);
+                html += card(d.chat_unread ? '<svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-dot"/></svg> Сообщений в чатах' : 'Сообщений в чатах', d.chat_unread || 0);
                 html += '</div>';
                 html += '<h3>Популярные товары</h3>';
                 if (d.popular_products.length) {
@@ -2467,7 +2541,7 @@
                     });
                     html += '</tbody></table>';
                 } else {
-                    html += '<p class="help">Ошибок нет ✅</p>';
+                    html += '<p class="help">Ошибок нет <svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg></p>';
                 }
                 box.innerHTML = html;
             } catch (e) {
@@ -2783,13 +2857,13 @@
                 row.appendChild(inp);
                 const pick = document.createElement('button');
                 pick.type = 'button';
-                pick.textContent = '📁';
+                pick.innerHTML = '<svg class='ic' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><use href='#i-folder'/></svg>';
                 pick.title = 'Выбрать из медиатеки';
                 pick.addEventListener('click', () => pickMediaValue(url => { badges[i] = url; renderZoneFooterBadges(); }));
                 row.appendChild(pick);
                 const up = document.createElement('button');
                 up.type = 'button';
-                up.textContent = '⬆';
+                up.innerHTML = '<svg class='ic' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><use href='#i-upload'/></svg>';
                 up.title = 'Загрузить файл';
                 up.addEventListener('click', () => uploadMediaValue(url => { badges[i] = url; renderZoneFooterBadges(); }));
                 row.appendChild(up);

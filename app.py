@@ -3804,6 +3804,8 @@ def admin_delete_page():
     slug = payload.get('slug', '').strip()
     if not slug:
         return jsonify({'success': False, 'error': 'slug обязателен'}), 400
+    if slug in SYSTEM_PAGE_SLUGS:
+        return jsonify({'success': False, 'error': 'Системную страницу нельзя удалить'}), 400
     content = load_content()
     page = next((p for p in content['pages'] if p['slug'] == slug), None)
     if not page:

@@ -26,7 +26,8 @@ def test_products_tab_exists():
     assert 'data-tab="products"' in html
     assert 'id="tab-products"' in html
     assert 'id="all-products"' in html
-    assert '📦 Товары' in html
+    assert 'Товары</button>' in html
+    assert 'use href="#i-box"' in html
 
 
 def test_old_product_lists_removed_from_integrations():
