@@ -14,6 +14,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Точка монтирования volume app-uploads (ro в nginx): без пустой директории
+# в образе чистая перезаливка кода роняет nginx (read-only rootfs не даёт
+# создать mountpoint).
+RUN mkdir -p static/uploads
+
 # Персистентные данные: SQLite, image_cache, загруженные файлы (volume в compose)
 ENV DATABASE_URL=sqlite:////app/data/ekotoriya.db \
     CACHE_TYPE=SimpleCache \
