@@ -3355,6 +3355,7 @@ def _inject_editor(html, slug):
 
 
 @app.route('/admin/page/<slug>')
+@app.route('/admin/page/<slug>/')
 @admin_required
 def admin_edit_page(slug):
     """Режим редактирования прямо на странице сайта (как в Tilda).

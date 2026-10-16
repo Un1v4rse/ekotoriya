@@ -98,3 +98,22 @@ def test_admin_html_js_strings_not_broken(app_context):
     (инцидент 2026-10-16: class='ic' → SyntaxError, админка целиком не работала)."""
     html = _admin_client().get('/admin/').get_data(as_text=True)
     assert "class='ic'" not in html
+
+
+def test_page_editor_accepts_trailing_slash(app_context):
+    """Редактор страницы открывается и с /admin/page/<slug>, и с trailing slash —
+    иначе catch-all роут сайта перехватывал URL и отдавал aspro-404
+    (инцидент: созданную страницу невозможно было отредактировать)."""
+    client = _admin_client()
+    r = client.post('/admin/api/add-page',
+                    json={'slug': 'test', 'url': '/test/', 'title': 'Test'},
+                    headers=client.csrf_headers)
+    assert r.get_json()['success']
+    try:
+        for u in ('/admin/page/test', '/admin/page/test/'):
+            resp = client.get(u)
+            assert resp.status_code == 200, (u, resp.status_code)
+            assert 'Редактор страницы' in resp.get_data(as_text=True), u
+    finally:
+        client.post('/admin/api/delete-page', json={'slug': 'test'},
+                    headers=client.csrf_headers)
