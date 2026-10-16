@@ -464,6 +464,7 @@ ADMIN_PATH_SECTIONS = [
     ('/admin/api/ozon', 'integrations'),
     ('/admin/api/wb-token', 'integrations'),
     ('/admin/api/wb-autosync', 'integrations'),
+    ('/admin/api/sync-status', 'integrations'),
     ('/admin/api/save', 'site'),
     ('/admin/api/full-content', 'backup'),
     ('/admin/api/recent-uploads', 'pages'),
@@ -917,6 +918,8 @@ def make_context(content, page):
         # Одобренные отзывы покупателей — только на странице «Отзывы» (PG-6.3).
         'reviews_dynamic': (_approved_reviews_html()
                             if page.get('slug') == 'company__reviews' else ''),
+        # Режим «Скрыть маркетплейсы» (8.3): скрываем бейджи WB/Ozon и ссылки.
+        'hide_mp': bool(site.get('hide_marketplaces')),
     }
     # Глобальные зоны шапка/подвал (CN-T6): страница может переопределять конфиг
     # через page.settings.override_header/footer (+ header_config/footer_config).
@@ -5093,7 +5096,9 @@ def api_catalog():
         base = ('/catalog/' + section + '/') if section else '/catalog/'
     view = _filtered_catalog(request.args, section=section, base=base,
                              show_filters=True)
-    html = render_template('wb_catalog_results.html', catalog_view=view)
+    hide_mp = bool(load_content().get('site', {}).get('hide_marketplaces'))
+    html = render_template('wb_catalog_results.html', catalog_view=view,
+                           hide_mp=hide_mp)
     return jsonify({'success': True, 'html': html, 'total': view['total'],
                     'page': view['page'], 'pages': view['pages']})
 
@@ -5948,10 +5953,12 @@ def _product_detail_html(product, site=None):
         '</div>')
 
     # Внешняя ссылка на маркетплейс — только второстепенная: основная покупка
-    # (корзина/1 клик) происходит на сайте.
+    # (корзина/1 клик) происходит на сайте. Режим «Скрыть маркетплейсы» (8.3) —
+    # ссылку и «Нашли дешевле?» не показываем вовсе.
+    hide_mp = bool(site.get('hide_marketplaces'))
     ext_url = str(product.get('url') or '').strip()
     ext_html = ''
-    if ext_url.startswith(('http://', 'https://')):
+    if ext_url.startswith(('http://', 'https://')) and not hide_mp:
         mp_name = 'Ozon' if src == 'ozon' else 'Wildberries'
         ext_html = (
             '<div style="margin-top:14px;font-size:0.85rem;">'
@@ -6049,8 +6056,9 @@ def _product_detail_html(product, site=None):
         'margin-top:.7rem;font-size:.85rem;flex-wrap:wrap;">'
         f'<span>{stock_html}'
         '<span style="color:#aaa;margin-left:.3rem;cursor:help;" title="Остаток обновляется автоматически">ⓘ</span></span>'
-        f'<a href="#" style="color:#777;font-size:.82rem;text-decoration:underline;">📋 {_esc(label_cheaper)}</a>'
-        '</div>'
+        + ('' if hide_mp else
+           f'<a href="#" style="color:#777;font-size:.82rem;text-decoration:underline;">📋 {_esc(label_cheaper)}</a>')
+        + '</div>'
         '<div style="display:flex;gap:.5rem;margin-top:14px;align-items:stretch;">'
         f'{stepper_html}'
         f'<button type="button" class="wb-cart-btn" data-id="{_esc(str(pid))}" data-source="{_esc(src)}" '
@@ -6275,6 +6283,41 @@ def admin_api_dashboard():
                               'orders': p.get('orders', 0), 'likes': p.get('likes', 0),
                               'score': p.get('score', 0)} for p in popular],
     })
+
+
+@app.route('/admin/api/sync-status')
+@admin_required
+def admin_api_sync_status():
+    """Статус синхронизации для «Интеграций» (8.4): расписание, состояние,
+    последние запуски по журналу (sync_logs)."""
+    import json as _json
+    from models import SyncLog
+    try:
+        state = _json.loads(storage.get_setting('site.mp_autosync_state') or '{}')
+    except Exception:
+        state = {}
+    site = load_content().get('site', {})
+    result = {}
+    for source in ('wb', 'ozon'):
+        settings = dict(WB_AUTOSYNC_DEFAULTS)
+        saved = site.get('{}_autosync'.format(source))
+        if isinstance(saved, dict):
+            settings.update(saved)
+        st = (state or {}).get(source) or {}
+        last_log = (db.session.query(SyncLog).filter_by(source=source)
+                    .order_by(SyncLog.id.desc()).first())
+        last_ok = (db.session.query(SyncLog).filter_by(source=source, status='ok')
+                   .order_by(SyncLog.id.desc()).first())
+        result[source] = {
+            'enabled': bool(settings.get('enabled')),
+            'catalog_hours': settings.get('catalog_hours'),
+            'light_minutes': settings.get('light_minutes'),
+            'last_catalog': st.get('last_catalog'),
+            'last_light': st.get('last_light'),
+            'last_log': last_log.to_dict() if last_log else None,
+            'last_ok': last_ok.to_dict() if last_ok else None,
+        }
+    return jsonify({'success': True, 'status': result})
 
 
 @app.route('/admin/api/audit')

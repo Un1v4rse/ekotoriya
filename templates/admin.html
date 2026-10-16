@@ -697,6 +697,13 @@
 
                 <section id="tab-wildberries">
                     <h2>Интеграции с маркетплейсами</h2>
+                    <div class="field" style="background:#f7f5f2;border:1px solid var(--border);border-radius:8px;padding:0.8rem 1rem;">
+                        <label style="font-weight:600;display:flex;align-items:center;gap:0.4rem;margin:0;">
+                            <input type="checkbox" data-path="site.hide_marketplaces">
+                            🙈 Скрыть упоминания маркетплейсов на сайте
+                        </label>
+                        <div class="help" style="margin:0.3rem 0 0;">Вкл — на сайте исчезают бейджи WB/Ozon на карточках, ссылки «Посмотреть на Wildberries/Ozon» и «Нашли дешевле?». Сами товары и покупка на сайте остаются. Сохраняется кнопкой «Сохранить настройки сайта».</div>
+                    </div>
                     <div class="subnav" id="int-subnav">
                         <button type="button" data-subtab="wb" class="active">Wildberries</button>
                         <button type="button" data-subtab="ozon">Ozon</button>
@@ -704,6 +711,7 @@
                     </div>
 
                     <div id="int-sub-wb">
+                        <div id="wb-sync-status" class="help" style="background:#f7f7f7;border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.9rem;margin-bottom:0.9rem;">Загрузка статуса…</div>
                         <div class="field">
                             <label for="wb-token">API-токен WB (категория «Контент» или «Цены и скидки»)</label>
                             <input type="text" id="wb-token" data-path="site.wb_api_token" placeholder="Оставьте пустым — будет демо-каталог">
@@ -781,6 +789,7 @@
                     </div>
 
                     <div id="int-sub-ozon" style="display:none;">
+                        <div id="ozon-sync-status" class="help" style="background:#f7f7f7;border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.9rem;margin-bottom:0.9rem;">Загрузка статуса…</div>
                         <div class="row">
                             <div class="field">
                                 <label for="ozon-client-id">Client-Id</label>
@@ -1852,7 +1861,33 @@
                     ? `Готово${result.count !== undefined ? `: обработано ${result.count} товаров` : ''}${result.demo ? ' (демо-режим)' : ''}`
                     : 'Ошибка: ' + (result.error || '');
                 if (result.success) await reloadProducts();
+                loadSyncStatus();
             } catch (e) { resultEl.textContent = 'Ошибка: ' + e.message; }
+        }
+
+        /* Статус синхронизации (8.4): расписание, состояние, последние запуски */
+        async function loadSyncStatus() {
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/sync-status`);
+                const d = await resp.json();
+                if (!d.success) return;
+                ['wb', 'ozon'].forEach(src => {
+                    const el = $(`${src}-sync-status`);
+                    if (!el) return;
+                    const s = d.status[src] || {};
+                    const mode = s.enabled
+                        ? `авто-синхронизация вкл: полная — раз в ${s.catalog_hours} ч, цены/остатки — каждые ${s.light_minutes} мин`
+                        : 'авто-синхронизация выключена (кнопки «Синхронизировать» работают всегда)';
+                    let line = `<strong>${src === 'wb' ? 'Wildberries' : 'Ozon'}:</strong> ${mode}.`;
+                    const fmtTs = v => v ? new Date(Number(v) * 1000).toLocaleString('ru-RU') : null;
+                    const fullAt = fmtTs(s.last_catalog);
+                    if (fullAt) line += ` Полная синхронизация выполнялась: ${fullAt}.`;
+                    if (s.last_ok) line += ` Последний успех: ${escapeHtml((s.last_ok.time || '').replace('T', ' ').slice(0, 16))}.`;
+                    if (s.last_log) line += ` Журнал: ${s.last_log.status === 'ok' ? '✅' : '❌'} ${escapeHtml((s.last_log.time || '').replace('T', ' ').slice(0, 16))}${s.last_log.message ? ' — ' + escapeHtml(String(s.last_log.message).slice(0, 120)) : ''}.`;
+                    if (!s.last_log) line += ' Синхронизация ещё не запускалась.';
+                    el.innerHTML = line;
+                });
+            } catch (e) { /* тихо, обновим при следующем открытии */ }
         }
 
         /* ================= Журнал синхронизации ================= */
@@ -3150,6 +3185,7 @@
             if (name === 'zones') loadZones();
             if (name === 'templates') loadTemplatesTab();
             if (name === 'chats') { loadChats(); _chatsTimer = setInterval(() => loadChats(true), 15000); }
+            if (name === 'wildberries') loadSyncStatus();
         }
         document.querySelectorAll('nav button[data-tab]').forEach(btn => {
             btn.addEventListener('click', () => switchTab(btn.dataset.tab));
