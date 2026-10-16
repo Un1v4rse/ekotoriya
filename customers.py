@@ -128,11 +128,23 @@ def login_client(phone, password):
     return row.to_dict()
 
 
-def update_customer_profile(customer_id, name=None, email=None):
-    """Обновление контактов клиента из ЛК (LC-3)."""
+def update_customer_profile(customer_id, name=None, email=None, phone=None):
+    """Обновление контактов клиента из ЛК (LC-3, этап 7.1).
+
+    Телефон — логин, меняется с проверкой уникальности нормализованного
+    значения; при конфликте возвращает (None, 'ошибка')."""
     row = db.session.get(Customer, int(customer_id))
     if row is None:
         return None
+    if phone is not None:
+        phone_norm = normalize_phone(phone)
+        if not phone_norm:
+            return None, 'Некорректный телефон'
+        conflict = db.session.query(Customer).filter(
+            Customer.phone == phone_norm, Customer.id != row.id).first()
+        if conflict is not None:
+            return None, 'Этот телефон уже привязан к другому аккаунту'
+        row.phone = phone_norm
     if name is not None:
         row.name = name.strip()
     if email is not None:
@@ -140,6 +152,22 @@ def update_customer_profile(customer_id, name=None, email=None):
     _touch(row)
     db.session.commit()
     return row.to_dict()
+
+
+def change_client_password(customer_id, current_password, new_password):
+    """Смена пароля из ЛК (этап 7.1): проверяем текущий, валидируем новый."""
+    from werkzeug.security import check_password_hash, generate_password_hash
+    row = db.session.get(Customer, int(customer_id))
+    if row is None or not row.password_hash:
+        return None, 'Клиент не найден'
+    if not check_password_hash(row.password_hash, current_password or ''):
+        return None, 'Текущий пароль неверный'
+    if not new_password or len(new_password) < 6:
+        return None, 'Новый пароль должен быть не короче 6 символов'
+    row.password_hash = generate_password_hash(new_password)
+    _touch(row)
+    db.session.commit()
+    return row.to_dict(), None
 
 
 def add_order(name, phone, email, product_id, product_name, price, qty=1,

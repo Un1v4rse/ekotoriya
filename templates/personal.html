@@ -9,12 +9,12 @@
     <div class="lk-msg" id="profile-msg"></div>
     <form id="profile-form" class="lk-row" style="align-items:flex-end;">
         <div style="flex:1;min-width:200px;">
-            <label class="lk-label" for="pf-name">Имя</label>
+            <label class="lk-label" for="pf-name">Имя и фамилия</label>
             <input type="text" id="pf-name" name="name" value="{{ customer.name }}">
         </div>
         <div style="flex:1;min-width:200px;">
-            <label class="lk-label">Телефон</label>
-            <input type="tel" value="{{ customer.phone }}" disabled style="background:#f7f7f7;">
+            <label class="lk-label" for="pf-phone">Телефон (логин)</label>
+            <input type="tel" id="pf-phone" name="phone" value="{{ customer.phone }}">
         </div>
         <div style="flex:1;min-width:200px;">
             <label class="lk-label" for="pf-email">Email</label>
@@ -23,21 +23,43 @@
         <button class="lk-btn" type="submit">Сохранить</button>
     </form>
     <p class="lk-muted" style="margin:0.6rem 0 0;">
-        Заявок: {{ stats.orders_count }} · Сумма покупок: {{ stats.total_spent }} ₽
+        На сайте с {{ customer.created_at[:10] if customer.created_at else '—' }}
+        · Заявок: {{ stats.orders_count }} · Сумма покупок: {{ stats.total_spent }} ₽
         {% if stats.last_activity_at %}· Последняя активность: {{ stats.last_activity_at[:10] }}{% endif %}
+        {% if customer.consent_pd %}· Согласие на обработку ПДн: дано{% endif %}
     </p>
+</div>
+
+<div class="lk-card">
+    <h2>Смена пароля</h2>
+    <div class="lk-msg" id="pwd-msg"></div>
+    <form id="pwd-form" class="lk-row" style="align-items:flex-end;">
+        <div style="flex:1;min-width:200px;">
+            <label class="lk-label" for="pw-current">Текущий пароль</label>
+            <input type="password" id="pw-current" name="current_password" autocomplete="current-password">
+        </div>
+        <div style="flex:1;min-width:200px;">
+            <label class="lk-label" for="pw-new">Новый пароль (минимум 6 символов)</label>
+            <input type="password" id="pw-new" name="new_password" autocomplete="new-password">
+        </div>
+        <div style="flex:1;min-width:200px;">
+            <label class="lk-label" for="pw-confirm">Повторите новый пароль</label>
+            <input type="password" id="pw-confirm" name="confirm_password" autocomplete="new-password">
+        </div>
+        <button class="lk-btn" type="submit">Сменить пароль</button>
+    </form>
 </div>
 
 <div class="lk-card" id="orders">
     <h2>Мои заявки</h2>
     {% if orders %}
     <table class="lk-table">
-        <thead><tr><th>№</th><th>Товар</th><th>Сумма</th><th>Статус</th><th>Дата</th></tr></thead>
+        <thead><tr><th>№</th><th>Товар</th><th>Сумма</th><th>Статус</th><th>Дата</th><th></th></tr></thead>
         <tbody>
             {% for o in orders %}
             <tr>
                 <td>{{ o.id }}</td>
-                <td>{{ o.product_name or 'Заявка' }}</td>
+                <td>{{ o.product_name or 'Заявка' }}{% if o.qty > 1 %} ×{{ o.qty }}{% endif %}</td>
                 <td>{{ o.price * o.qty }} ₽</td>
                 <td><span class="lk-status {{ o.status }}">
                     {% if o.status == 'new' %}Новая
@@ -47,10 +69,12 @@
                     {% else %}{{ o.status }}{% endif %}
                 </span></td>
                 <td class="lk-muted">{{ o.created_at[:10] if o.created_at else '' }}</td>
+                <td><button type="button" class="lk-btn secondary lk-repeat" data-order-id="{{ o.id }}" style="padding:0.35rem 0.8rem;font-size:0.82rem;">Повторить</button></td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+    <div class="lk-msg" id="repeat-msg" style="margin-top:0.8rem;"></div>
     {% else %}
     <p class="lk-muted">Пока нет заявок. Загляните в <a href="/catalog/" style="color:var(--theme-link, #9a8269);">каталог</a>.</p>
     {% endif %}
@@ -80,6 +104,30 @@
     <p class="lk-muted">Нет избранных товаров. Нажимайте ❤ на карточках в каталоге.</p>
     {% endif %}
 </div>
+
+<div class="lk-card" id="chat">
+    <h2>Чат с магазином</h2>
+    <div id="chat-status" class="lk-muted" style="margin-bottom:0.7rem;"></div>
+    <div id="chat-messages" style="max-height:340px;overflow-y:auto;border:1px solid #eee;border-radius:var(--theme-border-radius,6px);padding:0.9rem;margin-bottom:0.8rem;background:#fafafa;">
+        <p class="lk-muted" style="margin:0;">Загрузка…</p>
+    </div>
+    <form id="chat-form" class="lk-row" style="align-items:flex-end;">
+        <div style="flex:1;min-width:220px;">
+            <label class="lk-label" for="chat-input">Сообщение</label>
+            <textarea id="chat-input" rows="2" style="width:100%;padding:0.6rem 0.75rem;border:1px solid #ddd;border-radius:var(--theme-border-radius,6px);font-size:0.95rem;font-family:inherit;resize:vertical;" placeholder="Напишите вопрос — ответим здесь"></textarea>
+        </div>
+        <button class="lk-btn" type="submit">Отправить</button>
+    </form>
+    <p class="lk-muted" style="margin:0.5rem 0 0;">Ссылкам в сообщениях не будет автоматически переход — безопасность переписки.</p>
+</div>
+
+<style>
+.lk-chat-msg { max-width:78%; margin:0 0 0.55rem; padding:0.5rem 0.75rem; border-radius:10px; font-size:0.9rem; line-height:1.4; white-space:pre-wrap; word-break:break-word; }
+.lk-chat-msg.client { margin-left:auto; background:var(--theme-primary, #b49d84); color:var(--theme-button-text, #fff); border-bottom-right-radius:3px; }
+.lk-chat-msg.admin { margin-right:auto; background:#fff; border:1px solid #eee; border-bottom-left-radius:3px; }
+.lk-chat-time { display:block; font-size:0.72rem; opacity:0.7; margin-top:0.25rem; }
+@media (max-width:640px) { .lk-chat-msg { max-width:92%; } }
+</style>
 
 <div class="lk-card">
     <h2>Вам может понравиться</h2>
@@ -113,6 +161,10 @@ function showMsg(id, text, ok) {
     el.textContent = text;
     el.className = 'lk-msg ' + (ok ? 'ok' : 'err');
 }
+function lkEscape(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+        {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 document.getElementById('profile-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     const body = Object.fromEntries(new FormData(this).entries());
@@ -124,5 +176,94 @@ document.getElementById('profile-form').addEventListener('submit', async functio
         showMsg('profile-msg', 'Ошибка сети: ' + err.message, false);
     }
 });
+
+document.getElementById('pwd-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const body = Object.fromEntries(new FormData(this).entries());
+    if (body.new_password !== body.confirm_password) {
+        showMsg('pwd-msg', 'Новые пароли не совпадают', false);
+        return;
+    }
+    try {
+        const resp = await fetch('/api/client/password', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+        const data = await resp.json();
+        showMsg('pwd-msg', data.success ? 'Пароль изменён' : (data.error || 'Ошибка'), data.success);
+        if (data.success) this.reset();
+    } catch (err) {
+        showMsg('pwd-msg', 'Ошибка сети: ' + err.message, false);
+    }
+});
+
+document.querySelectorAll('.lk-repeat').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        try {
+            const resp = await fetch('/api/client/orders/' + this.dataset.orderId + '/repeat', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+            const data = await resp.json();
+            const el = document.getElementById('repeat-msg');
+            el.textContent = data.success ? ('Товар снова в корзине (' + data.count + ' поз.)') : (data.error || 'Ошибка');
+            el.className = 'lk-msg ' + (data.success ? 'ok' : 'err');
+            if (data.success && confirm('Перейти в корзину?')) location.href = data.redirect || '/basket/';
+        } catch (err) {
+            const el = document.getElementById('repeat-msg');
+            el.textContent = 'Ошибка сети: ' + err.message;
+            el.className = 'lk-msg err';
+        }
+    });
+});
+
+/* Чат с магазином (этап 7.3): polling раз в 12 с, текст — через textContent */
+let _chatTimer = null;
+function renderChatMessages(messages) {
+    const box = document.getElementById('chat-messages');
+    if (!messages.length) {
+        box.innerHTML = '<p class="lk-muted" style="margin:0;">Задайте вопрос — менеджер ответит здесь.</p>';
+        return;
+    }
+    box.innerHTML = '';
+    messages.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'lk-chat-msg ' + (m.sender === 'admin' ? 'admin' : 'client');
+        const text = document.createElement('span');
+        text.textContent = m.text || '';
+        const time = document.createElement('span');
+        time.className = 'lk-chat-time';
+        time.textContent = (m.created_at || '').slice(0, 16).replace('T', ' ');
+        div.appendChild(text);
+        div.appendChild(time);
+        box.appendChild(div);
+    });
+    box.scrollTop = box.scrollHeight;
+}
+async function loadChat() {
+    try {
+        const resp = await fetch('/api/client/chat');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (!data.success) return;
+        const statusEl = document.getElementById('chat-status');
+        if (data.dialog && data.dialog.status === 'closed') {
+            statusEl.textContent = 'Диалог закрыт менеджером. Новое сообщение откроет его снова.';
+        } else if (data.messages.length) {
+            statusEl.textContent = 'Обычно отвечаем в течение рабочего дня.';
+        } else {
+            statusEl.textContent = '';
+        }
+        renderChatMessages(data.messages || []);
+    } catch (err) { /* тихо, перепроверим на следующем цикле */ }
+}
+document.getElementById('chat-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+    try {
+        const resp = await fetch('/api/client/chat', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text})});
+        const data = await resp.json();
+        if (data.success) { input.value = ''; loadChat(); }
+        else alert(data.error || 'Не удалось отправить сообщение');
+    } catch (err) { alert('Ошибка сети: ' + err.message); }
+});
+loadChat();
+_chatTimer = setInterval(loadChat, 12000);
 </script>
 {% endblock %}

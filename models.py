@@ -420,3 +420,55 @@ class AuditLog(db.Model):
             'detail': self.detail,
             'created_at': self.created_at.isoformat(timespec='seconds') if self.created_at else '',
         }
+
+
+class ChatDialog(db.Model):
+    """Диалог клиент↔магазин (цикл 4 / этап 7): одна запись на клиента.
+
+    status: open | closed (админ может закрыть диалог; новое сообщение
+    клиента автоматически переоткрывает его)."""
+    __tablename__ = 'chat_dialogs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'),
+                            nullable=False, unique=True, index=True)
+    status = db.Column(db.String(20), default='open', index=True)
+    created_at = db.Column(db.DateTime, default=utcnow)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'customer_id': self.customer_id,
+            'status': self.status or 'open',
+            'created_at': self.created_at.isoformat(timespec='seconds') if self.created_at else '',
+            'updated_at': self.updated_at.isoformat(timespec='seconds') if self.updated_at else '',
+        }
+
+
+class ChatMessage(db.Model):
+    """Сообщение чата. sender: client | admin.
+
+    Текст хранится как есть; HTML при выводе экранируется (модерация ссылок —
+    они не кликабельны, отображаются как текст)."""
+    __tablename__ = 'chat_messages'
+
+    id = db.Column(db.Integer, primary_key=True)
+    dialog_id = db.Column(db.Integer, db.ForeignKey('chat_dialogs.id'),
+                          nullable=False, index=True)
+    sender = db.Column(db.String(20), default='client', index=True)
+    text = db.Column(db.Text, default='')
+    read_by_admin = db.Column(db.Boolean, default=False, index=True)
+    read_by_client = db.Column(db.Boolean, default=False, index=True)
+    created_at = db.Column(db.DateTime, default=utcnow, index=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'dialog_id': self.dialog_id,
+            'sender': self.sender or 'client',
+            'text': self.text or '',
+            'read_by_admin': bool(self.read_by_admin),
+            'read_by_client': bool(self.read_by_client),
+            'created_at': self.created_at.isoformat(timespec='seconds') if self.created_at else '',
+        }

@@ -220,6 +220,7 @@
         }
         @media (max-width: 700px) {
             .row, .row3 { grid-template-columns: 1fr; }
+            #chats-layout { grid-template-columns: 1fr !important; }
         }
     </style>
 </head>
@@ -252,6 +253,7 @@
                 <button data-tab="socials" data-section="socials">👍 Соцсети</button>
                 <button data-tab="wildberries" data-section="integrations">🛒 Интеграции (WB / Ozon)</button>
                 <button data-tab="customers" data-section="customers">👥 Клиенты и заявки</button>
+                <button data-tab="chats" data-section="chats">💬 Чаты</button>
                 <button data-tab="seo" data-section="seo">📈 Продвижение (SEO)</button>
                 <button data-tab="backup" data-section="backup">💾 Резервная копия</button>
                 {% if admin_role == 'superadmin' %}
@@ -974,6 +976,20 @@
                     </div>
                     <div id="reviews-list" class="table-wrap">
                         <p class="help">Нажмите «Обновить список», чтобы загрузить отзывы. Новые отзывы появляются на сайте только после одобрения.</p>
+                    </div>
+                </section>
+
+                <section id="tab-chats">
+                    <h2>Чаты с покупателями</h2>
+                    <div class="field row">
+                        <button type="button" class="secondary" onclick="loadChats()">🔄 Обновить список</button>
+                        <span class="help" id="chats-summary"></span>
+                    </div>
+                    <div id="chats-layout" style="display:grid;grid-template-columns:minmax(260px,340px) 1fr;gap:1rem;align-items:start;">
+                        <div id="chats-list" class="table-wrap" style="max-height:560px;overflow-y:auto;"></div>
+                        <div id="chat-window" style="border:1px solid #ddd;border-radius:8px;padding:1rem;background:#fafafa;">
+                            <p class="help" style="margin:0;">Выберите диалог слева, чтобы открыть переписку.</p>
+                        </div>
                     </div>
                 </section>
 
@@ -2219,6 +2235,108 @@
             } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
         }
 
+        /* Чаты с покупателями (этап 7.4) */
+        let _openChatCustomerId = null;
+        let _chatsTimer = null;
+
+        async function loadChats(keepOpen) {
+            const container = $('chats-list');
+            if (!container) return;
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/chats`);
+                const data = await resp.json();
+                const items = data.success ? data.chats : [];
+                const unreadTotal = items.reduce((s, c) => s + c.unread, 0);
+                $('chats-summary').textContent = items.length
+                    ? `Диалогов: ${items.length} · Непрочитанных сообщений: ${unreadTotal}`
+                    : 'Диалогов пока нет — покупатели пишут из личного кабинета на сайте.';
+                if (!items.length) {
+                    container.innerHTML = '<p class="help">Пока нет диалогов.</p>';
+                    if (!keepOpen) $('chat-window').innerHTML = '<p class="help" style="margin:0;">Выберите диалог слева, чтобы открыть переписку.</p>';
+                    return;
+                }
+                container.innerHTML = items.map(c => {
+                    const name = escapeHtml(c.customer.name || 'Без имени');
+                    const phone = escapeHtml(c.customer.phone || '');
+                    const closed = c.dialog.status === 'closed' ? ' · закрыт' : '';
+                    return `<div data-cid="${c.customer.id}" onclick="openChat(${c.customer.id})" style="padding:0.55rem 0.7rem;border-bottom:1px solid #eee;cursor:pointer;background:${_openChatCustomerId === c.customer.id ? '#f4efe8' : '#fff'};">
+                        <div style="font-weight:600;font-size:0.9rem;">${name} ${c.unread ? `<span style="background:#c0392b;color:#fff;border-radius:999px;padding:0.05rem 0.5rem;font-size:0.75rem;">${c.unread}</span>` : ''}</div>
+                        <div class="help" style="margin:0.1rem 0 0;">${phone}${closed}</div>
+                        <div class="help" style="margin:0.1rem 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.last_message || '—')}</div>
+                    </div>`;
+                }).join('');
+                if (keepOpen && _openChatCustomerId) openChat(_openChatCustomerId, true);
+            } catch (e) {
+                container.innerHTML = '<p class="help">Ошибка: ' + e.message + '</p>';
+            }
+        }
+
+        async function openChat(customerId, silent) {
+            _openChatCustomerId = customerId;
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/chat/${customerId}`);
+                const data = await resp.json();
+                if (!data.success) { $('chat-window').innerHTML = '<p class="help" style="margin:0;">' + escapeHtml(data.error || 'Диалог не найден') + '</p>'; return; }
+                const c = data.customer || {};
+                const name = escapeHtml(c.name || 'Без имени');
+                const phone = escapeHtml(c.phone || '');
+                const email = escapeHtml(c.email || '');
+                const status = data.dialog.status === 'closed' ? 'закрыт' : 'открыт';
+                let html = `<div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.6rem;">
+                    <strong>${name}</strong><span class="help" style="margin:0;">${phone}${email ? ' · ' + email : ''} · диалог ${status}</span>
+                    <span style="margin-left:auto;display:flex;gap:0.4rem;">
+                        <button type="button" class="secondary" onclick="toggleChatStatus(${customerId}, '${data.dialog.status === 'closed' ? 'open' : 'closed'}')">${data.dialog.status === 'closed' ? 'Открыть диалог' : 'Закрыть диалог'}</button>
+                    </span></div>
+                    <div id="adm-chat-messages" style="max-height:420px;overflow-y:auto;background:#fff;border:1px solid #eee;border-radius:6px;padding:0.7rem;margin-bottom:0.7rem;">`;
+                if (!data.messages.length) {
+                    html += '<p class="help" style="margin:0;">Сообщений пока нет.</p>';
+                }
+                data.messages.forEach(m => {
+                    const mine = m.sender === 'admin';
+                    html += `<div style="max-width:80%;margin:0 0 0.5rem ${mine ? '0 0 0 auto' : ''};padding:0.45rem 0.7rem;border-radius:10px;font-size:0.88rem;white-space:pre-wrap;word-break:break-word;background:${mine ? 'var(--theme-primary, #b49d84)' : '#f1f1f1'};color:${mine ? '#fff' : '#333'};border-bottom-${mine ? 'right' : 'left'}-radius:3px;">
+                        ${escapeHtml(m.text || '')}<span style="display:block;font-size:0.7rem;opacity:0.7;margin-top:0.2rem;">${escapeHtml((m.created_at || '').slice(0, 16).replace('T', ' '))}${mine ? ' · менеджер' : ''}</span></div>`;
+                });
+                html += `</div>
+                    <div style="display:flex;gap:0.5rem;align-items:flex-end;">
+                        <textarea id="adm-chat-reply" rows="2" style="flex:1;padding:0.5rem 0.7rem;border:1px solid #ddd;border-radius:6px;font-family:inherit;font-size:0.9rem;resize:vertical;" placeholder="Ответ покупателю…"></textarea>
+                        <button type="button" class="primary" onclick="replyChat(${customerId})">Отправить</button>
+                    </div>`;
+                $('chat-window').innerHTML = html;
+                const box = $('adm-chat-messages');
+                if (box) box.scrollTop = box.scrollHeight;
+                if (!silent) loadChats(true);
+            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
+        }
+
+        async function replyChat(customerId) {
+            const ta = $('adm-chat-reply');
+            const text = (ta.value || '').trim();
+            if (!text) return;
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/chat/${customerId}/reply`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({text})
+                });
+                const result = await resp.json();
+                if (result.success) openChat(customerId, true);
+                else showMsg('Ошибка: ' + (result.error || ''), false);
+            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
+        }
+
+        async function toggleChatStatus(customerId, status) {
+            try {
+                const resp = await fetch(`${location.origin}/admin/api/chat/${customerId}/status`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': window.CSRF_TOKEN},
+                    body: JSON.stringify({status})
+                });
+                const result = await resp.json();
+                if (result.success) { openChat(customerId, true); loadChats(true); }
+                else showMsg('Ошибка: ' + (result.error || ''), false);
+            } catch (e) { showMsg('Ошибка сети: ' + e.message, false); }
+        }
+
         async function loadSegments() {
             $('segments-box').style.display = 'block';
             const days = parseInt($('seg-days').value, 10) || 30;
@@ -2278,6 +2396,7 @@
                 html += card('Заявок сегодня', d.orders_today);
                 html += card('Клиентов всего', d.customers_total);
                 html += card('Новых клиентов (7 дней)', d.customers_new_7d);
+                html += card(d.chat_unread ? '🔴 Сообщений в чатах' : 'Сообщений в чатах', d.chat_unread || 0);
                 html += '</div>';
                 html += '<h3>Популярные товары</h3>';
                 if (d.popular_products.length) {
@@ -3001,9 +3120,9 @@
         /* ================= Вкладки ================= */
         // AD-2: разделы, доступные ролям (сервер дублирует проверку — UI лишь прячет)
         const ROLE_SECTIONS = {
-            superadmin: ['pages','theme','menu','zones','socials','seo','site','integrations','customers','backup','dashboard','audit','users'],
+            superadmin: ['pages','theme','menu','zones','socials','seo','site','integrations','customers','chats','backup','dashboard','audit','users'],
             content: ['pages','theme','menu','zones','socials','seo','site','backup'],
-            orders: ['dashboard','customers','integrations','backup'],
+            orders: ['dashboard','customers','chats','integrations','backup'],
         };
         const ADMIN_ROLE = '{{ admin_role }}';
         window.ADMIN_ROLE = ADMIN_ROLE;
@@ -3023,12 +3142,14 @@
         function switchTab(name) {
             document.querySelectorAll('nav button[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
             document.querySelectorAll('main section').forEach(s => s.classList.toggle('active', s.id === 'tab-' + name));
+            if (_chatsTimer) { clearInterval(_chatsTimer); _chatsTimer = null; }
             if (name === 'dashboard') loadDashboard();
             if (name === 'audit') loadAudit();
             if (name === 'users') loadAdminUsers();
             if (name === 'theme') { loadThemePresets(); loadThemeHistory(); }
             if (name === 'zones') loadZones();
             if (name === 'templates') loadTemplatesTab();
+            if (name === 'chats') { loadChats(); _chatsTimer = setInterval(() => loadChats(true), 15000); }
         }
         document.querySelectorAll('nav button[data-tab]').forEach(btn => {
             btn.addEventListener('click', () => switchTab(btn.dataset.tab));

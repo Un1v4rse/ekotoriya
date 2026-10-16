@@ -172,6 +172,13 @@ try:
 except Exception as _migrate_err:
     print(f'[migrate_cycle8] пропущено: {_migrate_err}')
 
+# Миграция «цикл 9» (цикл 4 / этап 7): чат клиент↔магазин (chat_dialogs, chat_messages).
+try:
+    import migrate_cycle9
+    migrate_cycle9.migrate(app)
+except Exception as _migrate_err:
+    print(f'[migrate_cycle9] пропущено: {_migrate_err}')
+
 # Кэширование (AR-3): SimpleCache по умолчанию, тип — через env CACHE_TYPE.
 from flask_caching import Cache
 cache = Cache(app, config={
@@ -414,9 +421,9 @@ def _admin_role():
 # superadmin — всё; content — контент сайта; orders — заявки/клиенты/товары.
 ROLE_SECTIONS = {
     'superadmin': {'pages', 'theme', 'menu', 'socials', 'seo', 'site', 'integrations',
-                   'customers', 'backup', 'dashboard', 'audit', 'users'},
+                   'customers', 'chats', 'backup', 'dashboard', 'audit', 'users'},
     'content': {'pages', 'theme', 'menu', 'socials', 'seo', 'site', 'backup'},
-    'orders': {'dashboard', 'customers', 'integrations', 'backup'},
+    'orders': {'dashboard', 'customers', 'chats', 'integrations', 'backup'},
 }
 
 # Префикс пути → раздел (проверяется в порядке следования).
@@ -428,6 +435,8 @@ ADMIN_PATH_SECTIONS = [
     ('/admin/api/restore', 'backup'),
     ('/admin/api/customer', 'customers'),
     ('/admin/api/customers', 'customers'),
+    ('/admin/api/chats', 'chats'),
+    ('/admin/api/chat/', 'chats'),
     ('/admin/api/segments', 'customers'),
     ('/admin/api/orders', 'customers'),
     ('/admin/api/order-status', 'customers'),
@@ -1329,13 +1338,120 @@ def personal_page():
 @app.route('/api/client/profile', methods=['POST'])
 @_client_required
 def api_client_profile():
-    """Обновление контактов клиента из ЛК (LC-3)."""
+    """Обновление контактов клиента из ЛК (LC-3, этап 7.1: +телефон)."""
     data = request.get_json() or {}
-    updated = customers.update_customer_profile(
-        session['customer_id'], name=data.get('name'), email=data.get('email'))
-    if not updated:
+    result = customers.update_customer_profile(
+        session['customer_id'], name=data.get('name'), email=data.get('email'),
+        phone=data.get('phone'))
+    if isinstance(result, tuple):
+        return jsonify({'success': False, 'error': result[1]}), 400
+    if not result:
         return jsonify({'success': False, 'error': 'Клиент не найден'}), 404
-    return jsonify({'success': True, 'customer': updated})
+    return jsonify({'success': True, 'customer': result})
+
+
+@app.route('/api/client/password', methods=['POST'])
+@_client_required
+@_rate_limit(10)
+def api_client_password():
+    """Смена пароля из ЛК (этап 7.1): текущий + новый (≥6 символов)."""
+    data = request.get_json() or {}
+    updated, error = customers.change_client_password(
+        session['customer_id'],
+        data.get('current_password', ''),
+        data.get('new_password', ''))
+    if error:
+        return jsonify({'success': False, 'error': error}), 400
+    return jsonify({'success': True})
+
+
+@app.route('/api/client/orders/<int:order_id>/repeat', methods=['POST'])
+@_client_required
+@_rate_limit(20)
+def api_client_order_repeat(order_id):
+    """Повтор заказа (этап 7.2): позиция заявки клиента уходит в корзину."""
+    order = db.session.get(Order, order_id)
+    if order is None or order.customer_id != session['customer_id']:
+        return jsonify({'success': False, 'error': 'Заявка не найдена'}), 404
+    pid = str(order.product_id or '').strip()
+    if not pid:
+        return jsonify({'success': False, 'error': 'В заявке нет товара'}), 400
+    products = get_products()
+    found = None
+    for p in products:
+        if str(p.get('nm_id') or p.get('id')) == pid:
+            found = p
+            break
+    source = (found or {}).get('source') or 'wb'
+    key = f'{source}:{pid}'
+    meta = session.get('cart_meta') or {}
+    if found is None:
+        meta[key] = {'name': order.product_name or 'Товар',
+                     'price': max(0, int(order.price or 0))}
+    else:
+        meta.pop(key, None)
+    session['cart_meta'] = meta
+    cart = session.get('cart') or {}
+    cart[key] = int(cart.get(key, 0)) + max(1, int(order.qty or 1))
+    session['cart'] = cart
+    session.modified = True
+    return jsonify({'success': True, 'cart': cart,
+                    'count': sum(cart.values()), 'redirect': '/basket/'})
+
+
+def _own_dialog(customer_id, create=False):
+    """Диалог клиента (этап 7.3) или None; create=True — создать при отсутствии."""
+    from models import ChatDialog
+    dialog = db.session.query(ChatDialog).filter_by(
+        customer_id=int(customer_id)).first()
+    if dialog is None and create:
+        dialog = ChatDialog(customer_id=int(customer_id), status='open')
+        db.session.add(dialog)
+        db.session.commit()
+    return dialog
+
+
+@app.route('/api/client/chat')
+@_client_required
+def api_client_chat_get():
+    """История своего чата (этап 7.3); входящие от админа помечаются прочитанными."""
+    from models import ChatMessage
+    dialog = _own_dialog(session['customer_id'])
+    if dialog is None:
+        return jsonify({'success': True, 'dialog': None, 'messages': []})
+    messages = db.session.query(ChatMessage).filter_by(
+        dialog_id=dialog.id).order_by(ChatMessage.id.asc()).limit(500).all()
+    changed = False
+    for m in messages:
+        if m.sender == 'admin' and not m.read_by_client:
+            m.read_by_client = True
+            changed = True
+    if changed:
+        db.session.commit()
+    return jsonify({'success': True, 'dialog': dialog.to_dict(),
+                    'messages': [m.to_dict() for m in messages]})
+
+
+@app.route('/api/client/chat', methods=['POST'])
+@_client_required
+@_rate_limit(10)
+def api_client_chat_send():
+    """Клиент пишет в чат (этап 7.3): 1..2000 символов; закрытый диалог открывается."""
+    from models import ChatMessage
+    data = request.get_json() or {}
+    text = str(data.get('text') or '').strip()
+    if not text:
+        return jsonify({'success': False, 'error': 'Введите сообщение'}), 400
+    if len(text) > 2000:
+        return jsonify({'success': False, 'error': 'Сообщение слишком длинное'}), 400
+    dialog = _own_dialog(session['customer_id'], create=True)
+    if dialog.status != 'open':
+        dialog.status = 'open'
+    msg = ChatMessage(dialog_id=dialog.id, sender='client', text=text,
+                      read_by_admin=False, read_by_client=True)
+    db.session.add(msg)
+    db.session.commit()
+    return jsonify({'success': True, 'message': msg.to_dict()})
 
 
 @app.route('/auth/')
@@ -6129,8 +6245,9 @@ def admin_api_customers():
 @app.route('/admin/api/dashboard')
 @admin_required
 def admin_api_dashboard():
-    """Дашборд (AD-3): заявки, новые клиенты, ошибки синка, популярные товары."""
-    from models import SyncLog
+    """Дашборд (AD-3): заявки, новые клиенты, ошибки синка, популярные товары,
+    непрочитанные сообщения чата (этап 7.4)."""
+    from models import ChatMessage, SyncLog
     now = datetime.now(timezone.utc)
     orders_all = db.session.query(Order).all()
     orders_new = [o for o in orders_all if o.status == 'new']
@@ -6140,6 +6257,8 @@ def admin_api_dashboard():
     sync_errors = [e.to_dict() for e in
                    db.session.query(SyncLog).filter_by(status='error')
                    .order_by(SyncLog.id.desc()).limit(10).all()]
+    chat_unread = db.session.query(ChatMessage).filter_by(
+        sender='client', read_by_admin=False).count()
     popular = customers.get_popular_products(get_products(), limit=5)
     return jsonify({
         'success': True,
@@ -6149,6 +6268,7 @@ def admin_api_dashboard():
                              if o.created_at and (now - _aware(o.created_at)).days < 1]),
         'customers_total': len(customers_all),
         'customers_new_7d': len(new_customers),
+        'chat_unread': chat_unread,
         'sync_errors': sync_errors,
         'popular_products': [{'nm_id': p['product'].get('nm_id') or p['product'].get('id'),
                               'name': p['product'].get('name'),
@@ -6505,6 +6625,95 @@ def admin_api_review_delete():
     db.session.commit()
     _audit_log('review.delete', 'review', rid)
     return jsonify({'success': True})
+
+
+# ---------- Чат клиент↔магазин (этап 7.3–7.4) ----------
+
+@app.route('/admin/api/chats')
+@admin_required
+def admin_api_chats():
+    """Список диалогов (сначала с непрочитанными, затем по последнему сообщению)."""
+    from models import ChatDialog, ChatMessage
+    dialogs = db.session.query(ChatDialog).all()
+    items = []
+    for d in dialogs:
+        customer = db.session.get(Customer, d.customer_id)
+        msgs = db.session.query(ChatMessage).filter_by(dialog_id=d.id)
+        unread = msgs.filter_by(sender='client', read_by_admin=False).count()
+        last = msgs.order_by(ChatMessage.id.desc()).first()
+        items.append({
+            'dialog': d.to_dict(),
+            'customer': (customer.to_dict() if customer else
+                         {'id': d.customer_id, 'name': '', 'phone': ''}),
+            'unread': unread,
+            'last_message': (last.text or '')[:120] if last else '',
+            'last_at': last.created_at.isoformat(timespec='seconds') if last else '',
+        })
+    items.sort(key=lambda x: (x['unread'] > 0,
+                              x['last_at'] or x['dialog']['updated_at']), reverse=True)
+    return jsonify({'success': True, 'chats': items})
+
+
+@app.route('/admin/api/chat/<int:customer_id>')
+@admin_required
+def admin_api_chat_history(customer_id):
+    """История диалога с клиентом; клиентские сообщения помечаются прочитанными."""
+    from models import ChatDialog, ChatMessage
+    dialog = _own_dialog(customer_id)
+    if dialog is None:
+        return jsonify({'success': False, 'error': 'Диалог не найден'}), 404
+    messages = db.session.query(ChatMessage).filter_by(
+        dialog_id=dialog.id).order_by(ChatMessage.id.asc()).limit(500).all()
+    changed = False
+    for m in messages:
+        if m.sender == 'client' and not m.read_by_admin:
+            m.read_by_admin = True
+            changed = True
+    if changed:
+        db.session.commit()
+    customer = db.session.get(Customer, customer_id)
+    return jsonify({'success': True, 'dialog': dialog.to_dict(),
+                    'customer': customer.to_dict() if customer else None,
+                    'messages': [m.to_dict() for m in messages]})
+
+
+@app.route('/admin/api/chat/<int:customer_id>/reply', methods=['POST'])
+@admin_required
+def admin_api_chat_reply(customer_id):
+    """Ответ админа клиенту — с аудитом."""
+    from models import ChatDialog, ChatMessage
+    data = request.get_json() or {}
+    text = str(data.get('text') or '').strip()
+    if not text:
+        return jsonify({'success': False, 'error': 'Введите сообщение'}), 400
+    if len(text) > 2000:
+        return jsonify({'success': False, 'error': 'Сообщение слишком длинное'}), 400
+    dialog = _own_dialog(customer_id, create=True)
+    if dialog.status != 'open':
+        dialog.status = 'open'
+    msg = ChatMessage(dialog_id=dialog.id, sender='admin', text=text,
+                      read_by_admin=True, read_by_client=False)
+    db.session.add(msg)
+    db.session.commit()
+    _audit_log('chat.reply', 'customer', customer_id,
+               {'preview': text[:80]})
+    return jsonify({'success': True, 'message': msg.to_dict()})
+
+
+@app.route('/admin/api/chat/<int:customer_id>/status', methods=['POST'])
+@admin_required
+def admin_api_chat_status(customer_id):
+    """Закрыть/открыть диалог — с аудитом."""
+    from models import ChatDialog
+    data = request.get_json() or {}
+    status = data.get('status')
+    if status not in ('open', 'closed'):
+        return jsonify({'success': False, 'error': 'status: open|closed'}), 400
+    dialog = _own_dialog(customer_id, create=True)
+    dialog.status = status
+    db.session.commit()
+    _audit_log('chat.status', 'customer', customer_id, {'status': status})
+    return jsonify({'success': True, 'status': status})
 
 
 def _approved_reviews_html(limit=50):
