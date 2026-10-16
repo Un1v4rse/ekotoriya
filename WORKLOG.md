@@ -60,6 +60,22 @@
 - Следующий шаг: деплой на 185.56.162.91 (git archive → tar → `docker compose up -d --build app`)
 - Примечания: правило деплоя прежнее — код живёт в образе, любой деплой кода = rebuild.
 
+### Деплой 2026-10-16 22:55 (коммит 113fca3) — выполнен
+- git archive → SFTP /opt/ekotoriya/_deploy.tar.gz → tar -xzf в ту же директорию →
+  `docker compose up -d --build app`. Инжидент: tar перезаписал docker-compose.yml,
+  вернув FORCE_HTTPS: "1" (на сервере всегда должно быть "0" — редиректил всех на
+  https, которого нет) → `sed -i 's/FORCE_HTTPS: "1"/FORCE_HTTPS: "0"/' docker-compose.yml`
+  → `docker compose up -d`. Урок: после распаковки архива ВСЕГДА проверять
+  FORCE_HTTPS в docker-compose.yml на сервере.
+- Смоук после деплоя: /, /catalog/, /catalog/namatrasniki/, /basket/, /contacts/,
+  /company/, /company/reviews/, /company/docs/, /help/opt/, /sitemap.xml,
+  /catalog/wb/890129778/ — все 200; /personal/ и /admin/ — 302 (на /auth/ и
+  /admin/login — норма для гостя). В контейнере: 37 symbol в спрайте admin.html,
+  FORCE_HTTPS=0, страница логина админки содержит SVG-иконку.
+- Бэкап перед деплоем: backups/backup_2026-10-16_22-40 (БД + content.json),
+  ротация: удалён backup_2026-09-26_00-32.
+
+
 ---
 - Статус: done
 - Сделано: заказчик прислал скриншот (1920px): 1) hero-баннер главной НЕ
