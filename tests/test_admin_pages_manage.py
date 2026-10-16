@@ -91,3 +91,10 @@ def test_pages_list_select_does_not_redirect(app_context):
     assert 'window.location.href' not in m.group(1)
     # системные страницы защищены и на клиенте
     assert 'системная страница' in html
+
+
+def test_admin_html_js_strings_not_broken(app_context):
+    """Регрессия: одинарные кавычки внутри JS-строк с SVG не ломают скрипт
+    (инцидент 2026-10-16: class='ic' → SyntaxError, админка целиком не работала)."""
+    html = _admin_client().get('/admin/').get_data(as_text=True)
+    assert "class='ic'" not in html

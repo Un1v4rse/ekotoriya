@@ -2857,13 +2857,13 @@
                 row.appendChild(inp);
                 const pick = document.createElement('button');
                 pick.type = 'button';
-                pick.innerHTML = '<svg class='ic' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><use href='#i-folder'/></svg>';
+                pick.innerHTML = '<svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-folder"/></svg>';
                 pick.title = 'Выбрать из медиатеки';
                 pick.addEventListener('click', () => pickMediaValue(url => { badges[i] = url; renderZoneFooterBadges(); }));
                 row.appendChild(pick);
                 const up = document.createElement('button');
                 up.type = 'button';
-                up.innerHTML = '<svg class='ic' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><use href='#i-upload'/></svg>';
+                up.innerHTML = '<svg class="ic" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-upload"/></svg>';
                 up.title = 'Загрузить файл';
                 up.addEventListener('click', () => uploadMediaValue(url => { badges[i] = url; renderZoneFooterBadges(); }));
                 row.appendChild(up);
