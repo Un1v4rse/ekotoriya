@@ -130,10 +130,14 @@ def _rank(products, scores, limit):
         by_key[f"{p.get('source', 'wb')}:{p.get('nm_id') or p.get('id')}"] = p
     out = []
     for key, score in ranked:
-        if key in by_key:
-            item = dict(by_key[key])
-            item['rec_score'] = round(score, 3)
-            out.append(item)
+        p = by_key.get(key)
+        # Не рекомендуем отсутствующие товары (кнопки покупки неактивны) —
+        # их покупатель ищет в каталоге (замечание заказчика, 2026-10-28).
+        if p is None or (p.get('stock') or 0) <= 0:
+            continue
+        item = dict(p)
+        item['rec_score'] = round(score, 3)
+        out.append(item)
         if len(out) >= limit:
             break
     return out

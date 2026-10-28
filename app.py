@@ -743,36 +743,7 @@ def ensure_site_defaults(content):
     else:
         for k, v in SEO_DEFAULTS.items():
             content['site']['seo'].setdefault(k, v)
-    _enrich_menu_defaults(content.get('menu'))
     return content
-
-
-# Дефолты верхнего меню «Каталог» — как на оригинале ekotoriya.ru: широкое
-# мега-меню (wide_menu) с картинками разделов 60×60 (файлы скачаны из оригинала
-# в static/upload/resize_cache/...). Подставляем только если у пункта ещё нет
-# своего значения — админ может задать image/wide в данных меню и перекрыть.
-_MENU_IMAGE_DEFAULTS = {
-    '/catalog/namatrasniki/': '/upload/resize_cache/iblock/200/60_60_0/p143wuvhmwktjcrs0xsgvkm49x4cp9qv.jpg',
-    '/catalog/odeyala/': '/upload/resize_cache/iblock/25b/60_60_0/416h4xf6752pb3wrmkf41k2531of73ut.jpg',
-    '/catalog/naperniki/': '/upload/resize_cache/iblock/f4d/60_60_0/0bqorzb2ycdqx53whn0sniyixt1c6rbc.webp',
-}
-
-
-def _enrich_menu_defaults(menu):
-    """Широкий вид «Каталога» + картинки разделов по умолчанию (оригинал-эталон)."""
-    if not isinstance(menu, list):
-        return
-    for item in menu:
-        if not isinstance(item, dict):
-            continue
-        if item.get('url') == '/catalog/' and item.get('children'):
-            item.setdefault('wide', True)
-        for child in item.get('children') or []:
-            if not isinstance(child, dict):
-                continue
-            img = _MENU_IMAGE_DEFAULTS.get(child.get('url'))
-            if img and not child.get('image'):
-                child['image'] = img
 
 
 def load_content():

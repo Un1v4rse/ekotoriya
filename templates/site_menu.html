@@ -1,12 +1,9 @@
-<!-- Верхнее меню сайта (рендерится из данных админки: раздел «Меню сайта»).
-     Вид — как на оригинале ekotoriya.ru: пункт с детьми «Каталог» раскрывается
-     широким мега-меню (td.wide_menu, колонки с картинками 60×60 и подразделами);
-     прочие пункты с детьми — обычным узким dropdown. -->
+<!-- Верхнее меню сайта (рендерится из данных админки: раздел «Меню сайта») -->
 <div class="table-menu">
 <table>
 <tr>
 {% for item in menu %}
-	<td class="menu-item {% if item.children %}dropdown{% if item.wide %} wide_menu{% endif %}{% endif %}   ">
+	<td class="menu-item unvisible {% if item.children %}dropdown{% endif %}   ">
 		<div class="wrap">
 			<a class="{% if item.children %}dropdown-toggle{% endif %}" href="{{ item.url }}">
 				<div>{{ item.title }}</div>
@@ -17,22 +14,15 @@
 				<div class="customScrollbar scrollblock overscroll-behavior-contain scrollblock--thick">
 					<ul class="menu-wrapper menu-type-1">
 						{% for child in item.children %}
-						<li class="{% if child.children %}dropdown-submenu{% endif %}{% if child.image %} has_img{% endif %}   parent-items">
-							{% if child.image %}
-							<div class="menu_img ">
-								<a href="{{ child.url }}" class="noborder img_link colored_theme_svg">
-									<img class=" lazyloaded" src="{{ child.image }}" data-src="{{ child.image }}" alt="{{ child.title }}" title="{{ child.title }}">
-								</a>
-							</div>
-							{% endif %}
+						<li class="{% if child.children %}dropdown-submenu{% endif %}   parent-items">
 							<a href="{{ child.url }}" title="{{ child.title }}">
-								<span class="name option-font-bold">{{ child.title }}</span>{% if child.children %}<i class="svg right svg-inline-right" aria-hidden="true"><svg width="3" height="5"><use xlink:href="/static/bitrix/templates/aspro_max/images/svg/trianglearrow_sprite.svg#trianglearrow_right"></use></svg></i>{% endif %}
+								<span class="name option-font-bold">{{ child.title }}</span>
 							</a>
 							{% if child.children %}
 							<ul class="dropdown-menu toggle_menu">
 								{% for grand in child.children %}
 								<li class="menu-item   ">
-									<a href="{{ grand.url }}" title="{{ grand.title }}" style="white-space: normal;"><span class="name">{{ grand.title }}</span></a>
+									<a href="{{ grand.url }}" title="{{ grand.title }}"><span class="name">{{ grand.title }}</span></a>
 								</li>
 								{% endfor %}
 							</ul>

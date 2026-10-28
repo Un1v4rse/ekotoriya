@@ -12,13 +12,13 @@ from models import Event, Order
 def _products():
     return [
         {'nm_id': 101, 'name': 'Наматрасник А', 'category': 'Наматрасники',
-         'brand': 'Экотория', 'final_price': 1000, 'source': 'wb'},
+         'brand': 'Экотория', 'final_price': 1000, 'source': 'wb', 'stock': 10},
         {'nm_id': 102, 'name': 'Наматрасник Б', 'category': 'Наматрасники',
-         'brand': 'Экотория', 'final_price': 1100, 'source': 'wb'},
+         'brand': 'Экотория', 'final_price': 1100, 'source': 'wb', 'stock': 10},
         {'nm_id': 103, 'name': 'Подушка', 'category': 'Подушки',
-         'brand': 'Экотория', 'final_price': 900, 'source': 'wb'},
+         'brand': 'Экотория', 'final_price': 900, 'source': 'wb', 'stock': 10},
         {'nm_id': 104, 'name': 'Одеяло', 'category': 'Одеяла',
-         'brand': 'Другой', 'final_price': 3000, 'source': 'ozon'},
+         'brand': 'Другой', 'final_price': 3000, 'source': 'ozon', 'stock': 10},
     ]
 
 
@@ -102,3 +102,26 @@ def test_recompute_all_writes_table():
     from models import Recommendation
     kinds = {r.kind for r in db.session.query(Recommendation).all()}
     assert 'popular' in kinds
+
+
+def test_out_of_stock_not_recommended():
+    """Товары без остатков не попадают в рекомендации (кнопки покупки неактивны).
+
+    Замечание заказчика (2026-10-28): на главной рекомендовались товары
+    «Нет в наличии» с задизейбленной кнопкой «Купить в 1 клик».
+    """
+    products = _products()
+    customers.add_like('101', 'Наматрасник А', session_id='s1')
+    customers.add_like('102', 'Наматрасник Б', session_id='s1')
+    # самый популярный (двойной вес) — без остатков
+    customers.add_like('102', 'Наматрасник Б', session_id='s2')
+    products[1]['stock'] = 0
+    popular = recommendations.popular_products(products, limit=8)
+    ids = {str(p.get('nm_id')) for p in popular}
+    assert '102' not in ids, 'нет в наличии — не рекомендуем'
+    assert '101' in ids      # следующий по популярности в наличии — на месте
+    # персональные рекомендации — та же фильтрация
+    c = customers.add_customer('Наличие', '+7 900 100-00-06')
+    customers.add_event('view', product_id='102', customer_id=c['id'])
+    personal = recommendations.personal_products(products, customer_id=c['id'])
+    assert all((p.get('stock') or 0) > 0 for p in personal)
