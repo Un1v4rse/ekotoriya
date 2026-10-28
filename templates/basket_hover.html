@@ -1,0 +1,33 @@
+<!-- Попап корзины при наведении на иконку (aspro .basket_hover_block).
+     Вставляется aspro-JS через POST /ajax/showBasketHover.php. Стили — в
+     static/css/site-fixes.css (.wb-bh-*). -->
+<div class="wb-bh">
+  {% if items %}
+  <div class="wb-bh-items">
+    {% for it in items %}
+    <div class="wb-bh-item">
+      <a class="wb-bh-img" href="{{ it.url }}">
+        {% if it.photo %}<img src="{% if it.photo.startswith('/') %}{{ it.photo }}{% else %}/proxy/image?url={{ it.photo | urlencode }}{% endif %}" alt="{{ it.name }}">{% endif %}
+      </a>
+      <div class="wb-bh-info">
+        <a class="wb-bh-name" href="{{ it.url }}">{{ it.name }}</a>
+        <div class="wb-bh-qty">{{ it.qty }} × {{ it.price }} ₽</div>
+      </div>
+      <div class="wb-bh-sum">{{ it.sum }} ₽</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="wb-bh-footer">
+    <div class="wb-bh-total">Итого: <b>{{ total }} ₽</b></div>
+    <div class="wb-bh-actions">
+      <a class="wb-bh-btn" href="/basket/">В корзину</a>
+      <a class="wb-bh-btn accent" href="/basket/">Оформить заказ</a>
+    </div>
+  </div>
+  {% else %}
+  <div class="wb-bh-empty">
+    <div class="wb-bh-empty-title">В корзине пока пусто</div>
+    <a class="wb-bh-btn accent" href="/catalog/">Перейти в каталог</a>
+  </div>
+  {% endif %}
+</div>

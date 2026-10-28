@@ -743,7 +743,36 @@ def ensure_site_defaults(content):
     else:
         for k, v in SEO_DEFAULTS.items():
             content['site']['seo'].setdefault(k, v)
+    _enrich_menu_defaults(content.get('menu'))
     return content
+
+
+# Дефолты верхнего меню «Каталог» — как на оригинале ekotoriya.ru: широкое
+# мега-меню (wide_menu) с картинками разделов 60×60 (файлы скачаны из оригинала
+# в static/upload/resize_cache/...). Подставляем только если у пункта ещё нет
+# своего значения — админ может задать image/wide в данных меню и перекрыть.
+_MENU_IMAGE_DEFAULTS = {
+    '/catalog/namatrasniki/': '/upload/resize_cache/iblock/200/60_60_0/p143wuvhmwktjcrs0xsgvkm49x4cp9qv.jpg',
+    '/catalog/odeyala/': '/upload/resize_cache/iblock/25b/60_60_0/416h4xf6752pb3wrmkf41k2531of73ut.jpg',
+    '/catalog/naperniki/': '/upload/resize_cache/iblock/f4d/60_60_0/0bqorzb2ycdqx53whn0sniyixt1c6rbc.webp',
+}
+
+
+def _enrich_menu_defaults(menu):
+    """Широкий вид «Каталога» + картинки разделов по умолчанию (оригинал-эталон)."""
+    if not isinstance(menu, list):
+        return
+    for item in menu:
+        if not isinstance(item, dict):
+            continue
+        if item.get('url') == '/catalog/' and item.get('children'):
+            item.setdefault('wide', True)
+        for child in item.get('children') or []:
+            if not isinstance(child, dict):
+                continue
+            img = _MENU_IMAGE_DEFAULTS.get(child.get('url'))
+            if img and not child.get('image'):
+                child['image'] = img
 
 
 def load_content():
@@ -1031,6 +1060,32 @@ def ajax_bottom_panel():
 @app.route('/ajax/getAjaxBasket.php/', methods=['GET', 'POST'])
 def ajax_basket():
     return jsonify({'success': True, 'basket': []}), 200
+
+
+@app.route('/ajax/showBasketHover.php', methods=['GET', 'POST'])
+@app.route('/ajax/showBasketHover.php/', methods=['GET', 'POST'])
+def ajax_show_basket_hover():
+    """Содержимое попапа корзины при наведении на иконку (как на оригинале).
+
+    aspro-JS (basketTop) постит сюда и вставляет ответ в .basket_hover_block.
+    Раньше роута не было — catch-all отдавал полную 404-страницу, и попап
+    выглядел «сломанным окном» (шапка/футер 404 внутри попапа).
+    """
+    items, total = _cart_items()
+    rows = []
+    for it in items:
+        p = it['product']
+        src, _, pid = it['key'].partition(':')
+        rows.append({
+            'name': p.get('name') or f'Товар {pid}',
+            'url': f'/catalog/{src}/{pid}/',
+            'photo': p.get('photo') or '',
+            'qty': it['qty'],
+            'price': it['price'],
+            'sum': it['qty'] * it['price'],
+        })
+    return Response(render_template('basket_hover.html', items=rows,
+                                    total=total))
 
 
 @app.route('/static/bitrix/tools/conversion/ajax_counter.php', methods=['GET', 'POST'])
@@ -3184,10 +3239,13 @@ def _inject_lazyload_fix(html):
     html = _rewrite_legacy_product_links(html)
     fix_ver = int(os.path.getmtime(os.path.join(BASE_DIR, 'static', 'js', 'lazyload-fix.js')))
     review_ver = int(os.path.getmtime(os.path.join(BASE_DIR, 'static', 'js', 'review-form.js')))
+    fixes_css = os.path.join(BASE_DIR, 'static', 'css', 'site-fixes.css')
+    fixes_css_ver = int(os.path.getmtime(fixes_css)) if os.path.exists(fixes_css) else 1
     base = json.dumps(_section_catalog_base())
     liked_ids = _visitor_liked_ids()
     liked = json.dumps(liked_ids)
-    inject = (f'<script src="/static/js/lazyload-fix.js?v={fix_ver}" defer></script>\n'
+    inject = (f'<link rel="stylesheet" href="/static/css/site-fixes.css?v={fixes_css_ver}">\n'
+              f'<script src="/static/js/lazyload-fix.js?v={fix_ver}" defer></script>\n'
               # Избранное посетителя: wb-actions.js размечает кнопки и счётчик.
               f'<script>window.__likedIds={liked};'
               f'window.__likesCount={len(liked_ids)};</script>\n'

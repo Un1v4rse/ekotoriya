@@ -1,0 +1,123 @@
+/* Фиксы клона поверх aspro-стилей: попап корзины при наведении (.basket_hover_block).
+   В оригинале разметку попапа рисует битрикс-компонент и стили есть в aspro CSS;
+   у нас попап отдаёт /ajax/showBasketHover.php (шаблон basket_hover.html) —
+   позиционирование и вид задаём здесь. Акцентный цвет кнопок — фирменный бежевый
+   темы (как кнопки «Перейти в каталог» на главной). */
+
+.wrap_icon.wrap_basket.top_basket,
+#headerfixed .basket-link.basket {
+  position: relative;
+}
+
+.basket_hover_block {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 340px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, .16);
+  z-index: 1005;
+  display: none;
+  text-align: left;
+}
+
+.wrap_icon.wrap_basket.top_basket:hover .basket_hover_block,
+#headerfixed .basket-link.basket:hover + .basket_hover_block,
+.basket_hover_block:hover {
+  display: block;
+}
+
+.wb-bh { font-size: 14px; line-height: 1.4; color: #222; }
+
+.wb-bh-items { max-height: 320px; overflow-y: auto; }
+
+.wb-bh-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f0ebe4;
+}
+
+.wb-bh-img {
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wb-bh-img img {
+  max-width: 52px;
+  max-height: 52px;
+  object-fit: contain;
+}
+
+.wb-bh-info { flex: 1 1 auto; min-width: 0; }
+
+.wb-bh-name {
+  display: block;
+  color: #222;
+  text-decoration: none;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.wb-bh-name:hover { color: #b39870; }
+
+.wb-bh-qty { color: #888; font-size: 12.5px; margin-top: 2px; }
+
+.wb-bh-sum { flex: 0 0 auto; font-weight: 700; white-space: nowrap; }
+
+.wb-bh-footer { padding: 12px 14px 14px; }
+
+.wb-bh-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.wb-bh-total b { font-size: 17px; }
+
+.wb-bh-actions { display: flex; gap: 8px; }
+
+.wb-bh-btn {
+  flex: 1 1 50%;
+  text-align: center;
+  padding: 9px 10px;
+  border-radius: 6px;
+  border: 1px solid #b39870;
+  color: #7a6a4f;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 13px;
+  transition: background .15s ease, color .15s ease;
+}
+
+.wb-bh-btn.accent {
+  background: #b39870;
+  color: #fff;
+}
+
+.wb-bh-btn.accent:hover { background: #a0865e; }
+
+.wb-bh-btn:not(.accent):hover { background: #f4ede1; }
+
+.wb-bh-empty { padding: 26px 16px 22px; text-align: center; }
+
+.wb-bh-empty-title { margin-bottom: 14px; color: #666; }
+
+.wb-bh-empty .wb-bh-btn { display: block; }
+
+/* Мобильная ширина: попап не шире экрана */
+@media (max-width: 480px) {
+  .basket_hover_block { width: 290px; right: -40px; }
+}
