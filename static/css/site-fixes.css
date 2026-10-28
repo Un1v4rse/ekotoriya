@@ -121,3 +121,20 @@
 @media (max-width: 480px) {
   .basket_hover_block { width: 290px; right: -40px; }
 }
+
+/* Компактные выпадашки верхнего меню (заказчик: «пустота» под пунктами).
+   Тема aspro даёт строкам дропдауна padding 14px + line-height 25px
+   (≈52px на строку) — дропдаун выглядит вытянутым с пустым местом внизу.
+   Уплотняем строки; высота контейнера — по содержимому. */
+#main .mega-menu table td:not(.wide_menu) .dropdown-menu li a,
+#main .mega-menu table td:not(.wide_menu) .dropdown-menu li.dropdown-submenu a,
+.table-menu .dropdown-menu ul.menu-wrapper > li > a {
+  padding-top: 8px !important;
+  padding-bottom: 7px !important;
+  line-height: 20px !important;
+}
+.table-menu .dropdown-menu .customScrollbar,
+#headerfixed .dropdown-menu .customScrollbar {
+  height: auto !important;
+  max-height: 70vh !important;
+}

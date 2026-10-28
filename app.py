@@ -980,7 +980,8 @@ def make_context(content, page):
                 show_filters=True)
         elif (page.get('url') or '') == '/':
             ctx['catalog_view'] = _filtered_catalog(
-                request.args, per_page=12, base='/', show_filters=False)
+                request.args, per_page=12, base='/', show_filters=False,
+                hide_out_of_stock=True)
     except Exception:
         pass
     return ctx
@@ -5195,7 +5196,7 @@ def api_catalog():
 
 
 def _filtered_catalog(args, section='', per_page=None, base='/catalog/',
-                      show_filters=True):
+                      show_filters=True, hide_out_of_stock=False):
     """Фильтрация/сортировка/пагинация каталога (CT-1, CT-5).
 
     Фильтры: q, source, category, in_stock, price_from/to, sort, size, color.
@@ -5241,6 +5242,11 @@ def _filtered_catalog(args, section='', per_page=None, base='/catalog/',
     if category:
         products = [p for p in products if p.get('category') == category]
     if args.get('in_stock'):
+        products = [p for p in products if (p.get('stock') or 0) > 0]
+    # Главная (hide_out_of_stock): не выводим отсутствующие товары — кнопка
+    # «Купить в 1 клик» неактивна (заказчик 2026-10-28). В общем каталоге
+    # /catalog/ всё остаётся — найти их можно там.
+    if hide_out_of_stock:
         products = [p for p in products if (p.get('stock') or 0) > 0]
     try:
         price_from = int(args.get('price_from') or 0)
