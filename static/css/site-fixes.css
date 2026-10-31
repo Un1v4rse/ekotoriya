@@ -138,3 +138,9 @@
   height: auto !important;
   max-height: 70vh !important;
 }
+/* Само меню — без фиксированной высоты: только по содержимому */
+#main .table-menu .dropdown-menu,
+#headerfixed .table-menu .dropdown-menu {
+  height: auto !important;
+  max-height: none !important;
+}

@@ -1498,9 +1498,11 @@
 		{% set section_header_parent = ('Одеяла', '/catalog/odeyala/') %}
 		{% include 'section_header.html' %}
 		<div class="middle">
+{% if not is_product_page %}{% include 'wb_catalog_block.html' %}{% endif %}
 {{ page.content_html | safe }}
 		</div>
 </div> 					</div>
+{% include 'recommendations_block.html' %}
 
 		<footer id="footer">
 

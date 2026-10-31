@@ -101,6 +101,36 @@ def test_api_catalog_keeps_section_layout(client, demo_products):
     assert prices == sorted(prices, reverse=True)
 
 
+def test_subtype_page_matches_section_layout(client, demo_products):
+    """Страница подтипа (/catalog/<раздел>/<подтип>/) той же раскладкой, что и
+    раздел: панель фильтров + сетка wb-sec-card, товары отфильтрованы по
+    ключевому слову подтипа, плитки подразделов родителя не выводятся."""
+    r = client.get('/catalog/namatrasniki/namatrasniki-na-rezinke/')
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert 'wb-sec-filters' in html
+    assert 'wb-sec-panel__sort' in html
+    assert 'wb-sec-results' in html
+    # демо-каталог: ровно 2 товара «на резинке» (см. test_section_page_subcategory_tiles)
+    assert html.count('class="wb-sec-card__name"') == 2
+    # скрытое поле подтипа в форме фильтров — живой фильтр держит предфильтр
+    assert 'name="sub" value="namatrasniki-na-rezinke"' in html
+    assert 'class="wb-sec-subcat"' not in html  # плитки подразделов не рендерятся
+
+
+def test_api_catalog_subtype_filter(client, demo_products):
+    r = client.get('/api/catalog?section=namatrasniki'
+                   '&sub=namatrasniki-na-rezinke')
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data['success']
+    assert data['total'] == 2
+    assert 'wb-sec-card' in data['html']
+    # без sub — все товары раздела
+    r = client.get('/api/catalog?section=namatrasniki')
+    assert r.get_json()['total'] > 2
+
+
 def test_catalog_and_home_pages_untouched(client, demo_products):
     r = client.get('/catalog/')
     html = r.get_data(as_text=True)

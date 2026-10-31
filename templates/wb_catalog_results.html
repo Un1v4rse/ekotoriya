@@ -18,13 +18,13 @@
     grid-template-columns:repeat(2,minmax(0,1fr)) !important;}}
 @media (max-width:520px){.wb-sec-results .wb-products-grid{
     grid-template-columns:1fr !important;}}
-.wb-sec-card{display:block;text-decoration:none;color:inherit;background:#fff;
+.wb-sec-card{display:flex;flex-direction:column;text-decoration:none;color:inherit;background:#fff;
     border:1px solid #ededed;border-radius:2px;overflow:hidden;
     transition:box-shadow .2s;}
 .wb-sec-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.08);}
 .wb-sec-card__photo{display:block;padding:0;}
 .wb-sec-card__photo img{width:100%;height:230px;object-fit:cover;display:block;}
-.wb-sec-card__body{display:block;padding:.9rem 1rem 1.1rem;}
+.wb-sec-card__body{display:flex;flex-direction:column;flex:1 0 auto;padding:.9rem 1rem 1.1rem;}
 .wb-sec-card__name{font-size:.92rem;font-weight:400;line-height:1.35;
     color:#222;min-height:2.7em;display:-webkit-box;-webkit-line-clamp:2;
     -webkit-box-orient:vertical;overflow:hidden;}
@@ -39,7 +39,7 @@
     font-size:.7rem;font-weight:700;padding:.1rem .4rem;border-radius:3px;}
 .wb-sec-card__badge u{text-decoration:none;background:#ffe9a8;color:#6b5200;
     font-size:.74rem;padding:.1rem .45rem;border-radius:3px;}
-.wb-sec-card__acts{display:flex;flex-direction:column;gap:.4rem;margin-top:.8rem;}
+.wb-sec-card__acts{display:flex;flex-direction:column;gap:.4rem;margin-top:auto;padding-top:.8rem;}
 .wb-sec-card__acts .wb-like-btn,.wb-sec-card__acts .wb-cart-btn{
     width:100%;background:#fff;border:1px solid #ddd;border-radius:3px;
     padding:.42rem;font-size:.82rem;font-weight:600;cursor:pointer;}
@@ -103,7 +103,7 @@
 <div class="wb-products-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.5rem;">
     {% for p in catalog_view.products %}
     {% set st = p.get('stock', 10) %}
-    <a href="/catalog/{{ p.source }}/{{ p.id }}/" class="wb-product-card" style="display: block; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; background: #fff; text-decoration: none; color: inherit; transition: box-shadow 0.2s;">
+    <a href="/catalog/{{ p.source }}/{{ p.id }}/" class="wb-product-card" style="display: flex; flex-direction: column; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; background: #fff; text-decoration: none; color: inherit; transition: box-shadow 0.2s;">
         <div style="padding: 1rem; background: #f9f9f9; position:relative;">
             {% if not hide_mp %}
             {% if p.source == 'ozon' %}
@@ -114,7 +114,7 @@
             {% endif %}
             <img src="{% if p.photo.startswith('/') %}{{ p.photo }}{% else %}/proxy/image?url={{ p.photo | urlencode }}{% endif %}" alt="{{ p.name }}" style="width: 100%; height: 220px; object-fit: contain; display: block;" {% if loop.index0 > 3 %}loading="lazy"{% endif %}>
         </div>
-        <div style="padding: 1rem;">
+        <div style="padding: 1rem; display: flex; flex-direction: column; flex: 1 0 auto;">
             <div data-name="{{ p.name }}" style="font-weight: 600; font-size: 0.95rem; line-height: 1.35; min-height: 3.9em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;">{{ p.name }}</div>
             <div style="margin-top: 0.75rem; display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;">
                 {% if p.discount_price and p.discount_price < p.price %}
@@ -142,7 +142,7 @@
             <div class="wb-stock-badge" style="margin-top: 0.5rem; font-size: 0.82rem; font-weight: 600; color: #137333;">В наличии</div>
             {% endif %}
             <div style="margin-top: 0.75rem; font-size: 0.85rem; color: #666;">Артикул: {{ p.id }}</div>
-            <button type="button" class="wb-like-btn" data-id="{{ p.id }}" data-name="{{ p.name }}" data-price="{{ p.final_price }}" data-photo="{{ p.photo or '' }}" data-url="/catalog/{{ p.source }}/{{ p.id }}/" data-source="{{ p.source or 'wb' }}" style="margin-top: 0.75rem; width: 100%; background: #fff; color: #c00; border: 1px solid #c00; padding: 0.5rem; border-radius: 6px; cursor: pointer; font-weight: 600;"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:2px;"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg> В избранное</button>
+            <button type="button" class="wb-like-btn" data-id="{{ p.id }}" data-name="{{ p.name }}" data-price="{{ p.final_price }}" data-photo="{{ p.photo or '' }}" data-url="/catalog/{{ p.source }}/{{ p.id }}/" data-source="{{ p.source or 'wb' }}" style="margin-top: auto; width: 100%; background: #fff; color: #c00; border: 1px solid #c00; padding: 0.5rem; border-radius: 6px; cursor: pointer; font-weight: 600;"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:2px;"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg> В избранное</button>
             <button type="button" class="wb-cart-btn" data-id="{{ p.id }}" data-source="{{ p.source or 'wb' }}" style="margin-top: 0.5rem; width: 100%; background: #fff; color: #333; border: 1px solid #999; padding: 0.5rem; border-radius: 6px; cursor: pointer; font-weight: 600;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:2px;"><circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/><path d="M3 3h2.5l2.3 11.5a1 1 0 0 0 1 .8h8.6a1 1 0 0 0 1-.8L20.5 7H6"/></svg> В корзину</button>
             <button type="button" class="wb-buy-btn" data-id="{{ p.id }}" data-name="{{ p.name }}" data-price="{{ p.final_price }}" data-stock="{{ st }}"{% if st <= 0 %} disabled style="margin-top: 0.5rem; width: 100%; background: #ccc; color: #fff; border: 0; padding: 0.6rem; border-radius: 6px; cursor: not-allowed; font-weight: 600;"{% else %} style="margin-top: 0.5rem; width: 100%; background: #b49d84; color: #fff; border: 0; padding: 0.6rem; border-radius: 6px; cursor: pointer; font-weight: 600;"{% endif %}>Купить в 1 клик</button>
             <form class="wb-order-form" data-id="{{ p.id }}" style="display:none; margin-top: 0.75rem; padding: 0.75rem; background: #f9f9f9; border-radius: 6px;">

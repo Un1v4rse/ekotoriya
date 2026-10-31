@@ -795,6 +795,25 @@ def _page_section(page):
     return m.group(1) if m else ''
 
 
+# Ключевые слова подтипов каталога для фильтра товаров по названию
+# (как _SUB_KEYS у плиток подразделов в _filtered_catalog).
+_SUB_SECTION_KEYS = {
+    'namatrasniki-na-molnii': ('молни',),
+    'namatrasniki-na-rezinke': ('резинк',),
+    'nepromokaemye-namatrasniki': ('непромокаем',),
+    'zimnie': ('зимн',),
+    'vsesezonnye': ('всесезон',),
+    'letnie': ('летн',),
+}
+
+
+def _page_subsection(page):
+    """Подтип каталога по slug: catalog__namatrasniki__namatrasniki-na-rezinke →
+    ('namatrasniki', 'namatrasniki-na-rezinke'); ('','') — страница не подтип."""
+    m = re.match(r'^catalog__([a-z0-9]+)__(.+)$', page.get('slug') or '')
+    return (m.group(1), m.group(2)) if m else ('', '')
+
+
 def _seo_org(content, host_url):
     """Organization (JSON-LD): название, логотип, контакты — на всех страницах."""
     site = content.get('site', {})
@@ -975,9 +994,11 @@ def make_context(content, page):
     # каталог /catalog/ формирует своё представление в catalog_page().
     try:
         if page_section:
+            _, sub_slug = _page_subsection(page)
             ctx['catalog_view'] = _filtered_catalog(
                 request.args, section=page_section, base=request.path,
-                show_filters=True)
+                show_filters=True,
+                sub_keys=_SUB_SECTION_KEYS.get(sub_slug))
         elif (page.get('url') or '') == '/':
             ctx['catalog_view'] = _filtered_catalog(
                 request.args, per_page=12, base='/', show_filters=False,
@@ -5181,13 +5202,15 @@ def api_catalog():
     для ссылок пагинации и history.pushState).
     """
     section = (request.args.get('section') or '').strip()
+    sub = (request.args.get('sub') or '').strip()
     base = (request.args.get('base') or '').strip()
     if not base.startswith('/') or base.startswith('//'):
         base = ''
     if not base:
         base = ('/catalog/' + section + '/') if section else '/catalog/'
     view = _filtered_catalog(request.args, section=section, base=base,
-                             show_filters=True)
+                             show_filters=True,
+                             sub_keys=_SUB_SECTION_KEYS.get(sub) if sub else None)
     hide_mp = bool(load_content().get('site', {}).get('hide_marketplaces'))
     html = render_template('wb_catalog_results.html', catalog_view=view,
                            hide_mp=hide_mp)
@@ -5196,7 +5219,7 @@ def api_catalog():
 
 
 def _filtered_catalog(args, section='', per_page=None, base='/catalog/',
-                      show_filters=True, hide_out_of_stock=False):
+                      show_filters=True, hide_out_of_stock=False, sub_keys=None):
     """Фильтрация/сортировка/пагинация каталога (CT-1, CT-5).
 
     Фильтры: q, source, category, in_stock, price_from/to, sort, size, color.
@@ -5211,6 +5234,9 @@ def _filtered_catalog(args, section='', per_page=None, base='/catalog/',
     wb_products в make_context). per_page — переопределение размера страницы
     (главная показывает по 12). base/show_filters/section попадают в
     представление для шаблона (пагинация, data-атрибуты живого фильтра).
+    sub_keys — кортеж ключевых слов подтипа (страницы вида /catalog/<раздел>/
+    <подтип>/): товары фильтруются по вхождению всех слов в название, а
+    плитки подразделов родительского раздела не выводятся.
     """
     import math as _math
     import re as _re
@@ -5218,6 +5244,9 @@ def _filtered_catalog(args, section='', per_page=None, base='/catalog/',
     if section:
         products = [p for p in products
                     if not p.get('site_section') or p.get('site_section') == section]
+    if sub_keys:
+        products = [p for p in products
+                    if all(k in (p.get('name') or '').lower() for k in sub_keys)]
 
     def _arg_list(key):
         if hasattr(args, 'getlist'):
@@ -5371,7 +5400,7 @@ def _filtered_catalog(args, section='', per_page=None, base='/catalog/',
     # Товары без совпадения не выводят плитку со счётчиком (в демо-каталоге
     # привязки товаров к подразделам нет — по ТЗ неизвестное не выводится).
     subsections = []
-    if section:
+    if section and not sub_keys:
         _SUB_KEYS = {
             'namatrasniki-na-molnii': ('молни',),
             'namatrasniki-na-rezinke': ('резинк',),
@@ -5420,6 +5449,8 @@ def _filtered_catalog(args, section='', per_page=None, base='/catalog/',
         'show_filters': show_filters,
         'section': section,
         'subsections': subsections,
+        'sub': (next((k for k, v in _SUB_SECTION_KEYS.items() if v == sub_keys), '')
+                if sub_keys else ''),
         'qs': _urlencode(qs_parts),
         'applied': {
             'q': args.get('q') or '', 'source': source, 'category': category,

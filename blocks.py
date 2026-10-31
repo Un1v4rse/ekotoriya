@@ -618,12 +618,12 @@ def _product_cards_html(products):
                       if stock <= 0 else '')
         out.append(
             f'<a href="/catalog/{p.get("source", "wb")}/{pid}/" class="wb-product-card" '
-            f'style="display:block;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;'
+            f'style="display:flex;flex-direction:column;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;'
             f'background:#fff;text-decoration:none;color:inherit;">'
             f'<div style="padding:1rem;background:#f9f9f9;">'
             f'<img src="{img}" alt="{esc(p.get("name", ""))}" loading="lazy" '
             f'style="width:100%;height:220px;object-fit:contain;display:block;"></div>'
-            f'<div style="padding:1rem;">'
+            f'<div style="padding:1rem;display:flex;flex-direction:column;flex:1 0 auto;">'
             f'<div style="font-weight:600;font-size:0.95rem;line-height:1.35;min-height:3.9em;'
             f'overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">'
             f'{esc(p.get("name", ""))}</div>'
@@ -631,8 +631,11 @@ def _product_cards_html(products):
             f'<span style="color:#c00;font-weight:700;font-size:1.15rem;">{final} ₽</span>{badge}</div>'
             f'{stock_html}'
             f'<button type="button" class="wb-like-btn" data-id="{pid}" data-name="{esc(p.get("name", ""))}" '
-            f'style="margin-top:0.75rem;width:100%;background:#fff;color:#c00;border:1px solid #c00;'
-            f'padding:0.5rem;border-radius:6px;cursor:pointer;font-weight:600;">❤ В избранное</button>'
+            f'style="margin-top:auto;width:100%;background:#fff;color:#c00;border:1px solid #c00;'
+            f'padding:0.5rem;border-radius:6px;cursor:pointer;font-weight:600;">'
+            f'<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:2px;">'
+            f'<path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>'
+            f' В избранное</button>'
             f'<button type="button" class="wb-buy-btn" data-id="{pid}" data-name="{esc(p.get("name", ""))}" '
             f'data-price="{final}" data-stock="{stock}" '
             f'style="margin-top:0.5rem;width:100%;background:#b49d84;color:#fff;border:0;padding:0.6rem;'
@@ -1366,15 +1369,15 @@ PRODUCTS_HYDRATOR = """<script>
                 : '<div style="margin-top:0.5rem;font-size:0.82rem;font-weight:600;color:#137333;">В наличии</div>');
         var buyDisabled = stock<=0;
         var photoSrc = (p.photo||'').charAt(0)==='/' ? p.photo : '/proxy/image?url='+encodeURIComponent(p.photo||'');
-        return '<div class="wb-product-card" style="display:block;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;background:#fff;text-decoration:none;color:inherit;">'
+        return '<div class="wb-product-card" style="display:flex;flex-direction:column;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;background:#fff;text-decoration:none;color:inherit;">'
           +'<div style="padding:1rem;background:#f9f9f9;"><img src="'+photoSrc+'" alt="" loading="lazy" style="width:100%;height:220px;object-fit:contain;display:block;"></div>'
-          +'<div style="padding:1rem;">'
-          +'<div data-name="'+String(p.name||'').replace(/"/g,'&quot;')+'" style="font-weight:600;font-size:0.95rem;line-height:1.35;min-height:3.9em;overflow:hidden;">'+(p.name||'')+'</div>'
+          +'<div style="padding:1rem;display:flex;flex-direction:column;flex:1 0 auto;">'
+          +'<div data-name="'+String(p.name||'').replace(/"/g,'&quot;')+'" style="font-weight:600;font-size:0.95rem;line-height:1.35;min-height:3.9em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">'+(p.name||'')+'</div>'
           +'<div style="margin-top:0.75rem;display:flex;align-items:baseline;gap:0.5rem;flex-wrap:wrap;">'+priceHtml+'</div>'
           +adminDisc
           +stockBadge
           +'<div style="margin-top:0.75rem;font-size:0.85rem;color:#666;">Артикул: '+(p.id||'')+'</div>'
-          +'<button type="button" class="wb-like-btn" data-id="'+p.id+'" data-name="'+String(p.name||'').replace(/"/g,'&quot;')+'" style="margin-top:0.75rem;width:100%;background:#fff;color:#c00;border:1px solid #c00;padding:0.5rem;border-radius:6px;cursor:pointer;font-weight:600;">❤ В избранное</button>'
+          +'<button type="button" class="wb-like-btn" data-id="'+p.id+'" data-name="'+String(p.name||'').replace(/"/g,'&quot;')+'" style="margin-top:auto;width:100%;background:#fff;color:#c00;border:1px solid #c00;padding:0.5rem;border-radius:6px;cursor:pointer;font-weight:600;"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:2px;"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg> В избранное</button>'
           +'<button type="button" class="wb-buy-btn" data-id="'+p.id+'" data-name="'+String(p.name||'').replace(/"/g,'&quot;')+'" data-price="'+(p.final_price||p.price||0)+'" data-stock="'+stock+'"'+(buyDisabled?' disabled style="margin-top:0.5rem;width:100%;background:#ccc;color:#fff;border:0;padding:0.6rem;border-radius:6px;cursor:not-allowed;font-weight:600;"':' style="margin-top:0.5rem;width:100%;background:#b49d84;color:#fff;border:0;padding:0.6rem;border-radius:6px;cursor:pointer;font-weight:600;"')+'>Купить в 1 клик</button>'
           +'<form class="wb-order-form" data-id="'+p.id+'" style="display:none;margin-top:0.75rem;padding:0.75rem;background:#f9f9f9;border-radius:6px;">'
           +'<input type="text" name="name" placeholder="Ваше имя" required style="width:100%;margin-bottom:0.4rem;padding:0.4rem;border:1px solid #ddd;border-radius:4px;">'

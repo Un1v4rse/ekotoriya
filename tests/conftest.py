@@ -57,6 +57,13 @@ MINIMAL_CONTENT = {
             'template': 'pages/catalog__namatrasniki.html',
             'blocks': [],
         },
+        {
+            'slug': 'catalog__namatrasniki__namatrasniki-na-rezinke',
+            'url': '/catalog/namatrasniki/namatrasniki-na-rezinke/',
+            'title': 'Наматрасники на резинке',
+            'template': 'pages/catalog__namatrasniki__namatrasniki-na-rezinke.html',
+            'blocks': [],
+        },
     ],
 }
 
