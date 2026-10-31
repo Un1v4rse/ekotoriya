@@ -2089,6 +2089,43 @@
         t.addEventListener('input', () => onchange(t.value));
         return t;
     }
+    function richTextInput(value, onchange, rows) {
+        const wrap = el('div', 'pe-rich-editor');
+        wrap.style.cssText = 'border:1px solid #d0d0d0;border-radius:4px;overflow:hidden;';
+        const toolbar = el('div', 'pe-rich-toolbar');
+        toolbar.style.cssText = 'display:flex;gap:4px;padding:4px;border-bottom:1px solid #e0e0e0;background:#f7f7f7;';
+        const ed = el('div', 'pe-rich-area', {contenteditable: 'true'});
+        ed.style.cssText = 'min-height:' + (rows || 4) + 'rem;padding:.5rem;outline:none;background:#fff;';
+        let html = value || '';
+        if (html && !/^\s*</.test(html)) {
+            html = '<p>' + String(html).split(/\n\s*\n/).filter(Boolean).map(p => p.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')).join('</p><p>') + '</p>';
+        }
+        ed.innerHTML = html || '<p><br></p>';
+        const btns = [
+            ['bold','B'],['italic','I'],['underline','U'],
+            ['insertUnorderedList','•'],['insertOrderedList','1.']
+        ];
+        btns.forEach(([cmd, label]) => {
+            const btn = el('button','pe-rich-btn',{type:'button'});
+            btn.textContent = label;
+            btn.style.cssText = 'min-width:28px;padding:2px 6px;border:1px solid #ccc;background:#fff;border-radius:3px;cursor:pointer;';
+            btn.addEventListener('click', (e) => { e.preventDefault(); ed.focus(); document.execCommand(cmd, false, null); });
+            toolbar.appendChild(btn);
+        });
+        const linkBtn = el('button','pe-rich-btn',{type:'button'});
+        linkBtn.textContent = 'Ссылка';
+        linkBtn.style.cssText = 'padding:2px 6px;border:1px solid #ccc;background:#fff;border-radius:3px;cursor:pointer;';
+        linkBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const url = prompt('URL (http://, https://, /, #, mailto:, tel:)');
+            if (url) { ed.focus(); document.execCommand('createLink', false, url); }
+        });
+        toolbar.appendChild(linkBtn);
+        ed.addEventListener('input', () => onchange(ed.innerHTML));
+        wrap.appendChild(toolbar);
+        wrap.appendChild(ed);
+        return wrap;
+    }
     function selectInput(options, value, onchange) {
         const s = document.createElement('select');
         options.forEach(([val, label]) => {
@@ -2489,7 +2526,7 @@
             container.appendChild(field('Цвет текста (необязательно)', colorInput(b.text_color, v => set('text_color', v))));
             container.appendChild(el('div', 'pe-help')).textContent = 'Совет: текст можно править прямо на холсте — двойной клик по заголовку.';
         } else if (type === 'text') {
-            container.appendChild(field('Текст', textareaInput(b.text, v => set('text', v), 8)));
+            container.appendChild(field('Текст', richTextInput(b.text, v => { set('text', v); if (!b.rich) set('rich', true); }, 8)));
             container.appendChild(field('Положение', selectInput([
                 ['left', 'Слева'], ['center', 'По центру'], ['right', 'Справа'],
             ], b.align || 'left', v => set('align', v))));
@@ -3434,9 +3471,17 @@
                 b.html = textEdit.targets.map(t =>
                     t instanceof Element ? t.outerHTML : (t.textContent || '')).join('');
             } else if (cfg.multi) {
-                b[cfg.field] = textEdit.targets.map(t => t.innerText.trim()).filter(Boolean).join('\n\n');
+                if (b.type === 'text' && b.rich) {
+                    b[cfg.field] = textEdit.targets.map(t => t.innerHTML).join('');
+                } else {
+                    b[cfg.field] = textEdit.targets.map(t => t.innerText.trim()).filter(Boolean).join('\n\n');
+                }
             } else if (textEdit.targets[0]) {
-                b[cfg.field] = textEdit.targets[0].innerText.trim();
+                if (b.type === 'text' && b.rich) {
+                    b[cfg.field] = textEdit.targets[0].innerHTML;
+                } else {
+                    b[cfg.field] = textEdit.targets[0].innerText.trim();
+                }
             }
             markDirty();
             recordHistory();

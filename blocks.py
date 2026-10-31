@@ -58,6 +58,12 @@ _SANITIZE_ALLOWED_ATTRS = {
     '*': {'class', 'id', 'title', 'align'},
 }
 
+# Белый список для безопасного Rich Text (Приоритет 1).
+_RICH_ALLOWED_TAGS = {'p', 'br', 'strong', 'b', 'em', 'i', 'a', 'ul', 'ol', 'li'}
+_RICH_ALLOWED_ATTRS = {
+    'a': {'href', 'target', 'rel'},
+}
+
 
 def _sanitize_url(value):
     """Разрешить только http(s): и относительные ссылки; иначе пустая строка."""
@@ -143,6 +149,85 @@ class _SanitizeHTMLParser(HTMLParser):
 def _sanitize_html(raw):
     """Очистить произвольный HTML до безопасного подмножества тегов."""
     parser = _SanitizeHTMLParser()
+    try:
+        parser.feed(str(raw or ''))
+        parser.close()
+    except Exception:
+        return ''
+    return ''.join(parser.out)
+
+
+class _RichTextSanitizer(HTMLParser):
+    """Санитайзер для безопасного Rich Text: жирный, курсив, ссылки,
+    абзацы, переносы строки, маркированные/нумерованные списки.
+    Удаляет script/style/event handlers и небезопасные URL.
+    """
+
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.out = []
+        self._drop_stack = []
+
+    def _dropping(self):
+        return bool(self._drop_stack)
+
+    def handle_starttag(self, tag, attrs):
+        tag = tag.lower()
+        if tag in _SANITIZE_DROP_WITH_CONTENT:
+            self._drop_stack.append(tag)
+            return
+        if self._dropping() or tag not in _RICH_ALLOWED_TAGS:
+            return
+        allowed = _RICH_ALLOWED_ATTRS.get(tag, set())
+        clean = []
+        for name, value in attrs:
+            name = name.lower()
+            if name.startswith('on') or name not in allowed:
+                continue
+            if name == 'href':
+                value = _sanitize_url(value)
+                if not value:
+                    continue
+            if name == 'target' and value not in ('_blank', '_self'):
+                continue
+            clean.append(f'{name}="{esc(value)}"' if value is not None else name)
+        suffix = ' ' + ' '.join(clean) if clean else ''
+        if tag == 'br':
+            self.out.append(f'<{tag}{suffix}>')
+        else:
+            self.out.append(f'<{tag}{suffix}>')
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+
+    def handle_endtag(self, tag):
+        tag = tag.lower()
+        if self._drop_stack:
+            if tag == self._drop_stack[-1]:
+                self._drop_stack.pop()
+            return
+        if tag in _RICH_ALLOWED_TAGS and tag != 'br':
+            self.out.append(f'</{tag}>')
+
+    def handle_data(self, data):
+        if not self._dropping():
+            self.out.append(esc(data))
+
+    def handle_entityref(self, name):
+        if not self._dropping():
+            self.out.append(f'&{name};')
+
+    def handle_charref(self, name):
+        if not self._dropping():
+            self.out.append(f'&#{name};')
+
+    def handle_comment(self, data):
+        pass
+
+
+def _sanitize_rich_text(raw):
+    """Очистить HTML текстового блока до безопасного форматирования."""
+    parser = _RichTextSanitizer()
     try:
         parser.feed(str(raw or ''))
         parser.close()
@@ -785,12 +870,18 @@ def render_block(block):
         return _block_wrapper(block, inner, extra_style=f'text-align:{align}')
 
     if btype == 'text':
-        paragraphs = [p.strip() for p in re.split(r'\n\s*\n', block.get('text', '')) if p.strip()]
-        if not paragraphs:
-            return ''
-        inner = ''.join(f'<p>{esc(p).replace(chr(10), "<br>")}</p>' for p in paragraphs)
-        inner = _div(_typo(block, 'text'), inner)
         align = {'left': 'left', 'center': 'center', 'right': 'right'}.get(block.get('align'), 'left')
+        if block.get('rich'):
+            inner = _sanitize_rich_text(block.get('text', '')).strip()
+            if not inner:
+                return ''
+            inner = _div(_typo(block, 'text'), inner)
+        else:
+            paragraphs = [p.strip() for p in re.split(r'\n\s*\n', block.get('text', '')) if p.strip()]
+            if not paragraphs:
+                return ''
+            inner = ''.join(f'<p>{esc(p).replace(chr(10), "<br>")}</p>' for p in paragraphs)
+            inner = _div(_typo(block, 'text'), inner)
         return _block_wrapper(block, inner, extra_style=f'text-align:{align}')
 
     if btype == 'image':
