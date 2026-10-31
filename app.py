@@ -461,6 +461,7 @@ ADMIN_PATH_SECTIONS = [
     ('/admin/api/seo', 'seo'),
     ('/admin/api/redirects-import', 'seo'),
     ('/admin/api/seo-audit', 'seo'),
+    ('/admin/api/preview', 'pages'),
     ('/admin/api/wb-products', 'integrations'),
     ('/admin/api/product-discount', 'integrations'),
     ('/admin/api/discount', 'integrations'),
@@ -3467,7 +3468,8 @@ def admin_edit_page(slug):
         editor_ver = int(os.path.getmtime(os.path.join(BASE_DIR, 'static', 'js', 'page-editor.js')))
         html = render_template('page_editor_wrapper.html', slug=slug,
                                content_url=page.get('url') or '/',
-                               csrf_token=get_csrf_token(), editor_ver=editor_ver)
+                               csrf_token=get_csrf_token(), editor_ver=editor_ver,
+                               admin_role=_admin_role() or 'superadmin')
         return Response(html)
     html = _render_page_html_marked(content, page)
     return Response(_inject_editor(html, slug))
@@ -3675,6 +3677,9 @@ def admin_page_save():
     blocks = [b for b in blocks if isinstance(b, dict)]
     if _admin_role() != 'superadmin':
         blocks = [b for b in blocks if b.get('type') != 'html']
+    ok, err = blocks_module.validate_blocks(blocks)
+    if not ok:
+        return jsonify({'success': False, 'error': err}), 400
     meta = payload.get('page') or {}
     for k in ('title', 'h1', 'meta_description', 'meta_keywords', 'canonical'):
         if k in meta:
@@ -3714,6 +3719,9 @@ def admin_preview():
             'h1': '',
             'meta_description': '',
         }
+    ok, err = blocks_module.validate_blocks(blocks)
+    if not ok:
+        return jsonify({'success': False, 'error': err}), 400
     preview_page = dict(page)
     for k in ('title', 'h1', 'meta_description', 'meta_keywords', 'canonical', 'url'):
         if page_fields.get(k):
@@ -4019,6 +4027,9 @@ def admin_page_publish():
     if page is None:
         return jsonify({'success': False, 'error': 'Страница не найдена'}), 404
     blocks = _page_draft_blocks(page)
+    ok, err = blocks_module.validate_blocks(blocks)
+    if not ok:
+        return jsonify({'success': False, 'error': err}), 400
     page.published_blocks = copy.deepcopy(blocks)
     page.content_html = blocks_module.render_blocks(blocks)
     page.updated_at = datetime.now(timezone.utc)

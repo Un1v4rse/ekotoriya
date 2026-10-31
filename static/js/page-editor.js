@@ -20,6 +20,7 @@
     const SLUG = scriptEl.dataset.slug;
     const API = p => `${location.origin}/admin/api${p}`;
     const CSRF = () => window.CSRF_TOKEN || '';
+    const ADMIN_ROLE = window.ADMIN_ROLE || 'superadmin';
 
     /* Режим обёртки (обычные страницы): контент страницы живёт в same-origin
        iframe (#pe-content-frame из page_editor_wrapper.html) шириной
@@ -246,6 +247,15 @@
             make: () => ({type: 'video', url: ''}),
             presets: [{name: 'YouTube / Vimeo', make: () => ({type: 'video', url: ''})}],
         },
+        embed: {
+            icon: '🌐', label: 'Виджет', desc: 'Безопасный embed: YouTube, Vimeo, RuTube, VK, карты, музыка',
+            mock: '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f4f4f8;border-radius:5px;border:1px dashed #bbb;color:#888;font-size:0.7rem;">EMBED</div>',
+            make: () => ({type: 'embed', url: '', height: 400, caption: ''}),
+            presets: [
+                {name: 'Видео', make: () => ({type: 'embed', url: '', height: 400, caption: ''})},
+                {name: 'Карта', make: () => ({type: 'embed', url: '', height: 400, caption: ''})},
+            ],
+        },
         features: {
             icon: '✨', label: 'Преимущества', desc: 'Карточки «почему мы»: иконка, заголовок, текст',
             mock: '<div class="gm-grid"><div class="gm-card-mini"><div class="tx" style="height:8px;background:#9a8269;"></div><div class="tx"></div></div><div class="gm-card-mini"><div class="tx" style="height:8px;background:#9a8269;"></div><div class="tx"></div></div><div class="gm-card-mini"><div class="tx" style="height:8px;background:#9a8269;"></div><div class="tx"></div></div><div class="gm-card-mini"><div class="tx" style="height:8px;background:#9a8269;"></div><div class="tx"></div></div></div>',
@@ -333,12 +343,17 @@
         {id: 'map', name: 'Карта', types: ['map']},
         {id: 'button', name: 'Кнопка', types: ['button']},
         {id: 'video', name: 'Видео', types: ['video']},
+        {id: 'embed', name: 'Виджет', types: ['embed']},
         {id: 'features', name: 'Преимущества', types: ['features']},
         {id: 'separator', name: 'Разделитель', types: ['divider', 'spacer']},
         {id: 'timer', name: 'Таймер', types: ['timer']},
         {id: 'zero', name: 'Zero', types: ['zero']},
         {id: 'html', name: 'HTML', types: ['html']},
     ];
+    // Блок «HTML-код» — только для суперадмина (CN-2, Приоритет 7).
+    if (ADMIN_ROLE !== 'superadmin') {
+        BLOCK_TYPES.html.hidden = true;
+    }
     BLOCK_TYPES.banner = {
         icon: '📢', label: 'Баннер', desc: 'Промо-блок: заголовок, текст и кнопка',
         mock: '<div style="width:100%;height:100%;background:#b49d84;border-radius:5px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.7rem;font-weight:700;">БАННЕР</div>',
@@ -2712,6 +2727,13 @@
         } else if (type === 'video') {
             container.appendChild(field('Ссылка на видео YouTube или Vimeo', textInput(b.url, v => set('url', v), 'https://youtube.com/watch?v=…')));
             container.appendChild(el('div', 'pe-help')).textContent = 'Достаточно обычной ссылки из адресной строки.';
+        } else if (type === 'embed') {
+            container.appendChild(field('Ссылка для встраивания', textInput(b.url, v => set('url', v), 'https://…')));
+            container.appendChild(field('Высота, px (не для видео)', numberInput(b.height || 400, v => set('height', v), 100, 1200)));
+            container.appendChild(field('Подпись (необязательно)', textInput(b.caption, v => set('caption', v))));
+            container.appendChild(el('div', 'pe-help')).innerHTML =
+                'Разрешённые сервисы: YouTube, Vimeo, RuTube, VK Видео, Dailymotion, SoundCloud, Spotify, Яндекс.Карты, Google Maps.<br>' +
+                'Видео автоматически растягивается на всю ширину в пропорции 16:9.';
         } else if (type === 'products') {
             container.appendChild(field('Заголовок над товарами (можно пусто)', textInput(b.title, v => set('title', v), 'Наши товары')));
             container.appendChild(field('Режим', selectInput([

@@ -281,6 +281,122 @@ def _video_embed_url(url):
     return ''
 
 
+# Белый список сторонних виджетов (Приоритет 7): URL проверяется по домену и
+# формату, после чего преобразуется в безопасный embed-URL. Всё остальное
+# отклоняется. iframe рендерится с sandbox и ограниченными permissions.
+_EMBED_VIDEO_HOSTS = {
+    'youtube.com/embed', 'player.vimeo.com', 'rutube.ru/play/embed',
+    'vk.com/video_ext.php', 'geo.dailymotion.com',
+}
+
+
+def _embed_url(url):
+    """Преобразовать ссылку пользователя в безопасный embed-URL или None."""
+    url = (url or '').strip()
+    if not url.lower().startswith(('http://', 'https://')):
+        return None
+    # YouTube
+    m = re.search(r'(?:youtube\.com/(?:watch\?v=|embed/|shorts/)|youtu\.be/)([\w\-]{6,20})', url)
+    if m:
+        return f'https://www.youtube.com/embed/{m.group(1)}'
+    # Vimeo
+    m = re.search(r'vimeo\.com/(\d+)', url)
+    if m:
+        return f'https://player.vimeo.com/video/{m.group(1)}'
+    # RuTube
+    m = re.search(r'rutube\.ru/(?:video/|play/embed/)([a-zA-Z0-9]+)', url)
+    if m:
+        return f'https://rutube.ru/play/embed/{m.group(1)}'
+    # VK Видео
+    m = re.search(r'vk\.com/video(-?\d+)_(\d+)', url)
+    if m:
+        return f'https://vk.com/video_ext.php?oid={m.group(1)}&id={m.group(2)}'
+    # Dailymotion
+    m = re.search(r'dailymotion\.com/video/([a-zA-Z0-9]+)', url)
+    if m:
+        return f'https://geo.dailymotion.com/player.html?video={m.group(1)}'
+    # SoundCloud
+    m = re.search(r'(soundcloud\.com/[\w\-]+/[\w\-]+)', url)
+    if m:
+        return f'https://w.soundcloud.com/player/?url={quote("https://" + m.group(1), safe="")}'
+    # Spotify
+    m = re.search(r'open\.spotify\.com/(track|album|playlist|episode)/([a-zA-Z0-9]+)', url)
+    if m:
+        return f'https://open.spotify.com/embed/{m.group(1)}/{m.group(2)}'
+    # Яндекс.Карты: только готовые share-ссылки с параметрами (text/um/lol/rtext)
+    if re.search(r'yandex\.(?:ru|com|by|kz)/maps', url):
+        parsed = urlparse(url)
+        qs = parsed.query
+        if not qs:
+            return None
+        # Разрешаем только безопасные параметры карт
+        allowed = {'text', 'um', 'll', 'z', 'rl', 'rtext', 'mode'}
+        pairs = []
+        for k, v in parse_qs(qs).items():
+            if k in allowed:
+                pairs.append(f'{quote(k, safe="")}={quote(v[0], safe="")}')
+        if not pairs:
+            return None
+        return f'https://yandex.ru/map-widget/v1/?{"&".join(pairs)}'
+    # Google Maps embed (только готовые embed-ссылки с pb=)
+    m = re.search(r'google\.(?:ru|com)/maps/embed\?pb=([^&]+)', url)
+    if m:
+        return f'https://www.google.com/maps/embed?pb={m.group(1)}'
+    return None
+
+
+def _embed_iframe_html(block):
+    """Рендер блока «Виджет / embed»: iframe с белого списка провайдеров."""
+    url = (block.get('url') or '').strip()
+    embed = _embed_url(url)
+    if not embed:
+        return ('<div style="border:2px dashed #c9c9c9;border-radius:8px;'
+                'padding:2.5rem 1rem;text-align:center;color:#999;'
+                'font-size:0.95rem;background:#fafafa;">'
+                '🌐 Виджет: укажите безопасную ссылку в настройках блока</div>')
+    height = _px(block.get('height'), 100, 1200) or 400
+    caption = (block.get('caption') or '').strip()
+    cap_html = (f'<p style="text-align:center;color:#666;font-size:0.9rem;margin-top:0.5rem;">'
+                f'{esc(caption)}</p>' if caption else '')
+    is_video = any(h in embed for h in _EMBED_VIDEO_HOSTS)
+    common_sandbox = 'allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox'
+    if is_video:
+        inner = (f'<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:8px;">'
+                 f'<iframe src="{esc(embed)}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;"'
+                 f' allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"'
+                 f' sandbox="{common_sandbox}" loading="lazy" referrerpolicy="no-referrer-when-downgrade"'
+                 f' allowfullscreen title="Видео"></iframe></div>{cap_html}')
+    else:
+        inner = (f'<iframe src="{esc(embed)}" style="width:100%;height:{height}px;border:0;border-radius:8px;"'
+                 f' allow="geolocation; fullscreen" sandbox="{common_sandbox}"'
+                 f' loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Карта"></iframe>{cap_html}')
+    return _block_wrapper(block, inner, extra_style='margin:1.5rem 0')
+
+
+def validate_blocks(blocks):
+    """Серверная валидация блоков перед сохранением/публикацией.
+
+    Возвращает (True, '') или (False, 'сообщение об ошибке').
+    """
+    if not isinstance(blocks, list):
+        return True, ''
+    for i, b in enumerate(blocks):
+        if not isinstance(b, dict):
+            continue
+        btype = b.get('type')
+        if btype == 'embed':
+            url = (b.get('url') or '').strip()
+            if not url:
+                return False, f'Блок виджета #{i + 1}: укажите ссылку'
+            if _embed_url(url) is None:
+                return False, (f'Блок виджета #{i + 1}: ссылка не из разрешённого '
+                               f'списка провайдеров (YouTube, Vimeo, RuTube, VK, '
+                               f'Dailymotion, SoundCloud, Spotify, Яндекс.Карты, Google Maps)')
+        if btype == 'html' and not _is_superadmin():
+            return False, f'Блок HTML-код #{i + 1}: доступен только суперадмину'
+    return True, ''
+
+
 def _parse_items(raw):
     """Нормализовать список элементов блока: список словарей или JSON-строка."""
     if isinstance(raw, str):
@@ -1032,6 +1148,9 @@ def render_block(block):
                  f'<iframe src="{embed}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;"'
                  f' allowfullscreen loading="lazy"></iframe></div>')
         return _block_wrapper(block, inner, extra_style='margin:1.5rem 0')
+
+    if btype == 'embed':
+        return _embed_iframe_html(block)
 
     if btype == 'products':
         # Блок «Товары» (CN-2): режимы all/wb/ozon по источнику, фильтр по

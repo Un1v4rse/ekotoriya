@@ -292,3 +292,99 @@
   - Нет.
 Следующий шаг:
   - Реализация серверной части optimistic locking и настройки глубины версий.
+
+
+[2026-11-01 00:00] [Приоритет 5 — завершение]
+Действие:
+  - Реализован optimistic locking для `/admin/api/page-draft` через `expected_saved_at`.
+  - Добавлено сохранение автора (`saved_by`) и времени (`saved_at`) черновика.
+  - Глубина архива версий вынесена в env `PAGE_VERSION_LIMIT` (default 10, max 100).
+  - В `page-editor.js` добавлен диалог конфликта и force-save.
+  - Созданы тесты `tests/test_draft_conflict.py`.
+  - Commit: `b6d665d`.
+Причина:
+  - Завершение Приоритета 5 master-промта (черновики / совместная работа / история).
+Изменённые файлы:
+  `app.py`, `static/js/page-editor.js`, `tests/test_draft_conflict.py`,
+  `.kimi-code/STATE.md`, `.kimi-code/WORKLOG.md`, `.kimi-code/BACKUPS.md`
+Проверки и результат:
+  - `pytest tests/test_draft_conflict.py` — 4 passed.
+  - `pytest tests/` — 489 passed, 1 failed (исходный).
+Созданный бэкап или commit:
+  - commit `b6d665d`.
+Проблемы:
+  - Исходный failing test остаётся.
+  - Сравнение diff версий в UI не реализовано.
+Следующий шаг:
+  - Переход к Приоритету 6/7.
+
+[2026-10-31 23:18] [Приоритет 6 — проверка нужности]
+Действие:
+  - Проверены `blocks.py`, `page-editor.js`, `models.py` на наличие блока/модели
+    коллекций (collection, article, blog, news, grid).
+  - Коллекций как отдельного типа или модели не обнаружено; проект их не использует.
+Причина:
+  - Master-промт требует подтвердить необходимость универсальных коллекций
+    перед развёртыванием модуля.
+Изменённые файлы:
+  Нет.
+Проверки и результат:
+  - Поиск по коду не выявил признаков использования коллекций.
+Созданный бэкап или commit:
+  Нет.
+Проблемы:
+  Нет.
+Следующий шаг:
+  - Пропустить Приоритет 6, перейти к Приоритету 7.
+
+[2026-10-31 23:18] [Приоритет 7 — старт] — безопасные сторонние виджеты
+Действие:
+  - Создан бэкап `backups/backup_2026-10-31_23-18`.
+  - Обновлён `.kimi-code/STATE.md`.
+Причина:
+  - Подготовка к реализации безопасного embed-блока с белым списком провайдеров,
+    ограничению html-блока ролью superadmin и тестам.
+Изменённые файлы:
+  `.kimi-code/STATE.md`, `.kimi-code/WORKLOG.md`, `.kimi-code/BACKUPS.md`
+Проверки и результат:
+  - Бэкап создан и проверен (src.tar 102M + ekotoriya.db 14M).
+Созданный бэкап или commit:
+  - бэкап `backups/backup_2026-10-31_23-18`.
+Проблемы:
+  Нет.
+Следующий шаг:
+  - Реализация embed-блока в `blocks.py` и `page-editor.js`.
+
+
+[2026-10-31 23:45] [Приоритет 7 — завершение]
+Действие:
+  - Добавлен в `blocks.py` белый список embed-провайдеров (`_embed_url`) и рендер
+    блока `embed` с sandbox-iframe.
+  - Добавлена серверная валидация `validate_blocks`, вызываемая в
+    `/admin/api/page-save`, `/admin/api/page-publish`, `/admin/api/preview`.
+  - В `page-editor.js` добавлен блок «Виджет», его редактор и скрытие
+    «HTML»-блока для не-суперадминов.
+  - В `page_editor_wrapper.html` и `app.py` добавлена передача роли админа
+    через `window.ADMIN_ROLE`.
+  - `/admin/api/preview` перемещён в раздел `pages` для content-менеджера.
+  - Созданы тесты `tests/test_embed_widgets.py` (19 тестов).
+  - Полный прогон: 509 passed, 0 failed.
+  - Smoke-test в браузере: редактор открывается, блок «Виджет» добавляется,
+    панель настроек embed видна.
+Причина:
+  - Завершение Приоритета 7 master-промта (безопасные сторонние виджеты).
+Изменённые файлы:
+  `blocks.py`, `app.py`, `static/js/page-editor.js`,
+  `templates/page_editor_wrapper.html`, `tests/test_embed_widgets.py`,
+  `.kimi-code/STATE.md`, `.kimi-code/WORKLOG.md`, `.kimi-code/BACKUPS.md`
+Проверки и результат:
+  - `pytest tests/test_embed_widgets.py` — 19 passed.
+  - `pytest tests/` — 509 passed, 0 failed.
+  - `node --check static/js/page-editor.js` — OK.
+  - Браузерный smoke-test — OK.
+Созданный бэкап или commit:
+  - бэкап `backups/backup_2026-10-31_23-18`.
+Проблемы:
+  Нет.
+Следующий шаг:
+  - Commit и завершение цикла 5 master-промта.
