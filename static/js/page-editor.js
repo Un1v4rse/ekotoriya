@@ -4034,7 +4034,7 @@
     const zero = {
         active: false, idx: -1, layer: null, float: null, handles: null,
         sel: null, container: null, locked: new Set(),
-        drag: null,
+        drag: null, clipboard: null, guides: null,
     };
 
     function zeroBlock() { return blocks[zero.idx]; }
@@ -4051,6 +4051,9 @@
             const ov = b.responsive[dev][elm.id];
             ['x', 'y', 'w', 'h'].forEach(k => { if (ov[k] != null) base[k] = +ov[k]; });
             if (ov.hide) base.hide = true;
+            if (ov.font_size != null) base.font_size = ov.font_size;
+            if (ov.color != null) base.color = ov.color;
+            if (ov.bg != null) base.bg = ov.bg;
         }
         return base;
     }
@@ -4146,9 +4149,24 @@
             '</div>' +
             '<div class="pe-zero-layers"></div>' +
             '<div class="pe-zero-props"></div>' +
-            '<div class="pe-zero-hint">Двигать: drag или стрелки · Resize: углы (Shift — пропорции) · Поворот: ручка над элементом</div>';
+            '<div class="pe-zero-float-actions">' +
+            '<button type="button" data-z="copy" title="Копировать (Ctrl+C)">📋 Копировать</button>' +
+            '<button type="button" data-z="paste" title="Вставить (Ctrl+V)">📥 Вставить</button>' +
+            '<button type="button" data-z="align-l" title="По левому краю">⬅</button>' +
+            '<button type="button" data-z="align-c" title="По центру по горизонтали">↔</button>' +
+            '<button type="button" data-z="align-r" title="По правому краю">➡</button>' +
+            '<button type="button" data-z="align-t" title="По верхнему краю">⬆</button>' +
+            '<button type="button" data-z="align-m" title="По центру по вертикали">↕</button>' +
+            '<button type="button" data-z="align-b" title="По нижнему краю">⬇</button>' +
+            '</div>' +
+            '<div class="pe-zero-hint">Двигать: drag или стрелки · Resize: углы (Shift — пропорции) · Поворот: ручка над элементом · Копировать/вставить: Ctrl+C / Ctrl+V</div>';
         layer.appendChild(float);
         float.querySelector('[data-z="close"]').addEventListener('click', closeZero);
+        float.querySelector('[data-z="copy"]').addEventListener('click', copyZeroElement);
+        float.querySelector('[data-z="paste"]').addEventListener('click', pasteZeroElement);
+        float.querySelectorAll('[data-z^="align-"]').forEach(btn => {
+            btn.addEventListener('click', () => alignZeroElement(btn.dataset.z.replace('align-', '')));
+        });
         float.querySelectorAll('[data-add]').forEach(btn => {
             btn.addEventListener('click', () => zeroAddElement(btn.dataset.add));
         });
@@ -4157,6 +4175,11 @@
         const handles = el('div', 'pe-zero-handles');
         zero.handles = handles;
         layer.appendChild(handles);
+
+        // Направляющие при drag
+        const guides = el('div', 'pe-zero-guides');
+        zero.guides = guides;
+        layer.appendChild(guides);
 
         bindZeroElements();
         renderZeroLayers();
@@ -4245,6 +4268,9 @@
         } else {
             writeCoords(d.elm, patch);
             applyElStyle(d.nodeEl, Object.assign({}, d.start, patch), d.elm.rotate);
+            if (d.mode === 'move' || d.mode === 'resize') {
+                showZeroGuides(Object.assign({}, d.start, patch));
+            }
         }
         updateZeroSelectionFrame();
     }
@@ -4255,6 +4281,7 @@
         moveDoc.removeEventListener('pointerup', onZeroDragEnd);
         document.removeEventListener('pointerup', onZeroDragEnd);
         zero.drag = null;
+        clearZeroGuides();
         markDirty();
         recordHistoryDebounced();
         scheduleRefresh();   // после ответа rebuildZeroOverlay восстановит оверлей
@@ -4281,6 +4308,13 @@
         const frame = el('div', 'pe-zero-frame');
         zero.handles.appendChild(frame);
         positionFrame(frame, c, elm.rotate);
+        // Индикатор переполнения текста
+        const nodeEl = findElNode(elm.id);
+        if (nodeEl && checkZeroTextOverflow(elm, nodeEl)) {
+            const warn = el('div', 'pe-zero-overflow');
+            warn.textContent = 'Текст может не помещаться';
+            frame.appendChild(warn);
+        }
         // угловые ручки resize
         ['nw', 'ne', 'sw', 'se'].forEach(h => {
             const hd = el('div', 'pe-zero-handle pe-zero-h-' + h, {title: 'Изменить размер (Shift — пропорции)'});
@@ -4356,6 +4390,49 @@
     }
     function findElNode(eid) {
         return zero.container ? zero.container.querySelector('[data-el="' + eid + '"]') : null;
+    }
+
+    function clearZeroGuides() {
+        if (zero.guides) zero.guides.innerHTML = '';
+    }
+    function showZeroGuides(cur) {
+        if (!zero.guides || !zero.container) return;
+        zero.guides.innerHTML = '';
+        const rect = zero.container.getBoundingClientRect();
+        const threshold = 0.5; // процент
+        const b = zeroBlock();
+        const others = zeroElements().filter(e => e.id !== zero.sel && !e.hidden);
+        const targets = [
+            cur.x, cur.x + cur.w, cur.x + cur.w / 2,
+            cur.y, cur.y + cur.h, cur.y + cur.h / 2,
+        ];
+        others.forEach(e => {
+            const c = effCoords(b, e);
+            const lines = [
+                [c.x, 'v'], [c.x + c.w, 'v'], [c.x + c.w / 2, 'v'],
+                [c.y, 'h'], [c.y + c.h, 'h'], [c.y + c.h / 2, 'h'],
+            ];
+            lines.forEach(([val, dir]) => {
+                targets.forEach((t, ti) => {
+                    if (Math.abs(t - val) <= threshold) {
+                        const line = document.createElement('div');
+                        line.className = 'pe-zero-guide pe-zero-guide-' + dir;
+                        if (dir === 'v') {
+                            line.style.left = val + '%';
+                            line.style.top = '0';
+                            line.style.width = '1px';
+                            line.style.height = '100%';
+                        } else {
+                            line.style.left = '0';
+                            line.style.top = val + '%';
+                            line.style.width = '100%';
+                            line.style.height = '1px';
+                        }
+                        zero.guides.appendChild(line);
+                    }
+                });
+            });
+        });
     }
 
     function zeroAddElement(type) {
@@ -4447,6 +4524,25 @@
             } else {
                 box.appendChild(el('div', 'pe-help')).textContent = 'Координаты наследуются от desktop — сдвиньте элемент, чтобы задать свои для ' + zeroDevice() + '.';
             }
+            // Мобильные стили (переопределение font-size, color, bg)
+            const dev = zeroDevice();
+            if (!b.responsive || typeof b.responsive !== 'object') b.responsive = {};
+            if (!b.responsive[dev] || typeof b.responsive[dev] !== 'object') b.responsive[dev] = {};
+            const ov = b.responsive[dev][elm.id] || (b.responsive[dev][elm.id] = {});
+            const setR = (k, v) => {
+                if (v === '' || v == null) delete ov[k];
+                else ov[k] = v;
+                if (!Object.keys(ov).length) delete b.responsive[dev][elm.id];
+                if (!Object.keys(b.responsive[dev]).length) delete b.responsive[dev];
+                commit();
+            };
+            if (elm.type === 'text') {
+                box.appendChild(field('Размер шрифта (моб.)', textInput(ov.font_size, v => setR('font_size', v || null), 'px')));
+                box.appendChild(field('Цвет текста (моб.)', colorInput(ov.color, v => setR('color', v || null))));
+            }
+            if (elm.type === 'shape') {
+                box.appendChild(field('Цвет фона (моб.)', colorInput(ov.bg, v => setR('bg', v || null))));
+            }
         }
 
         if (elm.type === 'text') {
@@ -4492,9 +4588,85 @@
         box.appendChild(field('Слой (z-index)', numberInput(elm.z || 0, v => { elm.z = v; commit(); }, 0, 100)));
     }
 
+    // Копирование / вставка элемента
+    function copyZeroElement() {
+        const elm = zeroElements().find(x => x.id === zero.sel);
+        if (!elm) return;
+        // Глубокая копия без id и responsive-переопределений
+        const clone = JSON.parse(JSON.stringify(elm));
+        delete clone.id;
+        zero.clipboard = clone;
+        toast('Элемент скопирован (Ctrl+V — вставить)');
+    }
+    function pasteZeroElement() {
+        const b = zeroBlock();
+        if (!b || !zero.clipboard) return;
+        if (!Array.isArray(b.elements)) b.elements = [];
+        const clone = JSON.parse(JSON.stringify(zero.clipboard));
+        clone.id = 'el' + Date.now().toString(36);
+        // Сдвиг вправо-вниз, чтобы не накладывался на оригинал
+        clone.x = round1(clampPct((+clone.x || 0) + 2));
+        clone.y = round1(clampPct((+clone.y || 0) + 2));
+        // Слой чуть выше
+        clone.z = (+clone.z || 0) + 1;
+        b.elements.push(clone);
+        zero.sel = clone.id;
+        markDirty();
+        recordHistory();
+        scheduleRefresh();
+    }
+
+    function alignZeroElement(mode) {
+        const b = zeroBlock();
+        const elm = zeroElements().find(x => x.id === zero.sel);
+        if (!elm || !zero.container) return;
+        const c = effCoords(b, elm);
+        const patch = {};
+        if (mode === 'l') patch.x = 0;
+        if (mode === 'r') patch.x = round1(100 - c.w);
+        if (mode === 'c') patch.x = round1((100 - c.w) / 2);
+        if (mode === 't') patch.y = 0;
+        if (mode === 'b') patch.y = round1(100 - c.h);
+        if (mode === 'm') patch.y = round1((100 - c.h) / 2);
+        if (Object.keys(patch).length) {
+            writeCoords(elm, patch);
+            const nodeEl = findElNode(elm.id);
+            if (nodeEl) applyElStyle(nodeEl, effCoords(b, elm), elm.rotate);
+            updateZeroSelectionFrame();
+            markDirty();
+            recordHistoryDebounced();
+            scheduleRefresh();
+        }
+    }
+
+    // Предупреждение о возможном переполнении текста
+    function checkZeroTextOverflow(elm, nodeEl) {
+        if (!elm || !nodeEl || elm.type !== 'text') return false;
+        const text = (elm.props && elm.props.text) || '';
+        if (!text) return false;
+        // Простая эвристика: высота текстового блока в px по размеру шрифта
+        const fontSize = parseFloat(nodeEl.style.fontSize) || 16;
+        const lineHeight = 1.35;
+        const lines = Math.max(1, text.length / 35); // примерно 35 символов в строке
+        const neededH = lines * fontSize * lineHeight;
+        const rectH = nodeEl.clientHeight;
+        return neededH > rectH * 1.1;
+    }
+
     // Стрелки: двигают выбранный элемент (Shift — размер, Alt — шаг 0.1%)
     zero.onKeyDown = function (e) {
-        if (!zero.active || !zero.sel) return false;
+        if (!zero.active) return false;
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && zero.sel) {
+            e.preventDefault();
+            copyZeroElement();
+            return true;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v' && zero.clipboard) {
+            e.preventDefault();
+            pasteZeroElement();
+            return true;
+        }
+        if (!zero.sel) return false;
         const arrows = {ArrowLeft: ['x', -1], ArrowRight: ['x', 1], ArrowUp: ['y', -1], ArrowDown: ['y', 1]};
         if (!arrows[e.key]) return false;
         const elm = zeroElements().find(x => x.id === zero.sel);

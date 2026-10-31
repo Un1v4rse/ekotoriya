@@ -458,6 +458,43 @@ def test_zero_link_wraps_element():
     assert 'javascript:' not in bad
 
 
+def test_zero_responsive_font_size_and_color():
+    block = {
+        'type': 'zero', 'height': 500,
+        'elements': [
+            {'id': 't1', 'type': 'text', 'x': 0, 'y': 0, 'w': 50, 'h': 20,
+             'props': {'text': 'Hello'}},
+            {'id': 's1', 'type': 'shape', 'x': 50, 'y': 0, 'w': 50, 'h': 20,
+             'props': {'color': '#b49d84', 'shape': 'rect'}},
+        ],
+        'responsive': {
+            'mobile': {
+                't1': {'font_size': 12, 'color': '#ff0000'},
+                's1': {'bg': '#00ff00'},
+            }
+        }
+    }
+    html = render_block(block)
+    assert 'cb-zero-text' in html
+    assert 'cb-zero-shape' in html
+    assert '@media (max-width:640px)' in html
+    assert '.cb-zero-text{font-size:12px}' in html
+    assert '.cb-zero-text{color:#ff0000}' in html
+    assert '.cb-zero-shape{background:#00ff00}' in html
+
+
+def test_zero_element_classes_for_responsive_styling():
+    block = {
+        'type': 'zero', 'height': 500,
+        'elements': [
+            {'id': 'b1', 'type': 'button', 'x': 0, 'y': 0, 'w': 30, 'h': 10,
+             'props': {'text': 'Кнопка', 'url': '/'}},
+        ]
+    }
+    html = render_block(block)
+    assert 'cb-zero-btn' in html
+
+
 # ---------- Обратная совместимость ----------
 
 LEGACY_BLOCKS = [

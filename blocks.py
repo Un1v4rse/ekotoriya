@@ -774,8 +774,8 @@ def _zero_element_html(el, index):
 
     if etype == 'text':
         content = esc(props.get('text') or '')
-        content = _div('width:100%;height:100%;overflow:hidden;' +
-                       _typo_styles(props.get('text_style')), content)
+        content = (f'<div class="cb-zero-text" style="width:100%;height:100%;overflow:hidden;'
+                   f'{_typo_styles(props.get("text_style"))}">{content}</div>')
     elif etype == 'button':
         text = (props.get('text') or '').strip() or 'Подробнее'
         url = _sanitize_url(props.get('url')) or '#'
@@ -784,7 +784,7 @@ def _zero_element_html(el, index):
             bstyle = ('display:inline-block;background:#b49d84;color:#fff;'
                       'padding:0.6rem 1.4rem;border-radius:6px;text-decoration:none;'
                       'font-weight:600;border:2px solid #b49d84')
-        content = f'<a href="{esc(url)}"{battrs} style="{bstyle}">{esc(text)}</a>'
+        content = f'<a class="cb-zero-btn" href="{esc(url)}"{battrs} style="{bstyle}">{esc(text)}</a>'
     elif etype == 'image':
         src = _sanitize_url(props.get('src'))
         if not src:
@@ -802,7 +802,7 @@ def _zero_element_html(el, index):
             css = f'width:100%;height:100%;min-height:2px;background:{color};'
         else:
             css = f'width:100%;height:100%;background:{color};'
-        content = f'<div style="{css}"></div>'
+        content = f'<div class="cb-zero-shape" style="{css}"></div>'
     elif etype == 'video':
         embed = _video_embed_url(props.get('url'))
         if not embed:
@@ -897,6 +897,16 @@ def _zero_responsive_css(block, uid):
                 props.append('display:none')
             if props:
                 body.append(f'.cb-zero-{uid} [data-el="{eid}"]{{{";".join(props)}}}')
+            # Независимые мобильные стили (Приоритет 4)
+            fs = _px(cfg.get('font_size'), 8, 120)
+            if fs is not None:
+                body.append(f'.cb-zero-{uid} [data-el="{eid}"] .cb-zero-text{{font-size:{fs}px}}')
+            col = _color(cfg.get('color'))
+            if col:
+                body.append(f'.cb-zero-{uid} [data-el="{eid}"] .cb-zero-text{{color:{col}}}')
+            bg = _color(cfg.get('bg'))
+            if bg:
+                body.append(f'.cb-zero-{uid} [data-el="{eid}"] .cb-zero-shape{{background:{bg}}}')
         if body:
             chunks.append(f'@media (max-width:{maxw}px){{' + ''.join(body) + '}')
     return ''.join(chunks)
