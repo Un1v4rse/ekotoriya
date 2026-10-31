@@ -1056,7 +1056,65 @@ def render_block(block):
             submit = f'<button type="submit"{battrs} style="{bstyle}">{esc(button)}</button>'
         else:
             submit = f'<button type="submit">{esc(button)}</button>'
-        # Обычный POST без JS: /api/order сам перенаправит обратно на страницу
+
+        # Расширяемая схема полей (Приоритет 2).
+        fields = _parse_items(block.get('fields'))
+        if fields:
+            schema = []
+            inputs = []
+            for f in fields:
+                fname = re.sub(r'[^a-z0-9_\-]', '', str(f.get('name') or ''))[:40]
+                if not fname:
+                    continue
+                ftype = str(f.get('type') or 'text')
+                if ftype not in ('text', 'tel', 'email', 'textarea', 'select', 'checkbox'):
+                    ftype = 'text'
+                flabel = str(f.get('label') or fname)
+                fplaceholder = str(f.get('placeholder') or '')
+                required = bool(f.get('required'))
+                schema.append({'name': fname, 'type': ftype, 'required': required})
+                req_attr = ' required' if required else ''
+                if ftype == 'textarea':
+                    inputs.append(
+                        f'<label style="display:block;margin-bottom:.35rem;font-size:.9rem;">{esc(flabel)}</label>'
+                        f'<textarea name="{fname}" placeholder="{esc(fplaceholder)}"{req_attr}></textarea>')
+                elif ftype == 'select':
+                    raw_options = f.get('options') or []
+                    if isinstance(raw_options, str):
+                        try:
+                            raw_options = json.loads(raw_options)
+                        except ValueError:
+                            raw_options = []
+                    options = [str(opt or '').strip() for opt in raw_options if isinstance(opt, (str, int, float))]
+                    options = [opt for opt in options if opt]
+                    opts_html = ''.join(f'<option value="{esc(opt)}">{esc(opt)}</option>' for opt in options)
+                    inputs.append(
+                        f'<label style="display:block;margin-bottom:.35rem;font-size:.9rem;">{esc(flabel)}</label>'
+                        f'<select name="{fname}"{req_attr}>{opts_html}</select>')
+                elif ftype == 'checkbox':
+                    inputs.append(
+                        f'<label style="display:flex;align-items:flex-start;gap:.4rem;font-size:.85rem;margin:.5rem 0;cursor:pointer;">'
+                        f'<input type="checkbox" name="{fname}" value="1"{req_attr} style="margin-top:.15rem;">'
+                        f'<span>{esc(flabel)}</span></label>')
+                else:
+                    inputs.append(
+                        f'<label style="display:block;margin-bottom:.35rem;font-size:.9rem;">{esc(flabel)}</label>'
+                        f'<input type="{ftype}" name="{fname}" placeholder="{esc(fplaceholder)}"{req_attr}>')
+            if schema:
+                import json as _json
+                schema_json = esc(_json.dumps(schema, ensure_ascii=False))
+                inner = (f'<div class="maxwidth-theme">{heading}'
+                         f'<form action="/api/form" method="post" class="cb-form-fields">'
+                         f'<input type="hidden" name="redirect" value="1">'
+                         f'<input type="hidden" name="form_title" value="{esc(note)}">'
+                         f'<input type="hidden" name="form_schema" value="{schema_json}">'
+                         f'<input type="text" name="website" value="" style="position:absolute;left:-9999px;" tabindex="-1" autocomplete="off">'
+                         f'{"".join(inputs)}'
+                         f'{submit}'
+                         f'</form></div>')
+                return _block_wrapper(block, inner)
+
+        # Fallback: старая жёсткая форма (безопасность + обратная совместимость).
         inner = (f'<div class="maxwidth-theme">{heading}'
                  f'<form action="/api/order" method="post" class="cb-form-fields">'
                  f'<input type="hidden" name="redirect" value="1">'

@@ -186,10 +186,10 @@
         form: {
             icon: '📩', label: 'Форма связи', desc: 'Форма обратной связи (заявка в админку)',
             mock: '<div class="gm-bar" style="width:95%;height:10px;border:1px solid #ccc;background:#fff;"></div><div class="gm-bar" style="width:95%;height:10px;border:1px solid #ccc;background:#fff;"></div><div class="gm-btn">ОТПРАВИТЬ</div>',
-            make: () => ({type: 'form', title: 'Остались вопросы?', button: 'Отправить', recipient: ''}),
+            make: () => ({type: 'form', title: 'Остались вопросы?', button: 'Отправить', success_message: 'Спасибо! Мы свяжемся с вами.', recipient: '', fields: []}),
             presets: [
-                {name: 'Светлая', make: () => ({type: 'form', title: 'Остались вопросы?', button: 'Отправить', recipient: ''})},
-                {name: 'Тёмная', make: () => ({type: 'form', title: 'Остались вопросы?', button: 'Отправить', recipient: '', bg_type: 'color', bg: '#2a2c33', text_color: '#ffffff'})},
+                {name: 'Светлая', make: () => ({type: 'form', title: 'Остались вопросы?', button: 'Отправить', success_message: 'Спасибо! Мы свяжемся с вами.', recipient: '', fields: []})},
+                {name: 'Тёмная', make: () => ({type: 'form', title: 'Остались вопросы?', button: 'Отправить', success_message: 'Спасибо! Мы свяжемся с вами.', recipient: '', bg_type: 'color', bg: '#2a2c33', text_color: '#ffffff', fields: []})},
             ],
         },
         contacts: {
@@ -2262,6 +2262,81 @@
         return wrap;
     }
 
+    // Редактор полей формы (Приоритет 2): name, label, type, placeholder,
+    // required, options (для select).
+    function formFieldsEditor(fields, onchange) {
+        fields = Array.isArray(fields) ? fields : [];
+        const wrap = el('div', 'pe-items');
+        const types = [
+            ['text', 'Текст (одна строка)'],
+            ['tel', 'Телефон'],
+            ['email', 'Email'],
+            ['textarea', 'Текст (несколько строк)'],
+            ['select', 'Выпадающий список'],
+            ['checkbox', 'Галочка (согласие)'],
+        ];
+        function render() {
+            wrap.innerHTML = '';
+            fields.forEach((item, k) => {
+                const row = el('div', 'pe-item');
+                row.style.flexDirection = 'column';
+                row.style.gap = '.4rem';
+                const nameInp = textInput(item.name, v => { item.name = v; onchange(fields); }, 'name');
+                const labelInp = textInput(item.label, v => { item.label = v; onchange(fields); }, 'Подпись поля');
+                const typeInp = document.createElement('select');
+                types.forEach(([val, lbl]) => {
+                    const o = document.createElement('option'); o.value = val; o.textContent = lbl;
+                    typeInp.appendChild(o);
+                });
+                typeInp.value = item.type || 'text';
+                typeInp.addEventListener('change', () => { item.type = typeInp.value; onchange(fields); render(); });
+                const placeholderInp = textInput(item.placeholder, v => { item.placeholder = v; onchange(fields); }, 'Подсказка внутри поля');
+                const optionsWrap = el('div', 'pe-item-field');
+                const optionsLbl = document.createElement('label');
+                optionsLbl.textContent = 'Варианты списка (по одному на строку)';
+                const optionsTa = document.createElement('textarea');
+                optionsTa.rows = 3;
+                optionsTa.placeholder = 'Вариант 1\nВариант 2';
+                optionsTa.value = (item.options || []).join('\n');
+                optionsTa.style.display = (item.type === 'select') ? 'block' : 'none';
+                optionsTa.addEventListener('input', () => {
+                    item.options = optionsTa.value.split('\n').map(s => s.trim()).filter(Boolean);
+                    onchange(fields);
+                });
+                optionsWrap.appendChild(optionsLbl);
+                optionsWrap.appendChild(optionsTa);
+                const reqWrap = el('label', '', {style: 'display:flex;align-items:center;gap:.4rem;font-size:.85rem;cursor:pointer;'});
+                const reqCb = document.createElement('input');
+                reqCb.type = 'checkbox';
+                reqCb.checked = !!item.required;
+                reqCb.addEventListener('change', () => { item.required = reqCb.checked; onchange(fields); });
+                reqWrap.appendChild(reqCb);
+                reqWrap.appendChild(document.createTextNode('Обязательное поле'));
+                row.appendChild(field('Имя поля (латиница)', nameInp));
+                row.appendChild(field('Подпись', labelInp));
+                row.appendChild(field('Тип', typeInp));
+                row.appendChild(field('Подсказка', placeholderInp));
+                row.appendChild(optionsWrap);
+                row.appendChild(reqWrap);
+                const del = el('button', 'pe-item-del', {type: 'button', title: 'Удалить поле'});
+                del.textContent = '🗑';
+                del.addEventListener('click', () => { fields.splice(k, 1); onchange(fields); render(); });
+                row.appendChild(del);
+                wrap.appendChild(row);
+            });
+            const add = el('button', 'pe-item-add', {type: 'button'});
+            add.textContent = '+ Добавить поле';
+            add.addEventListener('click', () => {
+                fields.push({name: 'field_' + (fields.length + 1), label: 'Новое поле', type: 'text', placeholder: '', required: false, options: []});
+                onchange(fields);
+                render();
+            });
+            wrap.appendChild(add);
+        }
+        render();
+        return wrap;
+    }
+
     // Поле картинки: медиатека / загрузка / URL + превью
     function imageField(labelText, block, key, set) {
         const wrap = el('div', 'pe-field');
@@ -2575,8 +2650,10 @@
         } else if (type === 'form') {
             container.appendChild(field('Заголовок над формой', textInput(b.title, v => set('title', v))));
             container.appendChild(field('Подпись на кнопке', textInput(b.button, v => set('button', v), 'Отправить')));
+            container.appendChild(field('Сообщение после отправки', textInput(b.success_message, v => set('success_message', v), 'Спасибо! Мы свяжемся с вами.')));
             container.appendChild(field('Кому передать заявку (телефон/email, необязательно)', textInput(b.recipient, v => set('recipient', v))));
-            container.appendChild(el('div', 'pe-help')).textContent = 'Заявки попадают в раздел «Клиенты и заявки» админки.';
+            container.appendChild(field('Поля формы', formFieldsEditor(b.fields || [], v => set('fields', v))));
+            container.appendChild(el('div', 'pe-help')).textContent = 'Если список полей пуст, используется стандартная форма (имя, телефон, email, согласие). Заявки попадают в раздел «Клиенты и заявки» админки.';
         } else if (type === 'map') {
             container.appendChild(field('Заголовок над картой', textInput(b.title, v => set('title', v))));
             container.appendChild(field('Адрес или координаты', textInput(b.address, v => set('address', v), 'Москва, Красная площадь, 1')));

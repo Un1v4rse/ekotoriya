@@ -6296,6 +6296,76 @@ def api_order():
     return jsonify({'success': True, 'order': order})
 
 
+@app.route('/api/form', methods=['POST'])
+@_rate_limit(20)
+def api_form():
+    """Универсальная форма из блока конструктора с настраиваемой схемой полей.
+
+    Принимает form_schema (JSON) и значения полей. Хонипот-поле website:
+    если заполнено — молча возвращаем успех (бот). Обязательные поля
+    валидируются на сервере независимо от клиента.
+    """
+    from models import FeedbackRequest
+    data = request.form.to_dict() or request.get_json() or {}
+    # Хонипот: не показываем боту, что его отсекли.
+    if (data.get('website') or '').strip():
+        if request.form.get('redirect'):
+            return redirect(request.referrer or '/')
+        return jsonify({'success': True})
+    schema_raw = data.get('form_schema') or '[]'
+    try:
+        schema = json.loads(schema_raw)
+    except (ValueError, TypeError):
+        schema = []
+    if not isinstance(schema, list):
+        schema = []
+    allowed_types = {'text', 'tel', 'email', 'textarea', 'select', 'checkbox'}
+    errors = []
+    values = {}
+    name = ''
+    phone = ''
+    for fld in schema:
+        if not isinstance(fld, dict):
+            continue
+        fname = re.sub(r'[^a-z0-9_\-]', '', str(fld.get('name') or ''))[:40]
+        if not fname:
+            continue
+        ftype = str(fld.get('type') or 'text')
+        if ftype not in allowed_types:
+            ftype = 'text'
+        required = bool(fld.get('required'))
+        raw_value = data.get(fname, '')
+        if isinstance(raw_value, list):
+            raw_value = raw_value[0]
+        value = str(raw_value or '').strip()
+        if ftype == 'checkbox':
+            value = '1' if raw_value else ''
+        values[fname] = value
+        if required and not value:
+            errors.append(str(fld.get('label') or fname))
+        if not name and ftype in ('text',):
+            name = value
+        if not phone and ftype == 'tel':
+            phone = value
+    if errors:
+        msg = 'Заполните обязательные поля: ' + ', '.join(errors)
+        if request.form.get('redirect'):
+            return redirect((request.referrer or '/') + '?form_error=' + quote(msg))
+        return jsonify({'success': False, 'error': msg}), 400
+    title = (data.get('form_title') or '').strip() or 'Форма обратной связи'
+    message = json.dumps({'title': title, 'values': values}, ensure_ascii=False)
+    db.session.add(FeedbackRequest(
+        name=name or '—',
+        phone=phone or '—',
+        message=message,
+        page=request.referrer or ''))
+    db.session.commit()
+    invalidate_site_cache()
+    if request.form.get('redirect'):
+        return redirect((request.referrer or '/') + '?form=ok')
+    return jsonify({'success': True})
+
+
 @app.route('/api/like', methods=['POST'])
 @_rate_limit(20)
 def api_like():
