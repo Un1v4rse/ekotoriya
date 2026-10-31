@@ -5,47 +5,45 @@
 - Локальный путь: `c:/Users/1/Desktop/Market Project/ekotoriya`
 - Git: https://github.com/Un1v4rse/ekotoriya.git, ветка `main`
 - Базовый commit (baseline): `a4a850d` — «[фикс] карточки: кнопки внизу + имя 3 строки; подтипы каталога = дизайн раздела; дропдаун height:auto»
-- Последний зафиксированный commit: `01dbc47` — «[цикл5-приоритет3] адаптивность: breakpoint overrides + custom width preview»
-- Текущие незакоммиченные изменения: Zero-редактор (Приоритет 4)
+- Последний зафиксированный commit: `ed2233a` — «[цикл5-приоритет4] Zero-редактор: copy/paste, guides, alignment, mobile styles»
+- Текущие незакоммиченные изменения: Приоритет 5 — Черновики / совместная работа / история (готово к коммиту)
 - Сервер prod: 185.56.162.91 (деплой только по явному запросу)
 
 ## Текущая фаза
-- Активная задача: **Приоритет 4 — Zero-редактор** (готова к коммиту)
-  - Копирование/вставка элементов (Ctrl+C / Ctrl+V + кнопки).
-  - Направляющие при drag/resize.
-  - Предупреждение о переполнении текста.
-  - Кнопки выравнивания элемента по краям/центру.
-  - Независимые мобильные стили (font_size, color, bg).
+- Активная задача: **Приоритет 5 — Черновики / совместная работа / история** (готова к коммиту)
+  - Optimistic locking для `/admin/api/page-draft` (expected_saved_at, 409).
+  - Сохранение автора (`saved_by`) и времени (`saved_at`) изменений черновика.
+  - Настраиваемая глубина архива версий через env `PAGE_VERSION_LIMIT`.
+  - Клиентский диалог конфликта с кнопками «Загрузить чужие» / «Перезаписать моими».
+  - Тесты двух клиентов и 409.
 
 ## Что изменено в активной задаче
-- `blocks.py`: zero-элементы получили классы `cb-zero-text`, `cb-zero-btn`, `cb-zero-shape`; responsive CSS поддерживает font_size/color/bg.
-- `page-editor.js`: clipboard copy/paste, guides, overflow warning, alignment buttons, responsive style fields.
-- `page-editor.css`: стили для guides, overflow warning, float actions.
-- `tests/test_cycle2_blocks.py`: 2 новых zero-теста.
+- `app.py`: optimistic locking в `/admin/api/page-draft`; `saved_at` с миллисекундами; `saved_by`; `PAGE_VERSION_LIMIT`.
+- `page-editor.js`: `draftSavedBy`, expected_saved_at в saveDraft, диалог конфликта, force save.
+- `tests/test_draft_conflict.py`: 4 теста.
 
 ## Изменённые файлы (после последнего commit)
-- `ekotoriya/blocks.py`
+- `ekotoriya/app.py`
 - `ekotoriya/static/js/page-editor.js`
-- `ekotoriya/static/css/page-editor.css`
-- `ekotoriya/tests/test_cycle2_blocks.py`
+- `ekotoriya/tests/test_draft_conflict.py`
 - `.kimi-code/STATE.md`
 - `.kimi-code/WORKLOG.md`
 - `.kimi-code/BACKUPS.md`
 
 ## Состояние тестов
-- Последний полный прогон: 485 passed, 1 failed (2026-10-31).
+- Последний полный прогон: 489 passed, 1 failed (2026-10-31).
 - Падающий тест: `test_product_create.py::test_recommendations_card_links_internal` — исходная ошибка (TemplateNotFound), не связана с текущей задачей.
 
 ## Бэкапы
+- `backups/backup_2026-11-01_00-00` (перед Приоритетом 5)
 - `backups/backup_2026-10-31_23-45` (перед Zero)
 - `backups/backup_2026-10-31_23-35` (перед Приоритетом 4)
-- `backups/backup_2026-10-31_23-00` (перед Приоритетом 3)
 
 ## Известные ограничения / отложенное
 - Сервер prod временно недоступен; деплой отложен.
-- Исходный failing test `test_recommendations_card_links_internal` остаётся.
-- Группировка/разгруппировка Zero-элементов не реализована (сложность; можно добавить позже).
+- Исходный failing test остаётся.
+- Сравнение diff двух версий в UI не реализовано (только загрузка/перезапись).
 
 ## Точное следующее действие
-1. Закоммитить `[цикл5-приоритет4] Zero-редактор: copy/paste, guides, alignment, mobile styles`.
-2. Перейти к Приоритету 5 — Черновики / совместная работа / история.
+1. Закоммитить `[цикл5-приоритет5] черновики: optimistic locking, автор, глубина версий`.
+2. Перейти к Приоритету 6 — Универсальные коллекции (если нужны) или Приоритету 7.

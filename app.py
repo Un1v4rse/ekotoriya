@@ -3582,6 +3582,7 @@ def admin_page_draft():
             'has_draft': True,
             'published_at': updated_at if page.published_blocks is not None else None,
             'updated_at': updated_at,
+            'saved_by': draft.get('saved_by') if isinstance(draft, dict) else '',
         })
     payload = request.get_json() or {}
     slug = payload.get('slug', '').strip()
@@ -3591,11 +3592,20 @@ def admin_page_draft():
     page = db.session.query(Page).filter_by(slug=slug).first()
     if page is None:
         return jsonify({'success': False, 'error': 'Страница не найдена'}), 404
-    saved_at = datetime.now(timezone.utc).isoformat(timespec='seconds')
+    current = page.draft_blocks if isinstance(page.draft_blocks, dict) else {}
+    current_saved_at = current.get('saved_at') or ''
+    expected = payload.get('expected_saved_at')
+    if expected and current_saved_at and expected != current_saved_at:
+        return jsonify({'success': False,
+                        'error': 'Черновик изменён другим админом',
+                        'saved_at': current_saved_at,
+                        'saved_by': current.get('saved_by') or ''}), 409
+    saved_at = datetime.now(timezone.utc).isoformat(timespec='milliseconds')
     page.draft_blocks = {'blocks': [b for b in blocks if isinstance(b, dict)],
-                         'saved_at': saved_at}
+                         'saved_at': saved_at,
+                         'saved_by': session.get('admin_user') or ''}
     db.session.commit()
-    return jsonify({'success': True, 'saved_at': saved_at})
+    return jsonify({'success': True, 'saved_at': saved_at, 'saved_by': session.get('admin_user') or ''})
 
 
 @app.route('/admin/api/preview-marked', methods=['POST'])
@@ -3962,7 +3972,10 @@ def admin_duplicate_page():
 
 _VERSION_META_FIELDS = ('title', 'h1', 'meta_description', 'meta_keywords', 'canonical', 'url')
 _PAGE_META_FIELDS = ('title', 'h1', 'meta_description', 'meta_keywords', 'canonical')
-_VERSIONS_PER_PAGE = 10
+
+# Глубина архива версий страниц: env PAGE_VERSION_LIMIT (1–100), по умолчанию 10.
+_VERSIONS_PER_PAGE = int(os.environ.get('PAGE_VERSION_LIMIT', '10') or 10)
+_VERSIONS_PER_PAGE = max(1, min(100, _VERSIONS_PER_PAGE))
 
 
 def _page_draft_blocks(page):

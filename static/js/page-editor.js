@@ -365,6 +365,7 @@
     let scaleBox = null;             // #pe-scale-box — обёртка страницы под transform: scale()
     let serverUpdatedAt = '';        // защита от конфликтов (409)
     let draftSavedAt = '';           // saved_at последнего черновика
+    let draftSavedBy = '';           // автор последнего черновика
     let publishedAt = '';            // published_at/updated_at опубликованной версии
     const openedAt = Date.now();
     let device = 'desktop';          // desktop 1200 / tablet 768 / mobile 360 / custom
@@ -738,6 +739,7 @@
             }
         }
         if (draft && draft.saved_at) draftSavedAt = draft.saved_at;
+        if (draft && draft.saved_by) draftSavedBy = draft.saved_by;
         if (draft && draft.published_at) publishedAt = draft.published_at;
         updateStatusBadge();
 
@@ -1173,10 +1175,18 @@
         if (!dirty && !manual) return;
         setSaveState('saving');
         try {
-            const resp = await apiPost('/page-draft', {slug: SLUG, blocks});
+            const payload = {slug: SLUG, blocks};
+            if (draftSavedAt) payload.expected_saved_at = draftSavedAt;
+            const resp = await apiPost('/page-draft', payload);
             const result = await resp.json();
+            if (resp.status === 409) {
+                setSaveState('error');
+                showDraftConflict(result.saved_at, result.saved_by);
+                return;
+            }
             if (result.success) {
                 draftSavedAt = result.saved_at || new Date().toISOString();
+                draftSavedBy = result.saved_by || '';
                 setSaveState('saved');
                 updateStatusBadge();
             } else {
@@ -1188,6 +1198,63 @@
             if (manual) toast('Ошибка сети: ' + e.message, 'error');
         }
     }
+    function showDraftConflict(otherSavedAt, otherSavedBy) {
+        const who = (otherSavedBy || 'другой админ') + ' в ' + (otherSavedAt ? new Date(otherSavedAt).toLocaleString('ru-RU') : 'недавно');
+        const modal = el('div', '', {id: 'pe-conflict-modal'});
+        modal.innerHTML =
+            '<div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;">' +
+            '<div style="background:var(--pe-panel);border-radius:10px;padding:1.5rem;max-width:420px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,.3);">' +
+            '<h3 style="margin:0 0 .75rem;font-size:1.1rem;">Конфликт черновика</h3>' +
+            '<p style="margin:0 0 1rem;font-size:.9rem;color:var(--pe-text);">Черновик изменён <strong>' + esc(who) + '</strong>. Ваши несохранённые изменения могут затереть чужие.</p>' +
+            '<div style="display:flex;gap:.5rem;justify-content:flex-end;">' +
+            '<button type="button" data-act="cancel" style="padding:.4rem .8rem;">Отмена</button>' +
+            '<button type="button" data-act="overwrite" style="padding:.4rem .8rem;background:var(--pe-danger);color:#fff;">Перезаписать моими</button>' +
+            '<button type="button" data-act="load" style="padding:.4rem .8rem;background:var(--pe-accent);color:#fff;">Загрузить чужие</button>' +
+            '</div></div></div>';
+        document.body.appendChild(modal);
+        modal.querySelectorAll('button').forEach(btn => btn.addEventListener('click', async () => {
+            const act = btn.dataset.act;
+            modal.remove();
+            if (act === 'load') {
+                const d = await fetchDraft();
+                if (d && d.draft && Array.isArray(d.draft.blocks)) {
+                    blocks = d.draft.blocks;
+                    draftSavedAt = d.draft.saved_at || '';
+                    draftSavedBy = d.saved_by || '';
+                    history = [JSON.stringify(blocks)];
+                    historyIdx = 0;
+                    updateHistoryButtons();
+                    renderStructure();
+                    scheduleRefresh();
+                    markDirty();
+                    toast('Загружены изменения другого администратора');
+                }
+            } else if (act === 'overwrite') {
+                await saveDraftForce();
+            }
+        }));
+    }
+    async function saveDraftForce() {
+        setSaveState('saving');
+        try {
+            const resp = await apiPost('/page-draft', {slug: SLUG, blocks});
+            const result = await resp.json();
+            if (result.success) {
+                draftSavedAt = result.saved_at || new Date().toISOString();
+                draftSavedBy = result.saved_by || '';
+                setSaveState('saved');
+                updateStatusBadge();
+                toast('Черновик перезаписан');
+            } else {
+                setSaveState('error');
+                toast('Ошибка сохранения черновика: ' + (result.error || ''), 'error');
+            }
+        } catch (e) {
+            setSaveState('error');
+            toast('Ошибка сети: ' + e.message, 'error');
+        }
+    }
+
     function startDraftAutosave() {
         setInterval(() => saveDraft(), 30000);   // раз в 30 секунд при dirty
     }
