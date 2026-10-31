@@ -504,6 +504,30 @@ def test_legacy_blocks_renders_key_fragments():
         '<!-- html block: restricted -->'
 
 
+def test_block_column_classes_respected():
+    # gallery
+    out = render_block({'type': 'gallery', 'cols': 2,
+                        'items': [{'src': '/a.jpg'}, {'src': '/b.jpg'}]})
+    assert 'cb-gallery-c2' in out
+    assert 'cb-gallery-c3' not in out
+    # features
+    out = render_block({'type': 'features', 'cols': 3,
+                        'items': [{'title': 'A', 'text': 'b'}]})
+    assert 'cb-features-c3' in out
+    assert 'cb-features-c4' not in out
+    # text_columns: по умолчанию по количеству пунктов
+    out = render_block({'type': 'text_columns',
+                        'items': [{'text': '1'}, {'text': '2'}, {'text': '3'}]})
+    assert 'cb-cols-3' in out
+    # text_columns: явный cols валидируется и не превышает число пунктов
+    out = render_block({'type': 'text_columns', 'cols': '4',
+                        'items': [{'text': '1'}, {'text': '2'}, {'text': '3'}]})
+    assert 'cb-cols-3' in out
+    out = render_block({'type': 'text_columns', 'cols': '2',
+                        'items': [{'text': '1'}, {'text': '2'}, {'text': '3'}]})
+    assert 'cb-cols-2' in out
+
+
 def test_render_blocks_marked_still_marks():
     out = blocks_module.render_blocks_marked(
         [{'type': 'heading', 'text': 'М'}, {'type': 'divider'}])

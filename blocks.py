@@ -465,7 +465,8 @@ def _decor_line(cfg, cls):
             f'width:{width}%;margin:0 auto;"></div>')
 
 
-def _block_wrapper(block, inner_html, uid=None, extra_style='', extra_attrs='', legacy=True):
+def _block_wrapper(block, inner_html, uid=None, extra_style='', extra_attrs='', legacy=True,
+                   extra_classes=None):
     """Общая обёртка блока (CN-T4): фон, отступы, расположение, эффекты.
 
     legacy=True — старые поля bg/padding/text_color читаются как раньше
@@ -475,6 +476,8 @@ def _block_wrapper(block, inner_html, uid=None, extra_style='', extra_attrs='', 
     if not uid:
         uid = _block_uid(btype, inner_html)
     classes = [f'cb-{btype}']
+    if isinstance(extra_classes, (list, tuple)):
+        classes.extend(extra_classes)
     styles = []
     attrs = extra_attrs
 
@@ -1151,7 +1154,7 @@ def render_block(block):
         heading = f'<h2 style="{title_typo}">{esc(title)}</h2>' if title else ''
         inner = (f'<div class="maxwidth-theme">{heading}'
                  f'<div class="cb-gallery-grid">{"".join(imgs)}</div></div>')
-        return _block_wrapper(block, inner)
+        return _block_wrapper(block, inner, extra_classes=[f'cb-gallery-c{cols}'])
 
     if btype == 'features':
         items = []
@@ -1182,7 +1185,7 @@ def render_block(block):
         heading = f'<h2 style="{title_typo}">{esc(title)}</h2>' if title else ''
         inner = (f'<div class="maxwidth-theme">{heading}'
                  f'<div class="cb-features-grid">{"".join(items)}</div></div>')
-        return _block_wrapper(block, inner)
+        return _block_wrapper(block, inner, extra_classes=[f'cb-features-c{cols}'])
 
     if btype == 'table':
         rows = []
@@ -1227,12 +1230,15 @@ def render_block(block):
         if not cols:
             return ''
         n = str(min(4, max(2, len(cols))))
+        cols_setting = str(block.get('cols') or '').strip()
+        if cols_setting in ('2', '3', '4'):
+            n = str(min(int(cols_setting), len(cols)))
         title = (block.get('title') or '').strip()
         title_typo = _typo(block, 'title')
         heading = f'<h2 style="{title_typo}">{esc(title)}</h2>' if title else ''
         inner = (f'<div class="maxwidth-theme">{heading}'
                  f'<div class="cb-cols-grid">{"".join(cols)}</div></div>')
-        return _block_wrapper(block, inner)
+        return _block_wrapper(block, inner, extra_classes=[f'cb-cols-{n}'])
 
     if btype == 'contacts':
         title = (block.get('title') or '').strip()
