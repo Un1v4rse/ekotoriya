@@ -141,3 +141,73 @@
   - Нет.
 Следующий шаг:
   - Добавить `/api/form` в `app.py`, UI `fields` в `page-editor.js`, тесты.
+
+
+[2026-10-31 22:40] [Приоритет 2 — завершение] — расширение форм
+Действие:
+  - Добавлен endpoint `/api/form` в `app.py`: валидация по `form_schema`,
+    хонипот-поле `website`, серверная проверка обязательных полей, создание
+    `FeedbackRequest` с сохранением всех значений в JSON в `message`.
+  - Добавлен UI `formFieldsEditor` в `page-editor.js`: список полей с типами
+    (text/tel/email/textarea/select/checkbox), подписью, placeholder,
+    обязательностью и вариантами для select.
+  - Обновлена панель настроек блока `form`: заголовок, кнопка, сообщение об
+    успехе, получатель, поля формы.
+  - Исправлен рендер select-опций в `blocks.py` для хранения options как
+    массива строк.
+  - Добавлены тесты `tests/test_form_builder.py` (8 шт.): рендер старой и
+    кастомной форм, select/checkbox, валидация, хонипот, redirect.
+  - Прогнаны тесты: 8/8 новых passed, полный набор 478 passed / 1 failed
+    (исходный `test_recommendations_card_links_internal`).
+  - Синтаксическая проверка `app.py`, `blocks.py`, `page-editor.js` — OK.
+  - Сделан commit `b0ffb97`.
+Причина:
+  - Завершение Приоритета 2 master-промта.
+Изменённые файлы:
+  `app.py`, `blocks.py`, `static/js/page-editor.js`, `tests/test_form_builder.py`,
+  `.kimi-code/STATE.md`, `.kimi-code/WORKLOG.md`, `.kimi-code/BACKUPS.md`,
+  `WORKLOG.md`
+Проверки и результат:
+  - `pytest tests/test_form_builder.py` — 8 passed.
+  - `pytest tests/` — 478 passed, 1 failed (исходный).
+Созданный бэкап или commit:
+  - commit `b0ffb97` на ветке `main`.
+Проблемы:
+  - Исходный failing test остаётся.
+Следующий шаг:
+  - Приоритет 3: адаптивность (произвольная ширина превью + breakpoint overrides).
+
+
+[2026-10-31 23:35] [Приоритет 3 — завершение] — адаптивность
+Действие:
+  - Добавлена серверная функция `_responsive_css()` в `blocks.py`: генерация
+    `@media (max-width:1024px)` и `@media (max-width:640px)` для override'ов
+    `hide`, `padding_top`, `padding_bottom`, `align`, `min_height`.
+  - В `_block_wrapper` uid-класс `cb-{uid}` добавляется только при наличии
+    responsive CSS или custom CSS суперадмина; это сохраняет старую разметку
+    для блоков без адаптива.
+  - В `page-editor.js` добавлена вкладка «Адаптив» с настройками tablet/mobile
+    (скрыть блок, отступы, мин. высота, выравнивание).
+  - В топ-бар добавлен input `#pe-device-width` для произвольной ширины
+    превью (320–1920 px); значение сохраняется в localStorage.
+  - Добавлены стили для input ширины в `page-editor.css`.
+  - Добавлены тесты `tests/test_responsive.py` (5 шт.).
+  - Прогнаны тесты: 5/5 новых passed, полный набор 483 passed / 1 failed
+    (исходный `test_recommendations_card_links_internal`).
+  - Создан бэкап `backups/backup_2026-10-31_23-00`.
+Причина:
+  - Завершение Приоритета 3 master-промта.
+Изменённые файлы:
+  `blocks.py`, `static/js/page-editor.js`, `static/css/page-editor.css`,
+  `tests/test_responsive.py`, `.kimi-code/STATE.md`, `.kimi-code/WORKLOG.md`,
+  `.kimi-code/BACKUPS.md`
+Проверки и результат:
+  - `pytest tests/test_responsive.py tests/test_form_builder.py` — 13 passed.
+  - `pytest tests/` — 483 passed, 1 failed (исходный).
+  - `node --check static/js/page-editor.js`, `py_compile` — OK.
+Созданный бэкап или commit:
+  - бэкап `backups/backup_2026-10-31_23-00`.
+Проблемы:
+  - Исходный failing test остаётся.
+Следующий шаг:
+  - Commit и переход к Приоритету 4 — Zero-редактор.

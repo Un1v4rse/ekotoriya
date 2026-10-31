@@ -670,10 +670,19 @@ def _block_wrapper(block, inner_html, uid=None, extra_style='', extra_attrs='', 
         if css and not any(t in low for t in forbidden):
             custom_css_html = f'<style>.cb-{uid}{{{css}}}</style>'
 
+    responsive_html = _responsive_css(block, uid)
+    if responsive_html:
+        custom_css_html += f'<style>{responsive_html}</style>'
+
     if extra_style:
         styles.insert(0, extra_style.rstrip(';'))
     style_attr = f' style="{";".join(styles)}"' if styles else ''
     body = f'{decor_top}{bg_html}{inner_html}{decor_bottom}'
+    # UID-класс нужен только если к блоку цепляются кастомные стили
+    # (custom CSS суперадмина или responsive overrides). В остальных случаях
+    # разметка остаётся прежней для обратной совместимости.
+    if custom_css_html:
+        classes.append(f'cb-{uid}')
     return (f'<div class="cb {" ".join(classes)}"{attrs}{style_attr}>'
             f'{body}</div>{custom_css_html}')
 
@@ -825,6 +834,42 @@ def _zero_element_html(el, index):
     if link and etype != 'button':
         content = f'<a href="{esc(link)}" style="display:block;width:100%;height:100%;">{content}</a>'
     return f'<div data-el="{eid}" style="position:absolute;{";".join(styles)}">{content}</div>'
+
+
+def _responsive_css(block, uid):
+    """Адаптив обычных блоков: per-breakpoint overrides (Приоритет 3).
+
+    Поддерживаемые override'ы: hide, padding_top, padding_bottom, align,
+    min_height. Desktop остаётся базовым значением; старые блоки без
+    responsive выглядят как раньше.
+    """
+    resp = block.get('responsive')
+    if not isinstance(resp, dict):
+        return ''
+    breakpoints = (('tablet', 1024), ('mobile', 640))
+    chunks = []
+    for media, maxw in breakpoints:
+        rules = resp.get(media)
+        if not isinstance(rules, dict):
+            continue
+        props = []
+        if rules.get('hide') is True:
+            props.append('display:none !important')
+        pt = _px(rules.get('padding_top'), 0, 200)
+        if pt is not None:
+            props.append(f'padding-top:{pt}px')
+        pb = _px(rules.get('padding_bottom'), 0, 200)
+        if pb is not None:
+            props.append(f'padding-bottom:{pb}px')
+        align = str(rules.get('align') or '').strip()
+        if align in ('left', 'center', 'right'):
+            props.append(f'text-align:{align} !important')
+        mh = _px(rules.get('min_height'), 0, 1200)
+        if mh is not None:
+            props.append(f'min-height:{mh}px')
+        if props:
+            chunks.append(f'@media (max-width:{maxw}px){{.cb-{uid}{{{";".join(props)}}}}}')
+    return ''.join(chunks)
 
 
 def _zero_responsive_css(block, uid):

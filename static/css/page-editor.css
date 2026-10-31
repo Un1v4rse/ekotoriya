@@ -146,6 +146,18 @@ body.pe-active {
     padding: 0.32rem 0.6rem !important;
 }
 .pe-device-switch button.pe-dev-active { background: var(--pe-accent) !important; color: #fff; }
+.pe-device-switch input[type="number"] {
+    width: 64px;
+    border: 0;
+    border-left: 1px solid var(--pe-border);
+    background: var(--pe-panel);
+    padding: 0.32rem 0.4rem;
+    font-size: 0.8rem;
+    text-align: center;
+    -moz-appearance: textfield;
+}
+.pe-device-switch input[type="number"]::-webkit-outer-spin-button,
+.pe-device-switch input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
 .pe-badge-status {
     font-size: 0.74rem;

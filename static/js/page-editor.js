@@ -367,8 +367,9 @@
     let draftSavedAt = '';           // saved_at последнего черновика
     let publishedAt = '';            // published_at/updated_at опубликованной версии
     const openedAt = Date.now();
-    let device = 'desktop';          // desktop 1200 / tablet 768 / mobile 360
+    let device = 'desktop';          // desktop 1200 / tablet 768 / mobile 360 / custom
     const DEVICE_WIDTHS = {desktop: 1200, tablet: 768, mobile: 360};
+    let customWidth = parseInt(localStorage.getItem('pe_custom_width') || '1200', 10) || 1200;
     let pageWidth = DEVICE_WIDTHS[device];   // ширина страницы в обёртке (px)
     let scaleCurrent = 1;            // применённый масштаб холста
     let zoomMode = 'fit';            // 'fit' (по ширине) | число 0.5–1 (ручной zoom)
@@ -402,6 +403,7 @@
         '<button type="button" data-dev="desktop" class="pe-dev-active" title="Desktop 1200px">🖥 <span class="pe-dev-label">Desktop</span></button>' +
         '<button type="button" data-dev="tablet" title="Tablet 768px">📱 <span class="pe-dev-label">Tablet</span></button>' +
         '<button type="button" data-dev="mobile" title="Mobile 360px">📱 <span class="pe-dev-label">Mobile</span></button>' +
+        '<input type="number" id="pe-device-width" min="320" max="1920" step="10" value="1200" title="Своя ширина, px">' +
         '</span>' +
         '<button type="button" id="pe-btn-zoom" class="pe-tb-icon" title="Масштаб холста (Ctrl + колесо — зум 50–100%). Клик — по ширине">100%</button>' +
         '<button type="button" id="pe-btn-fullwidth" title="Во всю ширину: растянуть страницу на весь холст без масштаба">⇤⇥</button>' +
@@ -765,7 +767,11 @@
         applyDevice();
     }
     function applyDevice() {
-        pageWidth = DEVICE_WIDTHS[device] || DEVICE_WIDTHS.desktop;
+        if (device === 'custom') {
+            pageWidth = Math.max(320, Math.min(1920, customWidth || 1200));
+        } else {
+            pageWidth = DEVICE_WIDTHS[device] || DEVICE_WIDTHS.desktop;
+        }
         if (zero.active) rebuildZeroOverlay();
         scheduleScaleUpdate();
         if (IFRAME_MODE && contentFrame) {
@@ -1062,6 +1068,7 @@
         $('pe-btn-preview').addEventListener('click', openPreview);
         $('pe-btn-hideui').addEventListener('click', () => setUiHidden(true));
         $('pe-device-switch').addEventListener('click', e => {
+            if (e.target.id === 'pe-device-width') return;
             const btn = e.target.closest('button[data-dev]');
             if (!btn) return;
             device = btn.dataset.dev;
@@ -1069,6 +1076,17 @@
                 b.classList.toggle('pe-dev-active', b === btn));
             applyDevice();
         });
+        const widthInput = $('pe-device-width');
+        if (widthInput) {
+            widthInput.value = pageWidth;
+            widthInput.addEventListener('change', () => {
+                customWidth = Math.max(320, Math.min(1920, parseInt(widthInput.value, 10) || 1200));
+                localStorage.setItem('pe_custom_width', String(customWidth));
+                device = 'custom';
+                document.querySelectorAll('#pe-device-switch button').forEach(b => b.classList.remove('pe-dev-active'));
+                applyDevice();
+            });
+        }
     }
 
     function setSaveState(state) {
@@ -2007,6 +2025,7 @@
         ['content', 'Контент'],
         ['bg', 'Фон'],
         ['layout', 'Расположение'],
+        ['responsive', 'Адаптив'],
         ['typo', 'Типографика'],
         ['button', 'Кнопка'],
         ['fx', 'Эффекты'],
@@ -2058,6 +2077,7 @@
         if (activeTab === 'content') renderContentTab(b, idx, type, set, body);
         else if (activeTab === 'bg') renderBgTab(b, set, body);
         else if (activeTab === 'layout') renderLayoutTab(b, set, body);
+        else if (activeTab === 'responsive') renderResponsiveTab(b, set, body);
         else if (activeTab === 'typo') renderTypoTab(b, set, body);
         else if (activeTab === 'button') renderButtonTab(b, idx, type, set, body);
         else if (activeTab === 'fx') renderFxTab(b, set, body);
@@ -2909,6 +2929,50 @@
             ], b.content_align || '', v => set('content_align', v))));
         }
         container.appendChild(el('div', 'pe-help')).textContent = 'Отступы и высота применяются к блоку целиком; «На всю ширину» растягивает контент за пределы ширины темы.';
+    }
+
+    /* ==================== Вкладка «Адаптив» (Приоритет 3) ==================== */
+    function renderResponsiveTab(b, set, container) {
+        if (!b.responsive || typeof b.responsive !== 'object') b.responsive = {};
+        const devices = [
+            ['tablet', 'Планшет (≤1024 px)'],
+            ['mobile', 'Мобильный (≤640 px)'],
+        ];
+        devices.forEach(([dev, label]) => {
+            const wrap = el('div', 'pe-responsive-device');
+            wrap.style.marginBottom = '1rem';
+            wrap.style.padding = '.75rem';
+            wrap.style.border = '1px solid #e0e0e0';
+            wrap.style.borderRadius = '8px';
+            const head = el('div', '', {style: 'font-weight:600;margin-bottom:.5rem;'});
+            head.textContent = label;
+            wrap.appendChild(head);
+            if (!b.responsive[dev] || typeof b.responsive[dev] !== 'object') b.responsive[dev] = {};
+            const r = b.responsive[dev];
+            const rset = (k, v) => {
+                if (v === '' || v == null || v === false) delete r[k];
+                else r[k] = v;
+                if (!Object.keys(r).length) delete b.responsive[dev];
+                if (!Object.keys(b.responsive).length) delete b.responsive;
+                set('responsive', b.responsive || {});
+            };
+            const hideRow = el('label', '', {style: 'display:flex;align-items:center;gap:.4rem;font-size:.9rem;margin-bottom:.5rem;cursor:pointer;'});
+            const hideCb = document.createElement('input');
+            hideCb.type = 'checkbox';
+            hideCb.checked = !!r.hide;
+            hideCb.addEventListener('change', () => rset('hide', hideCb.checked || false));
+            hideRow.appendChild(hideCb);
+            hideRow.appendChild(document.createTextNode('Скрыть блок на этом устройстве'));
+            wrap.appendChild(hideRow);
+            wrap.appendChild(field('Отступ сверху, px (пусто — как на десктопе)', numberInput(r.padding_top || 0, v => rset('padding_top', v || null), 0, 200)));
+            wrap.appendChild(field('Отступ снизу, px (пусто — как на десктопе)', numberInput(r.padding_bottom || 0, v => rset('padding_bottom', v || null), 0, 200)));
+            wrap.appendChild(field('Мин. высота, px (пусто — как на десктопе)', numberInput(r.min_height || 0, v => rset('min_height', v || null), 0, 1200)));
+            wrap.appendChild(field('Выравнивание содержимого', selectInput([
+                ['', 'Как на десктопе'], ['left', 'Слева'], ['center', 'По центру'], ['right', 'Справа'],
+            ], r.align || '', v => rset('align', v || null))));
+            container.appendChild(wrap);
+        });
+        container.appendChild(el('div', 'pe-help')).textContent = 'Desktop остаётся базовым значением. Оставьте поля пустыми, чтобы на планшете/телефоне повторялось поведение десктопа.';
     }
 
     /* ==================== Вкладка «Типографика» (CN-T4) ==================== */
