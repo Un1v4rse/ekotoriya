@@ -143,4 +143,10 @@
 #headerfixed .table-menu .dropdown-menu {
   height: auto !important;
   max-height: none !important;
+  padding-bottom: 0 !important;
+}
+/* Убираем выпадающий margin последнего пункта, чтобы внизу не оставалось
+   лишнего пустого пространства и не появлялся «лишний» скролл */
+.table-menu .dropdown-menu ul.menu-wrapper > li:last-child > a {
+  margin-bottom: 0 !important;
 }

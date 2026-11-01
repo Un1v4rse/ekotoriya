@@ -2443,9 +2443,17 @@ SECTION_LISTING_HIDE_CSS = (
     '</style>'
 )
 
-# Раскладка категорийных страниц (/catalog/<раздел>/) как у оригинала: живой
-# каталог (.wb-catalog-wrapper) встаёт в правую колонку рядом с левым меню
-# раздела (.left_block bitrix-клона), а не полной шириной под ним. Дочерние
+# Подтипы (/catalog/<раздел>/<подтип>/): весь bitrix-листинг скрыт целиком,
+# потому что живой каталог уже отображается внутри .wb-catalog-wrapper.
+SUBTYPE_LISTING_HIDE_CSS = (
+    '<style>'
+    '.section-content-wrapper{display:none !important;}'
+    '</style>'
+)
+
+# Раскладка категорийных страниц (/catalog/<раздел>/ и /catalog/<раздел>/<подтип>/)
+# как у оригинала: живой каталог (.wb-catalog-wrapper) встаёт в правую колонку рядом
+# с левым меню раздела (.left_block bitrix-клона), а не полной шириной под ним. Дочерние
 # элементы #content .middle: section_header → wb-catalog-wrapper →
 # section-content-wrapper (мёртвый листинг, скрыт) → left_block.
 # Меню развёрнуто до первого уровня (Наматрасники › / Одеяла › / Наперники,
@@ -3251,8 +3259,11 @@ def _inject_lazyload_fix(html):
               + (SECTION_LISTING_HIDE_CSS if re.match(
                   r'^/catalog/(?:namatrasniki|odeyala|naperniki)/$',
                   request.path or '') else '') + '\n'
+              + (SUBTYPE_LISTING_HIDE_CSS if re.match(
+                  r'^/catalog/(?:namatrasniki|odeyala|naperniki)/[^/]+/$',
+                  request.path or '') else '') + '\n'
               + (SECTION_LAYOUT_CSS if re.match(
-                  r'^/catalog/(?:namatrasniki|odeyala|naperniki)/$',
+                  r'^/catalog/(?:namatrasniki|odeyala|naperniki)(?:/[^/]+)?/$',
                   request.path or '') else '') + '\n'
               + SOCIALS_CSS + '\n'
               + LEGACY_MODAL_CSS + '\n'
@@ -5451,11 +5462,23 @@ def _filtered_catalog(args, section='', per_page=None, base='/catalog/',
                                    if keys and all(
                                        k in (p.get('name') or '').lower()
                                        for k in keys)]
+                        # Если в разделе нет товаров с ключевым словом, ищем
+                        # фото среди всех товаров каталога — для иконки плитки.
+                        if not matched:
+                            matched = [p for p in list(get_products())
+                                       if keys and all(
+                                           k in (p.get('name') or '').lower()
+                                           for k in keys)]
+                        photo = ''
+                        for p in matched:
+                            if p.get('photo'):
+                                photo = p['photo']
+                                break
                         subsections.append({
                             'title': sub.get('title') or '',
                             'url': sub.get('url') or '',
                             'count': len(matched) if matched else 0,
-                            'photo': matched[0].get('photo') if matched else '',
+                            'photo': photo,
                         })
         except Exception:
             subsections = []

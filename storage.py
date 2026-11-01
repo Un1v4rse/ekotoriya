@@ -25,8 +25,12 @@ DATA_FILE = BASE_DIR / 'data' / 'content.json'
 
 SETTINGS_KEYS = ('site', 'menu', 'socials')
 
+# Ключ версии кэша в SiteSetting. При каждом save_content() версия увеличивается,
+# что позволяет in-memory кэшу в других gunicorn-workers понять, что данные устарели.
+_CACHE_VERSION_KEY = '_storage_cache_version'
+
 _lock = threading.Lock()
-_cache = {'content': None, 'mtime': None}
+_cache = {'content': None, 'version': None}
 
 
 def _read_json_fallback():
@@ -45,11 +49,28 @@ def db_has_content():
         return False
 
 
+def _db_cache_version():
+    """Текущая версия кэша из БД (0, если записи ещё нет)."""
+    try:
+        row = db.session.get(SiteSetting, _CACHE_VERSION_KEY)
+        return int(row.value) if row and row.value is not None else 0
+    except Exception:
+        db.session.rollback()
+        return 0
+
+
 def load_content():
     """Полный dict контента (глубокая копия — вызывающий может менять свободно)."""
     with _lock:
         if _cache['content'] is not None:
-            return copy.deepcopy(_cache['content'])
+            # В multiprocess-окружении (gunicorn) каждый worker имеет свой
+            # _cache. Проверяем версию в БД, чтобы не отдавать устаревшие данные
+            # после изменений, сделанных другим процессом.
+            try:
+                if _cache.get('version') == _db_cache_version():
+                    return copy.deepcopy(_cache['content'])
+            except Exception:
+                pass
 
         if not db_has_content():
             content = _read_json_fallback()
@@ -64,12 +85,14 @@ def load_content():
             'pages': pages,
         }
         _cache['content'] = copy.deepcopy(content)
+        _cache['version'] = _db_cache_version()
         return copy.deepcopy(content)
 
 
 def invalidate_cache():
     with _lock:
         _cache['content'] = None
+        _cache['version'] = None
 
 
 def save_content(data):
@@ -118,11 +141,23 @@ def save_content(data):
                 if slug not in incoming:
                     db.session.delete(page)
 
+            # Инкремент версии кэша для инвалидации в других workers.
+            version_row = db.session.get(SiteSetting, _CACHE_VERSION_KEY)
+            if version_row is None:
+                version_row = SiteSetting(key=_CACHE_VERSION_KEY, value=1)
+                db.session.add(version_row)
+            else:
+                try:
+                    version_row.value = int(version_row.value) + 1
+                except (TypeError, ValueError):
+                    version_row.value = 1
+
             db.session.commit()
         except Exception:
             db.session.rollback()
             raise
         _cache['content'] = None
+        _cache['version'] = None
 
 
 def get_setting(key, default=None):

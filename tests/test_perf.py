@@ -25,11 +25,12 @@ def _count_queries(engine, fn):
 
 
 def test_load_content_uses_cache_not_queries(app_context):
-    """Повторный load_content() — 0 запросов к БД (кэш storage, AR-3)."""
+    """Повторный load_content() — не более 1 запроса к БД (кэш storage + проверка
+    версии для инвалидации в multiprocess-окружении, AR-3)."""
     engine = app_context.extensions['sqlalchemy'].engine
     storage.load_content()
     n = _count_queries(engine, lambda: storage.load_content())
-    assert n == 0
+    assert n <= 1
 
 
 def test_catalog_page_no_n_plus_1(app_context):
