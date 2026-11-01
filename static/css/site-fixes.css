@@ -122,31 +122,24 @@
   .basket_hover_block { width: 290px; right: -40px; }
 }
 
-/* Компактные выпадашки верхнего меню (заказчик: «пустота» под пунктами).
-   Тема aspro даёт строкам дропдауна padding 14px + line-height 25px
-   (≈52px на строку) — дропдаун выглядит вытянутым с пустым местом внизу.
-   Уплотняем строки; высота контейнера — по содержимому. */
-#main .mega-menu table td:not(.wide_menu) .dropdown-menu li a,
-#main .mega-menu table td:not(.wide_menu) .dropdown-menu li.dropdown-submenu a,
-.table-menu .dropdown-menu ul.menu-wrapper > li > a {
-  padding-top: 8px !important;
-  padding-bottom: 7px !important;
-  line-height: 20px !important;
+
+/* Исправление пустого пространства в дропдауне верхнего меню.
+   В aspro скрытые подменю (.toggle_menu) остаются display:block + visibility:hidden,
+   opacity:0 + transform, что увеличивает scrollHeight дропдауна и позволяет
+   прокручивать пустоту под пунктами. Переключаем их через display:none/block
+   при hover/focus — без изменения размеров самих пунктов. */
+#main .table-menu .dropdown-menu li.dropdown-submenu > ul.dropdown-menu,
+#headerfixed .table-menu .dropdown-menu li.dropdown-submenu > ul.dropdown-menu {
+  display: none !important;
 }
-.table-menu .dropdown-menu .customScrollbar,
-#headerfixed .dropdown-menu .customScrollbar {
-  height: auto !important;
-  max-height: 70vh !important;
-}
-/* Само меню — без фиксированной высоты: только по содержимому */
-#main .table-menu .dropdown-menu,
-#headerfixed .table-menu .dropdown-menu {
-  height: auto !important;
-  max-height: none !important;
-  padding-bottom: 0 !important;
-}
-/* Убираем выпадающий margin последнего пункта, чтобы внизу не оставалось
-   лишнего пустого пространства и не появлялся «лишний» скролл */
-.table-menu .dropdown-menu ul.menu-wrapper > li:last-child > a {
-  margin-bottom: 0 !important;
+#main .table-menu .dropdown-menu li.dropdown-submenu:hover > ul.dropdown-menu,
+#main .table-menu .dropdown-menu li.dropdown-submenu:focus-within > ul.dropdown-menu,
+#main .table-menu .dropdown-menu li.dropdown-submenu.open > ul.dropdown-menu,
+#headerfixed .table-menu .dropdown-menu li.dropdown-submenu:hover > ul.dropdown-menu,
+#headerfixed .table-menu .dropdown-menu li.dropdown-submenu:focus-within > ul.dropdown-menu,
+#headerfixed .table-menu .dropdown-menu li.dropdown-submenu.open > ul.dropdown-menu {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: none !important;
 }
