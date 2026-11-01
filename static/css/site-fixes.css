@@ -123,11 +123,13 @@
 }
 
 
-/* Исправление пустого пространства в дропдауне верхнего меню.
+/* Исправление пустого пространства/прокрутки в дропдауне верхнего меню.
    В aspro скрытые подменю (.toggle_menu) остаются display:block + visibility:hidden,
    opacity:0 + transform, что увеличивает scrollHeight дропдауна и позволяет
    прокручивать пустоту под пунктами. Переключаем их через display:none/block
-   при hover/focus — без изменения размеров самих пунктов. */
+   при hover/focus и фиксируем положение строго справа от пункта (top:0, left:100%),
+   чтобы подменю не выходило за нижнюю границу дропдауна и не давало ложную
+   прокрутку при наведении на промежуточные пункты. */
 #main .table-menu .dropdown-menu li.dropdown-submenu > ul.dropdown-menu,
 #headerfixed .table-menu .dropdown-menu li.dropdown-submenu > ul.dropdown-menu {
   display: none !important;
@@ -142,4 +144,8 @@
   visibility: visible !important;
   opacity: 1 !important;
   transform: none !important;
+  top: 0 !important;
+  left: 100% !important;
+  right: auto !important;
+  bottom: auto !important;
 }
