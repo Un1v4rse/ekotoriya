@@ -124,12 +124,9 @@
 
 
 /* Исправление пустого пространства/прокрутки в дропдауне верхнего меню.
-   В aspro скрытые подменю (.toggle_menu) остаются display:block + visibility:hidden,
-   opacity:0 + transform, что увеличивает scrollHeight дропдауна и позволяет
-   прокручивать пустоту под пунктами. Все пункты верхнего меню «Каталог»
-   помещаются без прокрутки, поэтому дропдаун делаем не scrollable, а
-   подменю переключаем через display:none/block при hover/focus и фиксируем
-   положение строго справа от пункта (top:0, left:100%). */
+   Подменю (.submenu-panel) вынесено за пределы scrollable контейнера, поэтому
+   больше не увеличивает scrollHeight дропдауна. Позиция каждой панели
+   вычисляется через небольшой JS по offsetTop родительского пункта меню. */
 #main .table-menu .dropdown-menu,
 #main .table-menu .dropdown-menu .customScrollbar,
 #headerfixed .table-menu .dropdown-menu,
@@ -138,22 +135,32 @@
   max-height: none !important;
   height: auto !important;
 }
-#main .table-menu .dropdown-menu li.dropdown-submenu > ul.dropdown-menu,
-#headerfixed .table-menu .dropdown-menu li.dropdown-submenu > ul.dropdown-menu {
-  display: none !important;
+#main .table-menu .dropdown-menu .submenu-panels,
+#headerfixed .table-menu .dropdown-menu .submenu-panels {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  z-index: 1000;
 }
-#main .table-menu .dropdown-menu li.dropdown-submenu:hover > ul.dropdown-menu,
-#main .table-menu .dropdown-menu li.dropdown-submenu:focus-within > ul.dropdown-menu,
-#main .table-menu .dropdown-menu li.dropdown-submenu.open > ul.dropdown-menu,
-#headerfixed .table-menu .dropdown-menu li.dropdown-submenu:hover > ul.dropdown-menu,
-#headerfixed .table-menu .dropdown-menu li.dropdown-submenu:focus-within > ul.dropdown-menu,
-#headerfixed .table-menu .dropdown-menu li.dropdown-submenu.open > ul.dropdown-menu {
-  display: block !important;
+#main .table-menu .dropdown-menu .submenu-panel,
+#headerfixed .table-menu .dropdown-menu .submenu-panel {
+  display: none !important;
+  position: absolute;
+  top: 0;
+  left: 0;
   visibility: visible !important;
   opacity: 1 !important;
   transform: none !important;
-  top: 0 !important;
-  left: 100% !important;
   right: auto !important;
   bottom: auto !important;
+  margin: 0 !important;
+}
+#main .table-menu .dropdown-menu .submenu-panel.is-active,
+#headerfixed .table-menu .dropdown-menu .submenu-panel.is-active {
+  display: block !important;
+}
+/* Отключаем старые вложенные подменю, если они ещё остались в разметке. */
+#main .table-menu .dropdown-menu li.dropdown-submenu > ul.dropdown-menu,
+#headerfixed .table-menu .dropdown-menu li.dropdown-submenu > ul.dropdown-menu {
+  display: none !important;
 }
